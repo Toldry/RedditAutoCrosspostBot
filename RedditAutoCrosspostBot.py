@@ -1,4 +1,5 @@
 import time
+import traceback
 import praw
 from pprint import pprint
 import re
@@ -75,6 +76,8 @@ def get_existing_crosspost(comment, other_subreddit):
     except Exception as e:
         if e.args[0] == 'Redirect to /submit': #when reddit tries redirecting a search query of a link to the submission page, that means 0 results were found for the search query
             return None
+        elif e.args[0] == 'Redirect to /subreddits/search': #when reddit redirects to /subreddits/search that means the subreddit `other_subreddit` doesn't exist
+            return None #TODO write this better
         elif e.args[0] == 'received 403 HTTP response': #this error is recieved when the other_subreddit is private "You must be invited to visit this community"
             return None
         else:
@@ -108,7 +111,6 @@ def get_all_moderators():
 link_id_regex = re.compile(r'^(.+)_(.+)$')
 ratelimit_error_regex = re.compile(r'you are doing that too much\. try again in (\d)+ minutes\.')
 def handle_comment(comment):
-    #pprint(vars(comment))
     global link_id_regex
     global ratelimit_error_regex
     
@@ -146,6 +148,8 @@ def handle_comment(comment):
         time.sleep(2)
     except Exception as e:
         print(f'crosspost failed: {str(e)}')
+        if len(e.args) == 0:
+            return
         search_ratelimit_error_message = cleaned_link_id = ratelimit_error_regex.search(e.args[0])
         if search_ratelimit_error_message is not None:
             minutes_to_wait = int(search_ratelimit_error_message.groups()[0])
@@ -166,10 +170,9 @@ def check_pattern(comment):
         return None
 
     groups = searchResult.groups()
-    print(groups)
 
     other_subreddit = groups[1]
-    print(other_subreddit)
+    print(f'other_subreddit={other_subreddit}')
     return other_subreddit
 
 def is_top_level_comment(comment):
@@ -188,4 +191,6 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         print(f'FATAL ERROR: {str(e)}')
+        print('traceback: ')
+        print(traceback.print_tb(e.__traceback__))
         raise
