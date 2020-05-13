@@ -9,14 +9,14 @@ import environment
 import listener
 
 
-TIME_DELAY_SECONDS = 30*60 #30 min
-COMMENT_SCORE_THRESHOLD = 4
+TIME_DELAY_SECONDS = 60*60 #60 min
+COMMENT_SCORE_THRESHOLD = 5
 POST_SUFFIX_TEXT = '''
 ---
-
+---
 ^^🤖 ^^this ^^comment ^^was ^^written ^^by ^^a ^^bot. ^^beep ^^boop ^^🤖
 
-^^if ^^there's ^^a ^^problem, ^^please ^^report ^^it ^^to ^^/u/orqa'''
+^^feel ^^welcome ^^to ^^respond ^^'Bad ^^bot'/'Good ^^bot', ^^it's ^^useful ^^feedback'''
 
 
 def respond_to_saved_comments():
@@ -86,16 +86,17 @@ def handle_comment(comment):
     except Exception as e:
         handled_with_grace = handle_crosspost_exception(e, comment, other_subreddit)
         if not handled_with_grace:
-            logging.error(f'Crosspost failed due to error: {str(e)}' + '\n\n' 
+            logging.error(f'Crosspost failed due to a problem: {str(e)}' + '\n\n' 
             + f'This occured while attempting to crosspost based on this comment: {comment.permalink}')
         if environment.DEBUG:
             raise
 
 
 def reply_to_crosspost_suggestion_comment(comment, cross_post, other_subreddit):
-    text = f'Crossposted to /r/{other_subreddit}:'
+    text = f'It looks like you think this post also fits in /r/{other_subreddit}:'
     text += '\n\n'
-    text += 'www.reddit.com' + cross_post.permalink
+    text += 'So I took the liberty and crossposted this link there. Here\'s a '
+    text += '[link](www.reddit.com' + cross_post.permalink + ')'
     text += POST_SUFFIX_TEXT
     return comment.reply(text)
 
@@ -107,21 +108,21 @@ def handle_crosspost_exception(e, comment, other_subreddit):
         if e.error_type == 'NO_CROSSPOSTS':
             logging.info(f'Crossposts are not allowed in /r/{other_subreddit}')
             return True
+        elif e.error_type == 'RATELIMIT':
+            amount, timeunit = re.compile(r'you are doing that too much\. try again in (\d)+ (second|minute)s?\.').search(e.message).groups()
+            amount = int(amount)
+            if timeunit == 'minute': amount *= 60
+            logging.info(f'Posting rate limit reached. waiting {amount} seconds...')
+            time.sleep(amount)
+            return True
+        elif e.error_type == 'INVALID_CROSSPOST_THING': #wtf does this even mean, reddit? why are some urls considered invalid for crossposting?
+            logging.info(f'Got that weird unhelpful INVALID_CROSSPOST_THING message again: {e.message}')
+            return True
+        elif e.error_type == 'SUBREDDIT_NOTALLOWED':
+            logging.info(f'Not allowed to post in /r/{other_subreddit}')
+            return True
         else:
             # Unfamiliar reddit error
             return False
 
-
-    if len(e.args) == 0:
-        return False
-
-    error_message = e.args[0]
-    
-    ratelimit_error_regex = re.compile(r'you are doing that too much\. try again in (\d)+ minutes\.')
-    search_ratelimit_error_message = ratelimit_error_regex.search(error_message)
-    if search_ratelimit_error_message is not None:
-        minutes_to_wait = int(search_ratelimit_error_message.groups()[0])
-        logging.info(f'waiting {minutes_to_wait} minutes...')
-        time.sleep(minutes_to_wait * 60)
-        return True
     return False

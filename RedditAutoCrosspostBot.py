@@ -54,3 +54,8 @@ def main():
 if __name__ == '__main__':
     # execute only if run as a script
     main()
+
+
+# TODO Add code to respond to 'Good bot' and 'Bad bot' replies
+# TODO Monitor and delete comments (and their corresponding crosspost) whose score is negative
+# TODO optional: before crossposting, check to make sure that this same link was not crossposted before (theoretically this should be solved already by the `get_existing_crosspost` function)
