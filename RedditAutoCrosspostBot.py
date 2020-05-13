@@ -34,6 +34,7 @@ def main():
     logging.info('Running RedditAutoCrosspostBot')
     reddit = reddit_instantiator.get_reddit_instance()
 
+    replier.respond_to_saved_comments()
     schedule.every(6).minutes.do(replier.respond_to_saved_comments)
     scanned_subreddits = 'all'
     #scanned_subreddits = 'test+test9'
