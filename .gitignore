@@ -1,2 +1,6 @@
 .credentials
+.*
 old.py
+app.log
+db.json
+*.pyc
