@@ -12,7 +12,7 @@ import listener
 import racb_db
 import reddit_instantiator
 
-TIME_DELAY_SECONDS = 60 * 60  # 60 min
+TIME_DELAY_SECONDS = 3 * 60 * 60  # 3 hours
 COMMENT_SCORE_THRESHOLD = 9
 
 
