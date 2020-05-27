@@ -1,11 +1,13 @@
-import praw
+"""Responds to comments fom the inbox"""
+
 import logging
-import reddit_instantiator
 import re
 import textwrap
 
-from consts import *
+import praw
 
+from . import consts
+from . import reddit_instantiator
 
 NEGATIVE_PHRASES = [
     'bad bot',
@@ -33,7 +35,7 @@ def respond_to_inbox():
             reddit.inbox.mark_read([comment])
 
 def check_sentiment(text):
-    cleaned_text = re.sub('[^\w\s]', '', text, flags=re.S).strip().lower()
+    cleaned_text = re.sub(r'[^\w\s]', '', text, flags=re.S).strip().lower()
     if cleaned_text in NEGATIVE_PHRASES:
         return 'negative'
     elif cleaned_text in POSITIVE_PHRASES:
@@ -50,6 +52,6 @@ def respond_to_negative_sentiment(comment):
     
     The creator of this bot will look at the responses and try to change the code to reduce the incidences like these.'''
     text = textwrap.dedent(text)
-    text += POST_SUFFIX_TEXT
+    text += consts.POST_SUFFIX_TEXT
 
     return comment.reply(text)

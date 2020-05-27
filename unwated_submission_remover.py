@@ -1,6 +1,8 @@
-import praw
 import logging
-import reddit_instantiator
+
+import praw
+
+from . import reddit_instantiator
 
 MINIMUM_SCORE = 0
 

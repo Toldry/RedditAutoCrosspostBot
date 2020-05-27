@@ -1,69 +1,94 @@
-import praw
-import time
+"""Replies to processed comment entries
+"""
+
 import logging
 import re
-import listener
-import requests
-import urllib.parse
 import textwrap
+import urllib.parse
 
-import reddit_instantiator
-import racb_db
-import environment
-from consts import *
+import praw
+import requests
+import time
 
-TIME_DELAY_SECONDS = 60*60 #60 min
+from . import consts
+from . import environment
+from . import listener
+from . import racb_db
+from . import reddit_instantiator
+
+TIME_DELAY_SECONDS = 60*60  # 60 min
 COMMENT_SCORE_THRESHOLD = 9
 
 
 def respond_to_saved_comments():
     logging.info('Responding to saved comments')
-    comment_entries = racb_db.get_comments_before_timedelta(TIME_DELAY_SECONDS) #get comments that were scraped TIME_DELAY_SECONDS seconds ago
+    # get comments that were scraped TIME_DELAY_SECONDS seconds ago
+    comment_entries = racb_db.get_comments_before_timedelta(TIME_DELAY_SECONDS)
     for comment_entry in comment_entries:
-        logging.info(f"Begin processing saved comment: {comment_entry['permalink']}")
+        logging.info(
+            f"Begin processing saved comment: {comment_entry['permalink']}")
         comment = get_full_comment_from_reddit(comment_entry)
         available = check_comment_availability(comment)
         if available:
             handle_comment(comment)
-        racb_db.remove_comment(comment_entry) #remove entry after processing
+        racb_db.remove_comment(comment_entry)  # remove entry after processing
 
 
 def get_full_comment_from_reddit(comment_info):
     reddit = reddit_instantiator.get_reddit_instance()
-    return reddit.comment(url= r'https://www.reddit.com' + comment_info['permalink'])
+    return reddit.comment(
+        url=r'https://www.reddit.com' + comment_info['permalink'])
+
 
 def get_existing_crosspost(comment, other_subreddit):
-    """Attempts to find whether an existing crosspost already exists in other_subreddit. 
-    Returns the oldest replica submission if found. 
+    """Attempts to find whether an existing crosspost
+    already exists in other_subreddit.
+    Returns the oldest replica submission if found.
     Returns `None` if no existing crosspost exists.
-    Returns a `string_reason` if it is impossible to crosspost to the other sub (due to it not existing, or being private, or otherwise)
+    Returns a `string_reason` if it is impossible to
+    crosspost to the other sub (due to it not existing,
+    or being private, or otherwise)
     """
     reddit = reddit_instantiator.get_reddit_instance()
     try:
-        query = f'url:\"{comment.submission.url}\"' #See git isseue to understand why this is necessary https://github.com/praw-dev/praw/issues/880
-        submissions = reddit.subreddit(other_subreddit).search(query = query, sort='new', time_filter='all')
-        submissions = [s for s in submissions] #iterate over submissions to fetch them
+        # See git isseue to understand why this is necessary
+        # https://github.com/praw-dev/praw/issues/880
+        query = f'url:\"{comment.submission.url}\"'
+        submissions = reddit.subreddit(other_subreddit).search(query=query,
+                                                               sort='new',
+                                                               time_filter='all')
+        # iterate over submissions to fetch them
+        submissions = [s for s in submissions]
     except Exception as e:
         error_message = e.args[0]
-        if error_message == 'Redirect to /submit': #when reddit tries redirecting a search query of a link to the submission page, that means 0 results were found for the search query
+        # when reddit tries redirecting a search query of
+        # a link to the submission page,
+        # that means 0 results were found for the search query
+        if error_message == 'Redirect to /submit':
             return None
-        elif (error_message == 'Redirect to /subreddits/search' #when reddit redirects to /subreddits/search that means the subreddit `other_subreddit` doesn't exist 
+        # when reddit redirects to /subreddits/search that means
+        # the subreddit `other_subreddit` doesn't exist
+        elif (error_message == 'Redirect to /subreddits/search'
               or error_message == 'received 404 HTTP response'):
             return 'SUBREDDIT_DOES_NOT_EXIST'
-        elif error_message == 'received 403 HTTP response': #this error is recieved when the other_subreddit is private "You must be invited to visit this community"
+        # this error is recieved when the other_subreddit is private
+        # "You must be invited to visit this community"
+        elif error_message == 'received 403 HTTP response':
             return 'SUBREDDIT_IS_PRIVATE'
         else:
             raise
 
     if len(submissions) == 0:
         return None
-    return submissions[-1] #return oldest submission that matches search
+    # return oldest submission that matches search
+    return submissions[-1]
+
 
 def handle_existing_post(comment, existing_post):
     text = f'''\
     I found [this preexisting post]({existing_post.link_permalink}) in {existing_post.subreddit_name_prefixed} with the same link as the original post.'''
     text = textwrap.dedent(text)
-    text += POST_SUFFIX_TEXT
+    text += consts.POST_SUFFIX_TEXT
     return comment.reply(text)
 
 def handle_comment(comment):
@@ -105,7 +130,7 @@ def reply_to_crosspost_suggestion_comment(comment, cross_post, other_subreddit):
 
     So I took the liberty and crossposted this link there. Here's a [link](www.reddit.com{cross_post.permalink})'''
     text = textwrap.dedent(text)
-    text += POST_SUFFIX_TEXT
+    text += consts.POST_SUFFIX_TEXT
     return comment.reply(text)
 
 
@@ -116,7 +141,7 @@ def reply_to_crosspost(comment, cross_post, other_subreddit):
     If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
     '''
     text = textwrap.dedent(text)
-    text += POST_SUFFIX_TEXT
+    text += consts.POST_SUFFIX_TEXT
     cross_post.reply(text)
     return
 

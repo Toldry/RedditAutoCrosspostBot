@@ -1,8 +1,14 @@
-import praw
+"""Maintains a singleton instcáe of the `praw.reddit` class
+"""
+
+__all__ = ['get_reddit_instance']
+
+import functools
 import logging
 import re
+
+import praw
 import time
-import functools
 
 reddit = None
 
@@ -33,13 +39,6 @@ def _read_credentials():
     return lines
 
 
-def get_reddit_instance():
-    if not reddit:
-        _decorate_praw()
-        _instantiate_reddit()   
-    return reddit
-
-
 def _decorate_praw():
     praw.models.Comment.reply = _wait_and_retry_when_ratelimit_reached(praw.models.Comment.reply)
     praw.models.Submission.crosspost = _wait_and_retry_when_ratelimit_reached(praw.models.Submission.crosspost)
@@ -53,7 +52,7 @@ def _wait_and_retry_when_ratelimit_reached(func):
             except praw.exceptions.RedditAPIException as e:
                 if e.error_type != 'RATELIMIT':
                     raise
-                amount, timeunit = re.compile(r'you are doing that too much\. try again in (\d)+ (second|minute)s?\.').search(e.message).groups()
+                amount, timeunit = re.compile(r'you are doing that too much\. try again in (\d+) (second|minute)s?\.').search(e.message).groups()
                 amount = int(amount)
                 logging.info(f'Posting rate limit reached. waiting {amount} {timeunit}s...')
                 if timeunit == 'minute': amount *= 60
@@ -61,4 +60,10 @@ def _wait_and_retry_when_ratelimit_reached(func):
 
     return wrapper
 
-__all__ = ['get_reddit_instance']        
+def get_reddit_instance():
+    """ Returns a singleton instance of the `praw.reddit` object
+    """
+    if not reddit:
+        _decorate_praw()
+        _instantiate_reddit()   
+    return reddit

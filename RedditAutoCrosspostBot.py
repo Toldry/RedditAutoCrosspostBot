@@ -1,33 +1,41 @@
-import schedule
-import logging
+"""Main entry point of the program
+"""
 
-import reddit_instantiator
-import environment
-import listener
-import replier
-import unwated_submission_remover
-import inbox_responder
+
+import logging
 from logging.handlers import RotatingFileHandler
 
-#https://www.pythonforengineers.com/build-a-reddit-bot-part-1/
+import schedule
 
-fileHandler = RotatingFileHandler("app.log", mode='a', maxBytes=5*1024*1024, backupCount=1, encoding=None, delay=0)
-streamHandler = logging.StreamHandler() 
+from . import environment
+from . import inbox_responder
+from . import listener
+from . import reddit_instantiator
+from . import replier
+from . import unwated_submission_remover
 
-fileHandler.setLevel(logging.INFO)
-streamHandler.setLevel(logging.DEBUG)
+# https://www.pythonforengineers.com/build-a-reddit-bot-part-1/
 
-logging.getLogger("prawcore").disabled = True
-logging.getLogger("urllib3.connectionpool").disabled = True
+configure_logging()
 
 
-logging.basicConfig(format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', 
-                    level=logging.DEBUG,
-                    handlers=[
-                        fileHandler,
-                        streamHandler
-                    ])
+def configure_logging():
+    fileHandler = RotatingFileHandler("app.log", mode='a', maxBytes=5*1024*1024, backupCount=1, encoding=None, delay=0)
+    streamHandler = logging.StreamHandler() 
 
+    fileHandler.setLevel(logging.INFO)
+    streamHandler.setLevel(logging.DEBUG)
+
+    logging_blacklist = ['prawcore', 'urllib3.connectionpool', 'schedule']
+    for item in logging_blacklist:
+        logging.getLogger(item).disabled = True
+
+    logging.basicConfig(format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', 
+                        level=logging.DEBUG,
+                        handlers=[
+                            fileHandler,
+                            streamHandler
+                        ])
 
 def main():
     logging.info('Running RedditAutoCrosspostBot')
