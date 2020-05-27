@@ -15,12 +15,11 @@ from . import unwated_submission_remover
 
 # https://www.pythonforengineers.com/build-a-reddit-bot-part-1/
 
-configure_logging()
-
 
 def configure_logging():
-    file_handler = RotatingFileHandler("app.log", mode='a', maxBytes=5 * 1024 * 1024, backupCount=1, encoding=None,
-                                       delay=0)
+    file_handler = RotatingFileHandler("app.log", mode='a', delay=0,
+                                       maxBytes=5 * 1024 * 1024,
+                                       backupCount=1, encoding=None)
     stream_handler = logging.StreamHandler()
 
     file_handler.setLevel(logging.INFO)
@@ -39,6 +38,7 @@ def configure_logging():
 
 
 def main():
+    configure_logging()
     logging.info('Running RedditAutoCrosspostBot')
     reddit = reddit_instantiator.get_reddit_instance()
 
@@ -67,5 +67,4 @@ def main():
 
 
 if __name__ == '__main__':
-    # execute only if run as a script
     main()

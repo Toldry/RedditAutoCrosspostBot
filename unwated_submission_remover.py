@@ -1,8 +1,6 @@
 """Removes unwanted submissions according to score"""
 import logging
 
-import praw
-
 from . import reddit_instantiator
 
 MINIMUM_SCORE = 0

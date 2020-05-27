@@ -2,13 +2,9 @@
 """
 
 import logging
-import re
 import textwrap
-import urllib.parse
 
 import praw
-import requests
-import time
 
 from . import consts
 from . import environment

@@ -35,7 +35,6 @@ def _instantiate_reddit():
 
 
 def _read_credentials():
-    lines = None
     with open('.credentials') as f:
         lines = [line.rstrip('\n') for line in f]
     return lines
