@@ -6,8 +6,8 @@ import textwrap
 
 import praw
 
-from . import consts
-from . import reddit_instantiator
+import consts
+import reddit_instantiator
 
 NEGATIVE_PHRASES = [
     'bad bot',

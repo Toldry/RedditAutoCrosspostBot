@@ -3,7 +3,7 @@
 import logging
 import re
 
-from . import racb_db
+import racb_db
 
 
 def handle_incoming_comment(comment):

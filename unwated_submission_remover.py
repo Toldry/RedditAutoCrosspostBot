@@ -1,7 +1,7 @@
 """Removes unwanted submissions according to score"""
 import logging
 
-from . import reddit_instantiator
+import reddit_instantiator
 
 MINIMUM_SCORE = 0
 

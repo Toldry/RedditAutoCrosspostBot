@@ -6,11 +6,11 @@ import textwrap
 
 import praw
 
-from . import consts
-from . import environment
-from . import listener
-from . import racb_db
-from . import reddit_instantiator
+import consts
+import environment
+import listener
+import racb_db
+import reddit_instantiator
 
 TIME_DELAY_SECONDS = 60 * 60  # 60 min
 COMMENT_SCORE_THRESHOLD = 9
@@ -137,7 +137,7 @@ def reply_to_crosspost_suggestion_comment(comment, cross_post, other_subreddit):
 def reply_to_crosspost(comment, cross_post, other_subreddit):
     text = f'''\
     I crossposted this from {comment.subreddit_name_prefixed} to r/{other_subreddit} after seeing [this decently upvoted comment]({comment.permalink}) (score={comment.score}) that seems to suggest that this post would be a good fit here too.
-    
+  
     If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
     '''
     text = textwrap.dedent(text)

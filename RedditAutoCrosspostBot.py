@@ -6,12 +6,12 @@ from logging.handlers import RotatingFileHandler
 
 import schedule
 
-from . import environment
-from . import inbox_responder
-from . import listener
-from . import reddit_instantiator
-from . import replier
-from . import unwated_submission_remover
+import environment
+import inbox_responder
+import listener
+import reddit_instantiator
+import replier
+import unwated_submission_remover
 
 # https://www.pythonforengineers.com/build-a-reddit-bot-part-1/
 
@@ -19,7 +19,7 @@ from . import unwated_submission_remover
 def configure_logging():
     file_handler = RotatingFileHandler("app.log", mode='a', delay=0,
                                        maxBytes=5 * 1024 * 1024,
-                                       backupCount=1, encoding=None)
+                                       backupCount=1, encoding='utf-8')
     stream_handler = logging.StreamHandler()
 
     file_handler.setLevel(logging.INFO)
