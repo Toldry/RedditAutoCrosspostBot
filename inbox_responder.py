@@ -19,6 +19,7 @@ POSITIVE_PHRASES = [
     'good bot',
 ]
 
+
 def respond_to_inbox():
     logging.info('Checking inbox')
     reddit = reddit_instantiator.get_reddit_instance()
@@ -30,9 +31,10 @@ def respond_to_inbox():
             respond_to_positive_sentiment(comment)
         elif sentiment == 'negative':
             respond_to_negative_sentiment(comment)
-        
+
         if sentiment is not None:
             reddit.inbox.mark_read([comment])
+
 
 def check_sentiment(text):
     cleaned_text = re.sub(r'[^\w\s]', '', text, flags=re.S).strip().lower()
@@ -42,9 +44,11 @@ def check_sentiment(text):
         return 'positive'
     return None
 
+
 def respond_to_positive_sentiment(comment):
     # comment.reply('🤖🌹')
     pass
+
 
 def respond_to_negative_sentiment(comment):
     text = f'''\

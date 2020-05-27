@@ -16,7 +16,7 @@ from . import listener
 from . import racb_db
 from . import reddit_instantiator
 
-TIME_DELAY_SECONDS = 60*60  # 60 min
+TIME_DELAY_SECONDS = 60 * 60  # 60 min
 COMMENT_SCORE_THRESHOLD = 9
 
 
@@ -86,10 +86,12 @@ def get_existing_crosspost(comment, other_subreddit):
 
 def handle_existing_post(comment, existing_post):
     text = f'''\
-    I found [this preexisting post]({existing_post.link_permalink}) in {existing_post.subreddit_name_prefixed} with the same link as the original post.'''
+    I found [this preexisting post]({existing_post.link_permalink}) in 
+    {existing_post.subreddit_name_prefixed} with the same link as the original post.'''
     text = textwrap.dedent(text)
     text += consts.POST_SUFFIX_TEXT
     return comment.reply(text)
+
 
 def handle_comment(comment):
     if comment.score < COMMENT_SCORE_THRESHOLD:
@@ -100,25 +102,27 @@ def handle_comment(comment):
     result = get_existing_crosspost(comment, other_subreddit)
     if result is not None and type(result) is not type(''):
         existing_post = result
-        logging.info('Existing crosspost found') 
+        logging.info('Existing crosspost found')
         reply = handle_existing_post(comment, existing_post)
         logging.info(f'Replied to comment, link: {reply.link_permalink}')
         return
     elif result is not None and type(result) is type(''):
         crosspost_is_impossible_reason_string = result
-        logging.info(f'Cannot crosspost to subreddit \'{other_subreddit}\' because {crosspost_is_impossible_reason_string}')
+        logging.info(
+            f'Cannot crosspost to subreddit \'{other_subreddit}\' because {crosspost_is_impossible_reason_string}')
         return
 
     try:
         cross_post = comment.submission.crosspost(subreddit=other_subreddit, send_replies=False)
         logging.info(f'Crosspost succesful. link to post: www.reddit.com{cross_post.permalink}')
-        #reply_to_crosspost_suggestion_comment(comment, cross_post, other_subreddit) # I commented this line out because people seem to negatively react to these comments.
+        # reply_to_crosspost_suggestion_comment(comment, cross_post, other_subreddit)
+        # I commented the above line out because people seem to negatively react to these comments.
         reply_to_crosspost(comment, cross_post, other_subreddit)
     except Exception as e:
         handled_with_grace = handle_crosspost_exception(e, comment, other_subreddit)
         if not handled_with_grace:
-            logging.error(f'Crosspost failed due to a problem: {str(e)}' + '\n\n' 
-            + f'This occured while attempting to crosspost based on this comment: {comment.permalink}')
+            logging.error(f'Crosspost failed due to a problem: {str(e)}' + '\n\n'
+                          + f'This occured while attempting to crosspost based on this comment: {comment.permalink}')
             if environment.DEBUG:
                 raise
 
@@ -145,6 +149,7 @@ def reply_to_crosspost(comment, cross_post, other_subreddit):
     cross_post.reply(text)
     return
 
+
 def handle_crosspost_exception(e, comment, other_subreddit):
     """Attempts to handle exceptions that arise while crossposting. Returns True if the error was handled gracefully
     """
@@ -152,7 +157,8 @@ def handle_crosspost_exception(e, comment, other_subreddit):
         if e.error_type == 'NO_CROSSPOSTS':
             logging.info(f'Crossposts are not allowed in /r/{other_subreddit}')
             return True
-        elif e.error_type == 'INVALID_CROSSPOST_THING': #wtf does this even mean, reddit? why are some urls considered invalid for crossposting?
+        # wtf does this even mean, reddit? why are some urls considered invalid for crossposting?
+        elif e.error_type == 'INVALID_CROSSPOST_THING':
             logging.info(f'Got that weird unhelpful INVALID_CROSSPOST_THING message again: {e.message}')
             return True
         elif e.error_type == 'SUBREDDIT_NOTALLOWED':
@@ -167,7 +173,7 @@ def handle_crosspost_exception(e, comment, other_subreddit):
 
 def check_comment_availability(comment):
     try:
-        comment.score #access a property to trigger praw to retrieve the comment
+        comment.score  # access a property to trigger praw to retrieve the comment
         return True
     except Exception as e:
         if type(e) == praw.exceptions.ClientException:

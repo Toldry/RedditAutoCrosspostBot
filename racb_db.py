@@ -12,12 +12,12 @@ comments = db.table('comments', cache_size=0)
 
 
 def add_comment(comment):
-    dict = {
+    comment_entry = {
         'permalink': comment.permalink,
         # 'scraped_itme_human_readable': datetime.now(timezone.utc).astimezone().isoformat(),
         'scarped_time': time.time(),
     }
-    comments.insert(dict)
+    comments.insert(comment_entry)
 
 
 def get_comments_before_timedelta(timedelta):
@@ -29,7 +29,7 @@ def remove_comment(comment_entry):
     comments.remove(doc_ids=[comment_entry.doc_id])
 
 
-def add_downvoted_crosspost(submission):
-    downvoted_crosspots.insert({
-        'permalink': submission.permalink
-    })
+# def add_downvoted_crosspost(submission):
+#     downvoted_crosspots.insert({
+#         'permalink': submission.permalink
+#     })

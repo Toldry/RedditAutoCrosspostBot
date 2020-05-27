@@ -12,15 +12,16 @@ import time
 
 reddit = None
 
+
 def _instantiate_reddit():
     username = 'AutoCrosspostBot'
     clientname = username
-    #password = 'REDACTED'
+    # password = 'REDACTED'
     app_client_id = 'UwKgkrvtl9fpUw'
-    #app_client_secret = 'REDACTED'
+    # app_client_secret = 'REDACTED'
     version = '0.3'
     developername = 'orqa'
-    useragent =  f'{clientname}/{version} by /u/{developername}'
+    useragent = f'{clientname}/{version} by /u/{developername}'
 
     password, app_client_secret = _read_credentials()
 
@@ -31,6 +32,7 @@ def _instantiate_reddit():
                          user_agent=useragent,
                          username=username,
                          password=password)
+
 
 def _read_credentials():
     lines = None
@@ -43,6 +45,7 @@ def _decorate_praw():
     praw.models.Comment.reply = _wait_and_retry_when_ratelimit_reached(praw.models.Comment.reply)
     praw.models.Submission.crosspost = _wait_and_retry_when_ratelimit_reached(praw.models.Submission.crosspost)
 
+
 def _wait_and_retry_when_ratelimit_reached(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -52,7 +55,8 @@ def _wait_and_retry_when_ratelimit_reached(func):
             except praw.exceptions.RedditAPIException as e:
                 if e.error_type != 'RATELIMIT':
                     raise
-                amount, timeunit = re.compile(r'you are doing that too much\. try again in (\d+) (second|minute)s?\.').search(e.message).groups()
+                amount, timeunit = re.compile(
+                    r'you are doing that too much\. try again in (\d+) (second|minute)s?\.').search(e.message).groups()
                 amount = int(amount)
                 logging.info(f'Posting rate limit reached. waiting {amount} {timeunit}s...')
                 if timeunit == 'minute': amount *= 60
@@ -60,10 +64,11 @@ def _wait_and_retry_when_ratelimit_reached(func):
 
     return wrapper
 
+
 def get_reddit_instance():
     """ Returns a singleton instance of the `praw.reddit` object
     """
     if not reddit:
         _decorate_praw()
-        _instantiate_reddit()   
+        _instantiate_reddit()
     return reddit

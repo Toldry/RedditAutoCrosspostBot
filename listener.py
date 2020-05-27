@@ -31,17 +31,17 @@ def is_top_level_comment(comment):
     return comment.parent_id == comment.link_id
 
 
-subreddit_regex = re.compile(r'^(\/)?r\/([a-zA-Z0-9-_]+)$')  # compile once
+subreddit_regex = re.compile(r'^(/)?r/([a-zA-Z0-9-_]+)$')  # compile once
 
 
 # Checks if the comment's body contains only a reference to a subreddit,
 # and return the subreddit name if there's a match
 def check_pattern(comment):
-    searchResult = subreddit_regex.search(comment.body)
-    if searchResult is None:
+    search_result = subreddit_regex.search(comment.body)
+    if search_result is None:
         return None
 
-    groups = searchResult.groups()
+    groups = search_result.groups()
 
     other_subreddit = groups[1]
     return other_subreddit
