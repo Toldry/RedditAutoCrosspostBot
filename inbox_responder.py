@@ -21,7 +21,7 @@ POSITIVE_PHRASES = [
 
 
 def respond_to_inbox():
-    logging.info('Checking inbox')
+    logging.debug('Checking inbox')
     reddit = reddit_instantiator.get_reddit_instance()
     for comment in reddit.inbox.unread(limit=None, mark_read=False):
         if not isinstance(comment, praw.models.Comment):

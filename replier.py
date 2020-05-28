@@ -76,13 +76,13 @@ def get_existing_crosspost(comment, other_subreddit):
 
     if len(submissions) == 0:
         return None
-    # return oldest submission that matches search
-    return submissions[-1]
+    oldest_submission = submissions[-1]
+    return oldest_submission
 
 
 def handle_existing_post(comment, existing_post):
     text = f'''\
-    I found [this preexisting post]({existing_post.link_permalink}) in 
+    I found [this post]({existing_post.permalink}) in 
     {existing_post.subreddit_name_prefixed} with the same link as the original post.'''
     text = textwrap.dedent(text)
     text += consts.POST_SUFFIX_TEXT
@@ -100,7 +100,7 @@ def handle_comment(comment):
         existing_post = result
         logging.info('Existing crosspost found')
         reply = handle_existing_post(comment, existing_post)
-        logging.info(f'Replied to comment, link: {reply.link_permalink}')
+        logging.info(f'Replied to comment, link: {reply.permalink}')
         return
     elif result is not None and type(result) is type(''):
         crosspost_is_impossible_reason_string = result
