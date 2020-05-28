@@ -45,8 +45,7 @@ def configure_logging():
                         ])
 
 
-def main(argv):
-    environment.DEBUG = arg
+def main():
     configure_logging()
     logging.info('Running RedditAutoCrosspostBot')
     reddit = reddit_instantiator.get_reddit_instance()
