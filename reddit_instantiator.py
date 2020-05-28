@@ -43,6 +43,7 @@ def _read_credentials():
 def _decorate_praw():
     praw.models.Comment.reply = _wait_and_retry_when_ratelimit_reached(praw.models.Comment.reply)
     praw.models.Submission.crosspost = _wait_and_retry_when_ratelimit_reached(praw.models.Submission.crosspost)
+    praw.models.Submission.reply = _wait_and_retry_when_ratelimit_reached(praw.models.Submission.reply)
 
 
 def _wait_and_retry_when_ratelimit_reached(func):

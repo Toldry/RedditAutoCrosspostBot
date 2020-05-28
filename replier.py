@@ -119,6 +119,7 @@ def handle_comment(comment):
         if not handled_with_grace:
             logging.error(f'Crosspost failed due to a problem: {str(e)}' + '\n\n'
                           + f'This occured while attempting to crosspost based on this comment: {comment.permalink}')
+            logging.exception(e)
             if environment.DEBUG:
                 raise
 
