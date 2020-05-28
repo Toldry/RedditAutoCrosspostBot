@@ -3,6 +3,7 @@
 
 import logging
 from logging.handlers import RotatingFileHandler
+import argparse
 
 import schedule
 
@@ -14,6 +15,13 @@ import replier
 import unwated_submission_remover
 
 # https://www.pythonforengineers.com/build-a-reddit-bot-part-1/
+
+def handle_commandline_arguments():
+    parser = argparse.ArgumentParser(description='Run the reddit AutoCrosspostBot.')
+    parser.add_argument("--production", default=False, action="store_true" , help="Set when running in production environment")
+
+    args = parser.parse_args()
+    environment.DEBUG = not args.production
 
 
 def configure_logging():
@@ -37,7 +45,8 @@ def configure_logging():
                         ])
 
 
-def main():
+def main(argv):
+    environment.DEBUG = arg
     configure_logging()
     logging.info('Running RedditAutoCrosspostBot')
     reddit = reddit_instantiator.get_reddit_instance()
@@ -65,6 +74,6 @@ def main():
             if environment.DEBUG:
                 raise
 
-
+handle_commandline_arguments()
 if __name__ == '__main__':
     main()
