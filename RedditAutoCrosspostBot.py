@@ -6,6 +6,7 @@ from logging.handlers import RotatingFileHandler
 import argparse
 
 import schedule
+import prawcore
 
 import environment
 import inbox_responder
@@ -48,21 +49,29 @@ def configure_logging():
 def main():
     configure_logging()
     logging.info('Running RedditAutoCrosspostBot')
-    reddit = reddit_instantiator.get_reddit_instance()
-
-    replier.respond_to_saved_comments()
-    unwated_submission_remover.delete_unwanted_submissions()
-    inbox_responder.respond_to_inbox()
 
     schedule.every(7).minutes.do(unwated_submission_remover.delete_unwanted_submissions)
     schedule.every(20).seconds.do(inbox_responder.respond_to_inbox)
     schedule.every(6).minutes.do(replier.respond_to_saved_comments)
 
+    schedule.run_all()
+    
+    while True:
+        try:
+            listen_to_comment_stream()
+        except prawcore.exceptions.ServerError as e:
+            # Sometimes the reddit service fails (e.g. error 503)
+            # just wait a bit a try again
+            time.sleep(30)
+
+
+
+def listen_to_comment_stream():
+    reddit = reddit_instantiator.get_reddit_instance()
     scanned_subreddits = 'all'
     # scanned_subreddits = 'test+test9'
     subreddit_object = reddit.subreddit(scanned_subreddits)
 
-    # infinite stream of comments from reddit
     logging.info('Listening to comment stream...')
     for comment in subreddit_object.stream.comments(skip_existing=True):
         try:
@@ -75,4 +84,9 @@ def main():
 
 handle_commandline_arguments()
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.exception(e)
+        raise
+    

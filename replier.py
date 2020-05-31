@@ -95,6 +95,11 @@ def handle_comment(comment):
         return
 
     other_subreddit = listener.check_pattern(comment)
+    if other_subreddit is None:
+        # this can happen when the comment was editted in the time between the entry was saved
+        # and the moment the comment entry is processed
+        return
+
     result = get_existing_crosspost(comment, other_subreddit)
     if result is not None and type(result) is not type(''):
         existing_post = result
