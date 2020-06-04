@@ -4,6 +4,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 import argparse
+import time
 
 import schedule
 import prawcore
@@ -90,3 +91,5 @@ if __name__ == '__main__':
         logging.exception(e)
         raise
     
+
+# TODO Use tineye.com or karmadecay.com or www.reddit.com/r/MAGIC_EYE_BOT/ to check for reposts 

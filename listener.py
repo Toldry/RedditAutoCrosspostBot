@@ -17,10 +17,12 @@ def handle_incoming_comment(comment):
     other_subreddit = check_pattern(comment)
     if other_subreddit is None:
         return
-    else:
-        # Match found
-        logging.debug(f'Match found: {comment.permalink}')
-        racb_db.add_comment(comment)
+
+    if other_subreddit.lower() == comment.subreddit.title.lower():
+        return
+
+    logging.debug(f'Match found: {comment.permalink}')
+    racb_db.add_comment(comment)
 
 
 def is_mod_post(comment):
