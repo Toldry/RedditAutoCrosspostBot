@@ -60,8 +60,9 @@ def main():
     while True:
         try:
             listen_to_comment_stream()
-        except prawcore.exceptions.ServerError as e:
+        except (prawcore.exceptions.ServerError, prawcore.exceptions.Forbidden) as e:
             # Sometimes the reddit service fails (e.g. error 503)
+            # One time I got an error 403 (unaothorized) for no apparent reason
             # just wait a bit a try again
             time.sleep(30)
 
