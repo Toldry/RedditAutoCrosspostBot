@@ -166,6 +166,21 @@ def handle_crosspost_exception(e, comment, other_subreddit):
         elif e.error_type == 'SUBREDDIT_NOTALLOWED':
             logging.info(f'Not allowed to post in /r/{other_subreddit}')
             return True
+        elif e.error_type == 'NO_IMAGES'
+            logging.info(f'Not allowed to post images in /r/{other_subreddit}')
+            return True
+        elif e.error_type == 'NO_LINKS'
+            logging.info(f'Not allowed to post links in /r/{other_subreddit}')
+            return True
+        elif e.error_type == 'NO_SELFS'
+            logging.info(f'Not allowed to post text posts in /r/{other_subreddit}')
+            return True
+        elif e.error_type == 'NO_VIDEOS'
+            logging.info(f'Not allowed to post videos in /r/{other_subreddit}')
+            return True
+        elif e.error_type == 'OVER18_SUBREDDIT_CROSSPOST'
+            logging.info(f'Not allowed to crosspost 18+ content in /r/{other_subreddit}')
+            return True
         else:
             # Unfamiliar reddit error
             return False
