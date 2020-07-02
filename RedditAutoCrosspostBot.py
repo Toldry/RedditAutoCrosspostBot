@@ -21,9 +21,11 @@ import unwated_submission_remover
 def handle_commandline_arguments():
     parser = argparse.ArgumentParser(description='Run the reddit AutoCrosspostBot.')
     parser.add_argument("--production", default=False, action="store_true" , help="Set when running in production environment")
+    parser.add_argument("--listen_only", default=False, action="store_true" , help="When set, the bot only listens to the comment stream but does not reply to items")
 
     args = parser.parse_args()
     environment.DEBUG = not args.production
+    environment.LISTEN_ONLY = args.listen_only
 
 
 def configure_logging():
@@ -53,7 +55,8 @@ def main():
 
     schedule.every(7).minutes.do(unwated_submission_remover.delete_unwanted_submissions)
     schedule.every(20).seconds.do(inbox_responder.respond_to_inbox)
-    schedule.every(6).minutes.do(replier.respond_to_saved_comments)
+    if not environment.LISTEN_ONLY:
+        schedule.every(6).minutes.do(replier.respond_to_saved_comments)
 
     schedule.run_all()
     

@@ -3,6 +3,7 @@
 import logging
 import re
 
+import consts
 import racb_db
 
 
@@ -22,6 +23,9 @@ def handle_incoming_comment(comment):
         return
 
     if title_contains_prohibited_phrases(comment):
+        return
+
+    if other_subreddit.lower() in consts.SUB_BLACKLIST or comment.subreddit.title.lower() in consts.SUB_BLACKLIST:
         return
 
     logging.debug(f'Match found: {comment.permalink}')
