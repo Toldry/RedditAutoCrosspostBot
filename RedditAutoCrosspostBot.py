@@ -5,6 +5,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 import argparse
 import time
+import requests
+import urllib3
 
 import schedule
 import prawcore
@@ -58,17 +60,38 @@ def main():
     if not environment.LISTEN_ONLY:
         schedule.every(6).minutes.do(replier.respond_to_saved_comments)
 
-    schedule.run_all()
+    if environment.DEBUG:
+        schedule.run_all()
     
     while True:
         try:
             listen_to_comment_stream()
-        except (prawcore.exceptions.ServerError, prawcore.exceptions.Forbidden) as e:
-            # Sometimes the reddit service fails (e.g. error 503)
-            # One time I got an error 403 (unaothorized) for no apparent reason
-            # just wait a bit a try again
-            time.sleep(30)
+        except (prawcore.exceptions.ServerError,
+                prawcore.exceptions.Forbidden,
+                requests.exceptions.ConnectTimeout,
+                ) as e:
+            if environment.DEBUG:
+                raise
+            else:
+                # Sometimes the reddit service fails (e.g. error 503)
+                # One time I got an error 403 (unaothorized) for no apparent reason
+                # Other times the internet connection fails
+                # just wait a bit a try again
+                logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
+                time.sleep(30)
+        except prawcore.exceptions.RequestException as e:
+            is_max_retry_error = (
+                e.original_exception and 
+                e.original_exception.args and 
+                len(e.original_exception.args) > 0 and 
+                isinstance(e.original_exception.args[0],urllib3.exceptions.MaxRetryError)
+            )
 
+            if is_max_retry_error:
+                logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
+                time.sleep(30)
+            else:
+                raise
 
 
 def listen_to_comment_stream():

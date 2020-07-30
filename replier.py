@@ -101,13 +101,13 @@ def handle_comment(comment):
         return
 
     result = get_existing_crosspost(comment, other_subreddit)
-    if result is not None and type(result) is not type(''):
+    if result is not None and isinstance(result, str):
         existing_post = result
         logging.info('Existing crosspost found')
         reply = handle_existing_post(comment, existing_post)
         logging.info(f'Replied to comment, link: {reply.permalink}')
         return
-    elif result is not None and type(result) is type(''):
+    elif result is not None and isinstance(result, str):
         crosspost_is_impossible_reason_string = result
         logging.info(
             f'Cannot crosspost to subreddit \'{other_subreddit}\' because {crosspost_is_impossible_reason_string}')
@@ -155,7 +155,7 @@ def reply_to_crosspost(comment, cross_post, other_subreddit):
 def handle_crosspost_exception(e, comment, other_subreddit):
     """Attempts to handle exceptions that arise while crossposting. Returns True if the error was handled gracefully
     """
-    if type(e) is praw.exceptions.RedditAPIException:
+    if isinstance(e, praw.exceptions.RedditAPIException):
         if e.error_type == 'NO_CROSSPOSTS':
             logging.info(f'Crossposts are not allowed in /r/{other_subreddit}')
             return True
@@ -193,7 +193,7 @@ def check_comment_availability(comment):
         comment.score  # access a property to trigger praw to retrieve the comment
         return True
     except Exception as e:
-        if type(e) == praw.exceptions.ClientException:
+        if isinstance(e, praw.exceptions.ClientException):
             logging.info('This comment cannot be reached for some reason (maybe removed or banned)')
             return False
         else:

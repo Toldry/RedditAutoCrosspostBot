@@ -6,6 +6,7 @@ __all__ = ['get_reddit_instance']
 import functools
 import logging
 import re
+import os
 
 import praw
 import time
@@ -35,7 +36,11 @@ def _instantiate_reddit():
 
 
 def _read_credentials():
-    with open('.credentials') as f:
+    script_path = os.path.abspath(__file__) 
+    script_dir = os.path.split(script_path)[0]
+    rel_path = '.credentials'
+    abs_file_path = os.path.join(script_dir, rel_path)
+    with open(abs_file_path) as f:
         lines = [line.rstrip('\n') for line in f]
     return lines
 
