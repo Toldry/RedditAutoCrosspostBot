@@ -80,14 +80,15 @@ def main():
                 logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
                 time.sleep(30)
         except prawcore.exceptions.RequestException as e:
-            is_max_retry_error = (
+            is_max_retry_or_read_timeout_error = (
                 e.original_exception and 
                 e.original_exception.args and 
                 len(e.original_exception.args) > 0 and 
-                isinstance(e.original_exception.args[0],urllib3.exceptions.MaxRetryError)
+                (   isinstance(e.original_exception.args[0], urllib3.exceptions.MaxRetryError) or
+                    isinstance(e.original_exception.args[0], urllib3.exceptions.ReadTimeoutError)
+                )
             )
-
-            if is_max_retry_error:
+            if is_max_retry_or_read_timeout_error:
                 logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
                 time.sleep(30)
             else:

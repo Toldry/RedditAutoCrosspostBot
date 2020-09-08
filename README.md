@@ -7,7 +7,7 @@ This reddit bot listens to comments and looks for ones that match the pattern
 `/r/othersubreddit`
 
 It then saves the link to that comment for later processing.
-After some period of time (e.g. 3 hours), the bot checks the same comment,  
+After some period of time (e.g. 3 hours, 2 months), the bot checks the same comment,  
 and if it has accrued enough upvotes, the bot will crosspost the submission that the comment replied to, to the other subreddit.
 
 # Known problem: Reposts
