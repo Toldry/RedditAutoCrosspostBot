@@ -81,12 +81,13 @@ def get_existing_crosspost(comment, other_subreddit):
 
 
 def handle_existing_post(comment, existing_post):
-    text = f'''\
-    I found [this post]({existing_post.permalink}) in 
-    {existing_post.subreddit_name_prefixed} with the same link as the original post.'''
-    text = textwrap.dedent(text)
-    text += consts.POST_SUFFIX_TEXT
-    return comment.reply(text)
+    # text = f'''\
+    # I found [this post]({existing_post.permalink}) in 
+    # {existing_post.subreddit_name_prefixed} with the same link as the original post.'''
+    # text = textwrap.dedent(text)
+    # text += consts.POST_SUFFIX_TEXT
+    # return comment.reply(text)
+    return
 
 
 def handle_comment(comment):
@@ -101,7 +102,7 @@ def handle_comment(comment):
         return
 
     result = get_existing_crosspost(comment, other_subreddit)
-    if result is not None and isinstance(result, str):
+    if result is not None and not isinstance(result, str):
         existing_post = result
         logging.info('Existing crosspost found')
         reply = handle_existing_post(comment, existing_post)

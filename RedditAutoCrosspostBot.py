@@ -122,3 +122,4 @@ if __name__ == '__main__':
 
 # TODO Use tineye.com or karmadecay.com or www.reddit.com/r/MAGIC_EYE_BOT/ to check for reposts 
 # TODO Change title of crossposts specific subreddits according to their rules (e.g. when crossposting into /r/TIHI rename the post to "Thanks I hate it")
+# TODO Replace tinydb with something else that's more efficient to work with tables with hundereds of thousands of entries
