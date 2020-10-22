@@ -5,6 +5,7 @@ import re
 import textwrap
 
 import praw
+import prawcore
 
 import consts
 import reddit_instantiator
@@ -24,16 +25,23 @@ def respond_to_inbox():
     logging.debug('Checking inbox')
     reddit = reddit_instantiator.get_reddit_instance()
     for comment in reddit.inbox.unread(limit=None, mark_read=False):
-        if not isinstance(comment, praw.models.Comment):
-            continue
-        sentiment = check_sentiment(comment.body)
-        if sentiment == 'positive':
-            respond_to_positive_sentiment(comment)
-        elif sentiment == 'negative':
-            respond_to_negative_sentiment(comment)
+        try:
+            if not isinstance(comment, praw.models.Comment):
+                continue
+            sentiment = check_sentiment(comment.body)
+            if sentiment == 'positive':
+                respond_to_positive_sentiment(comment)
+            elif sentiment == 'negative':
+                respond_to_negative_sentiment(comment)
 
-        if sentiment is not None:
-            reddit.inbox.mark_read([comment])
+            if sentiment is not None:
+                reddit.inbox.mark_read([comment])
+        except prawcore.exceptions.Forbidden as e:
+            if e.response.reason == 'Forbidden':
+                logging.info(f'Got 403 Forbidden error, probably because the bot is banned in {comment.subreddit_name_prefixed}')
+                reddit.inbox.mark_read([comment])
+            else:
+                raise
 
 
 def check_sentiment(text):

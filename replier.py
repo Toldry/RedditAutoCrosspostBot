@@ -131,7 +131,7 @@ def reply_to_crosspost_suggestion_comment(comment, cross_post, other_subreddit):
 
 def reply_to_crosspost(comment, cross_post, other_subreddit):
     text = f'''\
-    I crossposted this from {comment.subreddit_name_prefixed} to r/{other_subreddit} after seeing [this decently upvoted comment]({comment.permalink}) (score={comment.score}) that seems to suggest that this post would be a good fit here too.
+    I crossposted this from {comment.subreddit_name_prefixed} to r/{other_subreddit} after seeing [this decently upvoted **human-made** comment]({comment.permalink}) (score={comment.score}), that seems to suggest that this post would be a good fit here too.
   
     If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
     '''
@@ -144,37 +144,37 @@ def reply_to_crosspost(comment, cross_post, other_subreddit):
 def handle_crosspost_exception(e, comment, other_subreddit):
     """Attempts to handle exceptions that arise while crossposting. Returns True if the error was handled gracefully
     """
-    if isinstance(e, praw.exceptions.RedditAPIException):
-        if e.error_type == 'NO_CROSSPOSTS':
-            logging.info(f'Crossposts are not allowed in /r/{other_subreddit}')
-            return True
-        # wtf does this even mean, reddit? why are some urls considered invalid for crossposting?
-        elif e.error_type == 'INVALID_CROSSPOST_THING':
-            logging.info(f'Got that weird unhelpful INVALID_CROSSPOST_THING message again: {e.message}')
-            return True
-        elif e.error_type == 'SUBREDDIT_NOTALLOWED':
-            logging.info(f'Not allowed to post in /r/{other_subreddit}')
-            return True
-        elif e.error_type == 'NO_IMAGES':
-            logging.info(f'Not allowed to post images in /r/{other_subreddit}')
-            return True
-        elif e.error_type == 'NO_LINKS':
-            logging.info(f'Not allowed to post links in /r/{other_subreddit}')
-            return True
-        elif e.error_type == 'NO_SELFS':
-            logging.info(f'Not allowed to post text posts in /r/{other_subreddit}')
-            return True
-        elif e.error_type == 'NO_VIDEOS':
-            logging.info(f'Not allowed to post videos in /r/{other_subreddit}')
-            return True
-        elif e.error_type == 'OVER18_SUBREDDIT_CROSSPOST':
-            logging.info(f'Not allowed to crosspost 18+ content in /r/{other_subreddit}')
-            return True
-        else:
-            # Unfamiliar reddit error
-            return False
+    if not isinstance(e, praw.exceptions.RedditAPIException):
+        return False
 
-    return False
+    if e.error_type == 'NO_CROSSPOSTS':
+        logging.info(f'Crossposts are not allowed in /r/{other_subreddit}')
+        return True
+    # wtf does this even mean, reddit? why are some urls considered invalid for crossposting?
+    elif e.error_type == 'INVALID_CROSSPOST_THING':
+        logging.info(f'Got that weird unhelpful INVALID_CROSSPOST_THING message again: {e.message}')
+        return True
+    elif e.error_type == 'SUBREDDIT_NOTALLOWED':
+        logging.info(f'Not allowed to post in /r/{other_subreddit}')
+        return True
+    elif e.error_type == 'NO_IMAGES':
+        logging.info(f'Not allowed to post images in /r/{other_subreddit}')
+        return True
+    elif e.error_type == 'NO_LINKS':
+        logging.info(f'Not allowed to post links in /r/{other_subreddit}')
+        return True
+    elif e.error_type == 'NO_SELFS':
+        logging.info(f'Not allowed to post text posts in /r/{other_subreddit}')
+        return True
+    elif e.error_type == 'NO_VIDEOS':
+        logging.info(f'Not allowed to post videos in /r/{other_subreddit}')
+        return True
+    elif e.error_type == 'OVER18_SUBREDDIT_CROSSPOST':
+        logging.info(f'Not allowed to crosspost 18+ content in /r/{other_subreddit}')
+        return True
+    else:
+        # Unfamiliar reddit error
+        return False
 
 
 def check_comment_availability(comment):
