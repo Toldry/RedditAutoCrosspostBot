@@ -1,0 +1,112 @@
+# I've intentionally decided not to use `gettext` or `i18n` because their implementations appear to be overly complex for my simple use case
+
+DEFAULT_LANGUAGE = 'en'
+
+# I used google translate for these as placeholders, gonna need native speakers to do actual translations some time
+translations = {
+    'POST_SUFFIX_TEXT':{
+        'en':'''
+
+---
+^^🤖 ^^this ^^comment ^^was ^^written ^^by ^^a ^^bot. ^^beep ^^boop ^^🤖
+
+^^feel ^^welcome ^^to ^^respond ^^'Bad ^^bot'/'Good ^^bot', ^^it's ^^useful ^^feedback'''
+,
+    'es':'''
+
+--- 
+^^🤖 ^^este ^^comentario ^^fue ^^escrito ^^por ^^un ^^bot. ^^bip ^^boop ^^🤖
+
+^^siéntase ^^bienvenido ^^a ^^responder ^^'Mal ^^bot' ^^/ ^^'Buen ^^bot', ^^es ^^una ^^retroalimentación ^^útil'''
+,
+    'de':'''
+
+---
+^^🤖 ^^Dieser ^^Kommentar ^^wurde ^^von ^^einem ^^Bot ^^geschrieben. ^^Beep ^^Boop ^^🤖
+
+^^Fühlen ^^Sie ^^sich ^^willkommen, ^^auf ^^"Schlechter ^^Bot" ^^/ ^^"Guter ^^Bot" ^^zu ^^antworten. ^^Es ^^ist ^^ein ^^nützliches ^^Feedback'''
+,
+    'fr':'''
+
+---
+^^🤖 ^^ce ^^commentaire ^^a ^^été ^^écrit ^^par ^^un ^^bot. ^^bip ^^boop ^^🤖
+
+^^N'hésitez ^^pas ^^à ^^répondre ^^'Mauvais ^^bot' ^^/ ^^'Bon ^^bot', ^^c'est ^^un ^^retour ^^utile'''
+,
+    'he':'''
+---
+^^🤖 ^^תגובה ^^זו ^^נכתבה ^^על ^^ידי ^^בוט. ^^ביפ ^^בופ ^^🤖
+
+^^תרגישו ^^חופשי ^^להגיב ^^'בוט ^^רע' ^^/ ^^'בוט ^^טוב', ^^זה ^^משוב ^^שימושי'''
+    },
+    'RESPOND_TO_NEGATIVE_SENTIMENT':{
+        'en':'''
+Thanks for the feedback, would you mind detailing why this crosspost was inappropriate?
+
+The creator of this bot will look at the responses and try to change the code to reduce the incidences like these.'''
+,
+    'es':None,
+    'de':None,
+    'fr':None,
+    'he':None,
+    },
+    'REPLY_TO_CROSSPOST':{
+        'en':'''
+I crossposted this from {source_subreddit_name_prefixed} to r/{target_subreddit} after seeing [this decently upvoted **human-made** comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.
+  
+If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
+'''
+,
+    'es':'''
+Publiqué esto de {source_subreddit_name_prefixed} a r/{target_subreddit} después de ver [este comentario **hecho por humanos** con una votación decente] ({source_comment_permalink}) (score={source_comment_score}), que parece Sugiero que esta publicación también encajaría bien aquí.
+  
+Si cree que esto fue un error, siga adelante y vote en contra; Eliminaré las publicaciones con puntuaciones negativas.
+''',
+    'de':'''
+Ich habe dies von {source_subreddit_name_prefixed} auf r/{target_subreddit} gekreuzt, nachdem ich [diesen anständig hochgestuften  von Menschen gemachten  Kommentar] ({source_comment_permalink}) (score={source_comment_score}) gesehen habe schlagen vor, dass dieser Beitrag auch hier gut passen würde.
+
+Wenn Sie der Meinung sind, dass dies ein Fehler war, stimmen Sie ab. Ich werde Beiträge mit negativen Ergebnissen entfernen.
+'''
+,
+    'fr':'''
+J'ai croisé ceci de {source_subreddit_name_prefixed} à r/{target_subreddit} après avoir vu [ce commentaire  fait par l'homme  décemment voté] ({source_comment_permalink}) (score={source_comment_score}), cela semble suggèrent que cet article conviendrait également ici.
+  
+Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai les messages avec des scores négatifs.
+'''
+    ,
+    'he':'''
+עשיתי קרוספוסט מ- {source_subreddit_name_prefixed} ל- r/{target_subreddit} אחרי שראיתי את [התגובה הזו **שנכתבה על ידי בן-אדם** עם ניקוד נאות] ({source_comment_permalink}) (ניקוד = {source_comment_score}), שמרמזת כי פוסט זה מתאים גם לכאן.
+  
+אם אתה חושב שזו טעות, הרגישו חופשי להצביע-מטה; אסיר פוסטים עם ניקד שלילי.
+    ''',
+    }
+}
+
+subreddit_language_map = {
+    'ani_bm'            :'he',
+    'israel'            :'he',
+    'yo_elvr'           :'es',
+    'ich_iel'           :'de',
+    'LTB_iel'           :'de',
+    'schkreckl'         :'de',
+    'wasletztepreis'    :'de',
+    'OkBrudiMongo'      :'de',
+    'GeschichtsMaimais' :'de',
+    'moi_dlvv'          :'fr',
+    'rance'             :'fr',
+}
+
+def get_translated_string(string_key, target_subreddit):
+    if target_subreddit in subreddit_language_map:
+        target_language = subreddit_language_map[target_subreddit]
+        if target_language in translations[string_key] and translations[string_key][target_language] is not None:
+            ret = translations[string_key][target_language]
+            ret += translations['POST_SUFFIX_TEXT'][target_language]
+            return ret
+    
+    ret = translations[string_key][DEFAULT_LANGUAGE]
+    ret += translations['POST_SUFFIX_TEXT'][DEFAULT_LANGUAGE]
+    return ret
+
+    
+        

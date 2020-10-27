@@ -9,6 +9,7 @@ import prawcore
 
 import consts
 import reddit_instantiator
+import my_i18n as i18n
 
 NEGATIVE_PHRASES = [
     'bad bot',
@@ -59,11 +60,6 @@ def respond_to_positive_sentiment(comment):
 
 
 def respond_to_negative_sentiment(comment):
-    text = f'''\
-    Thanks for the feedback, would you mind detailing why this crosspost was inappropriate? 
-    
-    The creator of this bot will look at the responses and try to change the code to reduce the incidences like these.'''
-    text = textwrap.dedent(text)
-    text += consts.POST_SUFFIX_TEXT
+    text = i18n.get_translated_string('REPLY_TO_CROSSPOST', target_subreddit=comment.subreddit)
 
     return comment.reply(text)

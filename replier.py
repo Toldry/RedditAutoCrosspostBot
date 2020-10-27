@@ -11,6 +11,7 @@ import environment
 import listener
 import racb_db
 import reddit_instantiator
+import my_i18n as i18n
 
 TIME_DELAY_SECONDS = 60 * 60 * 24 * 30 * 2  # 2 months
 COMMENT_SCORE_THRESHOLD = 9
@@ -36,9 +37,9 @@ def get_full_comment_from_reddit(comment_info):
         url=r'https://www.reddit.com' + comment_info['permalink'])
 
 
-def get_existing_crosspost(comment, other_subreddit):
+def get_existing_crosspost(source_comment, target_subreddit):
     """Attempts to find whether an existing crosspost
-    already exists in other_subreddit.
+    already exists in target_subreddit.
     Returns the oldest replica submission if found.
     Returns `None` if no existing crosspost exists.
     Returns a `string_reason` if it is impossible to
@@ -49,8 +50,8 @@ def get_existing_crosspost(comment, other_subreddit):
     try:
         # See git isseue to understand why this is necessary
         # https://github.com/praw-dev/praw/issues/880
-        query = f'url:\"{comment.submission.url}\"'
-        submissions = reddit.subreddit(other_subreddit).search(query=query,
+        query = f'url:\"{source_comment.submission.url}\"'
+        submissions = reddit.subreddit(target_subreddit).search(query=query,
                                                                sort='new',
                                                                time_filter='all')
         # iterate over submissions to fetch them
@@ -63,11 +64,11 @@ def get_existing_crosspost(comment, other_subreddit):
         if error_message == 'Redirect to /submit':
             return None
         # when reddit redirects to /subreddits/search that means
-        # the subreddit `other_subreddit` doesn't exist
+        # the subreddit `target_subreddit` doesn't exist
         elif (error_message == 'Redirect to /subreddits/search'
               or error_message == 'received 404 HTTP response'):
             return 'SUBREDDIT_DOES_NOT_EXIST'
-        # this error is recieved when the other_subreddit is private
+        # this error is recieved when the target_subreddit is private
         # "You must be invited to visit this community"
         elif error_message == 'received 403 HTTP response':
             return 'SUBREDDIT_IS_PRIVATE'
@@ -80,18 +81,18 @@ def get_existing_crosspost(comment, other_subreddit):
     return oldest_submission
 
 
-def handle_comment(comment):
-    if comment.score < COMMENT_SCORE_THRESHOLD:
-        logging.info(f'comment score = {comment.score} < {COMMENT_SCORE_THRESHOLD} = threshold. Passing this comment.')
+def handle_comment(source_comment):
+    if source_comment.score < COMMENT_SCORE_THRESHOLD:
+        logging.info(f'comment score = {source_comment.score} < {COMMENT_SCORE_THRESHOLD} = threshold. Passing this comment.')
         return
 
-    other_subreddit = listener.check_pattern(comment)
-    if other_subreddit is None:
+    target_subreddit = listener.check_pattern(source_comment)
+    if target_subreddit is None:
         # this can happen when the comment was editted in the time between the entry was saved
         # and the moment the comment entry is processed
         return
 
-    result = get_existing_crosspost(comment, other_subreddit)
+    result = get_existing_crosspost(source_comment, target_subreddit)
     if result is not None and not isinstance(result, str):
         existing_post = result
         logging.info('Existing crosspost found')
@@ -99,78 +100,75 @@ def handle_comment(comment):
     elif result is not None and isinstance(result, str):
         crosspost_is_impossible_reason_string = result
         logging.info(
-            f'Cannot crosspost to subreddit \'{other_subreddit}\' because {crosspost_is_impossible_reason_string}')
+            f'Cannot crosspost to subreddit \'{target_subreddit}\' because {crosspost_is_impossible_reason_string}')
         return
 
     try:
-        cross_post = comment.submission.crosspost(subreddit=other_subreddit, send_replies=False)
+        cross_post = source_comment.submission.crosspost(subreddit=target_subreddit, send_replies=False)
         logging.info(f'Crosspost succesful. link to post: www.reddit.com{cross_post.permalink}')
-        # reply_to_crosspost_suggestion_comment(comment, cross_post, other_subreddit)
+        # reply_to_crosspost_suggestion_comment(comment, cross_post, target_subreddit)
         # I commented the above line out because people seem to negatively react to these comments.
-        reply_to_crosspost(comment, cross_post, other_subreddit)
+        reply_to_crosspost(source_comment, cross_post, target_subreddit)
     except Exception as e:
-        handled_with_grace = handle_crosspost_exception(e, comment, other_subreddit)
+        handled_with_grace = handle_crosspost_exception(e, source_comment, target_subreddit)
         if not handled_with_grace:
             logging.error(f'Crosspost failed due to a problem: {str(e)}' + '\n\n'
-                          + f'This occured while attempting to crosspost based on this comment: {comment.permalink}')
+                          + f'This occured while attempting to crosspost based on this comment: {source_comment.permalink}')
             logging.exception(e)
             if environment.DEBUG:
                 raise
 
 
-def reply_to_crosspost_suggestion_comment(comment, cross_post, other_subreddit):
+def reply_to_crosspost_suggestion_comment(source_comment, cross_post, target_subreddit):
     text = f'''\
-    It looks like you think this post also fits in r/{other_subreddit}:'
+    It looks like you think this post also fits in r/{target_subreddit}:'
 
 
     So I took the liberty and crossposted this link there. Here's a [link](www.reddit.com{cross_post.permalink})'''
     text = textwrap.dedent(text)
     text += consts.POST_SUFFIX_TEXT
-    return comment.reply(text)
+    return source_comment.reply(text)
 
 
-def reply_to_crosspost(comment, cross_post, other_subreddit):
-    text = f'''\
-    I crossposted this from {comment.subreddit_name_prefixed} to r/{other_subreddit} after seeing [this decently upvoted **human-made** comment]({comment.permalink}) (score={comment.score}), that seems to suggest that this post would be a good fit here too.
-  
-    If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
-    '''
-    text = textwrap.dedent(text)
-    text += consts.POST_SUFFIX_TEXT
-    cross_post.reply(text)
-    return
+def reply_to_crosspost(source_comment, cross_post, target_subreddit):
+    text = i18n.get_translated_string('REPLY_TO_CROSSPOST', target_subreddit)
+    text = text.format(source_subreddit_name_prefixed=source_comment.subreddit_name_prefixed,
+                       target_subreddit=target_subreddit,
+                       source_comment_permalink=source_comment.permalink,
+                       source_comment_score=source_comment.score)
+    return cross_post.reply(text)
 
 
-def handle_crosspost_exception(e, comment, other_subreddit):
+def handle_crosspost_exception(e, comment, target_subreddit):
     """Attempts to handle exceptions that arise while crossposting. Returns True if the error was handled gracefully
     """
     if not isinstance(e, praw.exceptions.RedditAPIException):
         return False
 
     if e.error_type == 'NO_CROSSPOSTS':
-        logging.info(f'Crossposts are not allowed in /r/{other_subreddit}')
+        logging.info(f'Crossposts are not allowed in /r/{target_subreddit}')
         return True
     # wtf does this even mean, reddit? why are some urls considered invalid for crossposting?
     elif e.error_type == 'INVALID_CROSSPOST_THING':
         logging.info(f'Got that weird unhelpful INVALID_CROSSPOST_THING message again: {e.message}')
         return True
     elif e.error_type == 'SUBREDDIT_NOTALLOWED':
-        logging.info(f'Not allowed to post in /r/{other_subreddit}')
+        logging.info(f'Not allowed to post in /r/{target_subreddit}')
         return True
     elif e.error_type == 'NO_IMAGES':
-        logging.info(f'Not allowed to post images in /r/{other_subreddit}')
+        logging.info(f'Not allowed to post images in /r/{target_subreddit}')
         return True
     elif e.error_type == 'NO_LINKS':
-        logging.info(f'Not allowed to post links in /r/{other_subreddit}')
+        logging.info(f'Not allowed to post links in /r/{target_subreddit}')
         return True
     elif e.error_type == 'NO_SELFS':
-        logging.info(f'Not allowed to post text posts in /r/{other_subreddit}')
+        logging.info(f'Not allowed to post text posts in /r/{target_subreddit}')
         return True
     elif e.error_type == 'NO_VIDEOS':
-        logging.info(f'Not allowed to post videos in /r/{other_subreddit}')
+        logging.info(f'Not allowed to post videos in /r/{target_subreddit}')
         return True
     elif e.error_type == 'OVER18_SUBREDDIT_CROSSPOST':
-        logging.info(f'Not allowed to crosspost 18+ content in /r/{other_subreddit}')
+        logging.info(f'Not allowed to crosspost 18+ content in /r/{target_subreddit}')
         return True
     else:
         # Unfamiliar reddit error
