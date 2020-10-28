@@ -10,7 +10,7 @@ It then saves the link to that comment for later processing.
 After some waiting period  (e.g. 3 months), the bot checks the same comment, and if it has accrued enough upvotes, the bot will crosspost the submission that the comment replied to, to the other subreddit.
 
 # Known problem: Reposts
-This bot has two methods for preventing reposts. It first checks whether the source submission link was already posted to the target subreddit, and then it uses [repostsleuth.com](repostsleuth.com) to check whether anything similar to that link was already posted to the target subreddit.
+This bot has two methods for preventing reposts. It first checks whether the source submission link was already posted to the target subreddit, and then it uses [repostsleuth.com](https://www.repostsleuth.com) to check whether anything similar to that link was already posted to the target subreddit.
 
 As far as I know, RepostSleuth doesn't support videos or any other non-image file format, so this method will fail to detect video reposts.
 
