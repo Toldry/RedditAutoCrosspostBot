@@ -1,8 +1,8 @@
 """Accesses a local database to store comment entries"""
 
 from datetime import datetime, timezone
-
 import time
+
 from tinydb import TinyDB, Query
 
 db = TinyDB('db.json', sort_keys=True, indent=4, separators=(',', ': '))

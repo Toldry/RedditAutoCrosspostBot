@@ -23,8 +23,6 @@ Python 3.X
 
 `pip install -r requirements.txt`
 
-TODO: I need to actually make that `requirements.txt` file some time 🤦‍♀️
-
 # How to run
 Development:
 
@@ -33,3 +31,7 @@ Development:
 Production:
 
 `python3 reddit_auto_crosspost_bot.py --production`
+
+
+# Heroku
+I use Heroku to host/run this app

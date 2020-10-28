@@ -7,9 +7,9 @@ import functools
 import logging
 import re
 import os
+import time
 
 import praw
-import time
 
 reddit = None
 
@@ -17,14 +17,15 @@ reddit = None
 def _instantiate_reddit():
     username = 'AutoCrosspostBot'
     clientname = username
-    # password = 'REDACTED'
     app_client_id = 'UwKgkrvtl9fpUw'
+    # password = 'REDACTED'
     # app_client_secret = 'REDACTED'
     version = '0.4'
     developername = 'orqa'
     useragent = f'{clientname}/{version} by /u/{developername}'
 
-    password, app_client_secret = _read_credentials()
+    password = os.environ.get('PASSWORD')
+    app_client_secret = os.environ.get('APP_CLIENT_SECRET')
 
     logging.info('Connecting to reddit via praw to instantiate connection instance')
     global reddit
@@ -33,16 +34,6 @@ def _instantiate_reddit():
                          user_agent=useragent,
                          username=username,
                          password=password)
-
-
-def _read_credentials():
-    script_path = os.path.abspath(__file__) 
-    script_dir = os.path.split(script_path)[0]
-    rel_path = '.credentials'
-    abs_file_path = os.path.join(script_dir, rel_path)
-    with open(abs_file_path) as f:
-        lines = [line.rstrip('\n') for line in f]
-    return lines
 
 
 def _decorate_praw():
