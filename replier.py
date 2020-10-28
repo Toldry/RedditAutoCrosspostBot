@@ -12,15 +12,13 @@ import listener
 import racb_db
 import reddit_instantiator
 import my_i18n as i18n
-
-TIME_DELAY_SECONDS = 60 * 60 * 24 * 30 * 2  # 2 months
-COMMENT_SCORE_THRESHOLD = 9
+import repost_detector
 
 
 def respond_to_saved_comments():
     logging.info('Responding to saved comments')
-    # get comments that were scraped TIME_DELAY_SECONDS seconds ago
-    comment_entries = racb_db.get_comments_before_timedelta(TIME_DELAY_SECONDS)
+    waiting_period_in_seconds = 60 * 60 * 24 * 30 * consts.WAITING_PERIOD_MONTHS
+    comment_entries = racb_db.get_comments_before_timedelta(waiting_period_in_seconds)
     for comment_entry in comment_entries:
         logging.info(
             f"Begin processing saved comment: {comment_entry['permalink']}")
@@ -82,16 +80,19 @@ def get_existing_crosspost(source_comment, target_subreddit):
 
 
 def handle_comment(source_comment):
-    if source_comment.score < COMMENT_SCORE_THRESHOLD:
-        logging.info(f'comment score = {source_comment.score} < {COMMENT_SCORE_THRESHOLD} = threshold. Passing this comment.')
+    if source_comment.score < consts.COMMENT_SCORE_THRESHOLD:
+        logging.info(f'comment score = {source_comment.score} < {consts.COMMENT_SCORE_THRESHOLD} = threshold. Passing this comment.')
         return
+    else:
+        logging.info(f'comment score = {source_comment.score} >= {consts.COMMENT_SCORE_THRESHOLD} = threshold. Continuing.')
+
 
     target_subreddit = listener.check_pattern(source_comment)
     if target_subreddit is None:
-        # this can happen when the comment was editted in the time between the entry was saved
-        # and the moment the comment entry is processed
+        logging.info('Re-checked the source comment for the target subreddit, and no match was found. The comment was probably edited since it was scraped. Passing.')
         return
 
+    logging.info('Checking for existing crosspost in target subreddit')
     result = get_existing_crosspost(source_comment, target_subreddit)
     if result is not None and not isinstance(result, str):
         existing_post = result
@@ -99,8 +100,12 @@ def handle_comment(source_comment):
         return
     elif result is not None and isinstance(result, str):
         crosspost_is_impossible_reason_string = result
-        logging.info(
-            f'Cannot crosspost to subreddit \'{target_subreddit}\' because {crosspost_is_impossible_reason_string}')
+        logging.info(f'Cannot crosspost to subreddit \'{target_subreddit}\' because {crosspost_is_impossible_reason_string}')
+        return
+
+    was_posted_before = repost_detector.check_if_posted_before(source_comment, target_subreddit)
+    logging.info(f'was_posted_before = {was_posted_before}')
+    if was_posted_before:
         return
 
     try:
@@ -135,7 +140,10 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     text = text.format(source_subreddit_name_prefixed=source_comment.subreddit_name_prefixed,
                        target_subreddit=target_subreddit,
                        source_comment_permalink=source_comment.permalink,
-                       source_comment_score=source_comment.score)
+                       source_comment_score=source_comment.score,
+                       source_submission_id=source_comment.submission.id,
+                       waiting_period_months=consts.WAITING_PERIOD_MONTHS,
+                       source_comment_author_name=source_comment.author.name,)
     return cross_post.reply(text)
 
 

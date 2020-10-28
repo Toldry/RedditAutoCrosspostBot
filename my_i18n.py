@@ -2,7 +2,7 @@
 
 DEFAULT_LANGUAGE = 'en'
 
-# I used google translate for these as placeholders, gonna need native speakers to do actual translations some time
+# I used google translate for these as placeholders, gonna need native speakers to do proper translations here
 translations = {
     'POST_SUFFIX_TEXT':{
         'en':'''
@@ -52,9 +52,21 @@ The creator of this bot will look at the responses and try to change the code to
     },
     'REPLY_TO_CROSSPOST':{
         'en':'''
-I crossposted this from {source_subreddit_name_prefixed} to r/{target_subreddit} after seeing [this decently upvoted **human-made** comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.
-  
+I crossposted this from {source_subreddit_name_prefixed} to r/{target_subreddit} after seeing [this decently upvoted **human-made**^^1 comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.
+    
+I checked on [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^^2 before crossposting, to make sure this wasn't already posted before in r/{target_subreddit}.
+
+I also waited {waiting_period_months} months^^3 before crossposting, in case a human might've wanted to crosspost this themselves.
+
 If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
+
+---
+^^1 ^^- ^^Assuming ^^/u/{source_comment_author_name} ^^is ^^human
+
+^^2 ^^- ^^Might ^^not ^^work ^^for ^^some ^^types ^^of ^^submissions, ^^such ^^as ^^videos
+
+^^3 ^^- ^^This ^^value ^^was ^^chosen ^^arbitrarily
+
 '''
 ,
     'es':'''

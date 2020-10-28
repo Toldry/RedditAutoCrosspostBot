@@ -53,7 +53,7 @@ def configure_logging():
 
 def main():
     configure_logging()
-    logging.info('Running RedditAutoCrosspostBot')
+    logging.info('Running reddit_auto_crosspost_bot')
 
     schedule.every(7).minutes.do(unwated_submission_remover.delete_unwanted_submissions)
     schedule.every(20).seconds.do(inbox_responder.respond_to_inbox)
@@ -120,6 +120,5 @@ if __name__ == '__main__':
         raise
     
 
-# TODO Use tineye.com or karmadecay.com or www.reddit.com/r/MAGIC_EYE_BOT/ to check for reposts 
 # TODO Change title of crossposts specific subreddits according to their rules (e.g. when crossposting into /r/TIHI rename the post to "Thanks I hate it")
 # TODO Replace tinydb with something else that's more efficient to work with tables with hundereds of thousands of entries

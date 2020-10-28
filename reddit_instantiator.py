@@ -20,7 +20,7 @@ def _instantiate_reddit():
     # password = 'REDACTED'
     app_client_id = 'UwKgkrvtl9fpUw'
     # app_client_secret = 'REDACTED'
-    version = '0.3'
+    version = '0.4'
     developername = 'orqa'
     useragent = f'{clientname}/{version} by /u/{developername}'
 
