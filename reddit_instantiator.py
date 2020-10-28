@@ -10,6 +10,7 @@ import os
 import time
 
 import praw
+import dotenv
 
 reddit = None
 
@@ -24,9 +25,10 @@ def _instantiate_reddit():
     developername = 'orqa'
     useragent = f'{clientname}/{version} by /u/{developername}'
 
+    dotenv.load_dotenv()
     password = os.environ.get('PASSWORD')
     app_client_secret = os.environ.get('APP_CLIENT_SECRET')
-
+    
     logging.info('Connecting to reddit via praw to instantiate connection instance')
     global reddit
     reddit = praw.Reddit(client_id=app_client_id,
