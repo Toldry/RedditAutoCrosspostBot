@@ -5,11 +5,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 import argparse
 import time
-import requests
-import urllib3
 
+import requests
 import schedule
 import prawcore
+import urllib3
 
 import environment
 import inbox_responder

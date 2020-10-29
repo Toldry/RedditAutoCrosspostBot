@@ -18,7 +18,7 @@ import repost_detector
 def respond_to_saved_comments():
     logging.info('Responding to saved comments')
     waiting_period_in_seconds = 60 * 60 * 24 * 30 * consts.WAITING_PERIOD_MONTHS
-    comment_entries = racb_db.get_comments_before_timedelta(waiting_period_in_seconds)
+    comment_entries = racb_db.get_comments_older_than(waiting_period_in_seconds)
     for comment_entry in comment_entries:
         logging.info(
             f"Begin processing saved comment: {comment_entry['permalink']}")
