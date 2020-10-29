@@ -7,15 +7,33 @@ CREATE INDEX IF NOT EXISTS idx_time_limits_scraped_time
 ON scraped_comments (scraped_time);
 
 
+DROP VIEW IF EXISTS scraped_comments_expanded;
+CREATE OR REPLACE VIEW scraped_comments_expanded AS
+    SELECT sc.*, (CURRENT_TIMESTAMP - sc.scraped_time) as time_interval_since_scraped
+    FROM scraped_comments AS sc;
+
 CREATE OR REPLACE FUNCTION get_comments_older_than(t INTERVAL) 
 RETURNS 
     TABLE(id INTEGER, permalink VARCHAR, scraped_time TIMESTAMP) 
 AS
 $$ 
 BEGIN RETURN QUERY
-    SELECT scraped_comments.id,scraped_comments.permalink,scraped_comments.scraped_time
-    FROM scraped_comments
-    WHERE CURRENT_TIMESTAMP  - scraped_comments.scraped_time > t;
+    SELECT sc.id,sc.permalink,sc.scraped_time
+    FROM scraped_comments_expanded as sc
+    WHERE sc.time_interval_since_scraped > t;
+END;
+$$ 
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_unchecked_comments_older_than(t INTERVAL) 
+RETURNS 
+    TABLE(id INTEGER, permalink VARCHAR, scraped_time TIMESTAMP) 
+AS
+$$ 
+BEGIN RETURN QUERY
+    SELECT sc.id,sc.permalink,sc.scraped_time
+    FROM scraped_comments_expanded as sc
+    WHERE sc.time_interval_since_scraped > t AND sc.score_checked = 'false';
 END;
 $$ 
 LANGUAGE plpgsql;
@@ -43,6 +61,22 @@ $$
 BEGIN
     DELETE FROM scraped_comments
     WHERE scraped_comments.id=id_to_delete;
+END;
+$$ 
+LANGUAGE plpgsql;
+
+ALTER TABLE scraped_comments
+ADD COLUMN IF NOT EXISTS score_checked BOOLEAN DEFAULT FALSE NOT NULL;
+
+CREATE OR REPLACE FUNCTION set_comment_checked(p_id INTEGER) 
+RETURNS 
+    VOID
+AS
+$$ 
+BEGIN
+    UPDATE scraped_comments
+    SET score_checked = 'true'
+    WHERE id=p_id;
 END;
 $$ 
 LANGUAGE plpgsql;

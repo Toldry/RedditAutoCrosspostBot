@@ -5,4 +5,6 @@ SUB_BLACKLIST = [
 
 WAITING_PERIOD_MONTHS = 3 # chosen arbitrarily
 
-COMMENT_SCORE_THRESHOLD = 9 # also chosen arbitrarily
+COMMENT_SCORE_THRESHOLD = 10 # also chosen arbitrarily
+
+WAITING_PERIOD_FOR_LOW_SCORE_COMMENT_REMOVAL_DAYS = 3 # yup also arbitrary

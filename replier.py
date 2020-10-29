@@ -26,7 +26,7 @@ def respond_to_saved_comments():
         available = check_comment_availability(comment)
         if available:
             handle_comment(comment)
-        racb_db.remove_comment(comment_entry)  # remove entry after processing
+        racb_db.delete_comment(comment_entry)
 
 
 def get_full_comment_from_reddit(comment_info):

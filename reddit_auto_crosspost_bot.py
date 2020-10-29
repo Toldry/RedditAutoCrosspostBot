@@ -17,6 +17,7 @@ import listener
 import reddit_instantiator
 import replier
 import unwated_submission_remover
+import low_score_comments_remover
 
 # https://www.pythonforengineers.com/build-a-reddit-bot-part-1/
 
@@ -56,7 +57,8 @@ def main():
     logging.info('Running reddit_auto_crosspost_bot')
 
     schedule.every(7).minutes.do(unwated_submission_remover.delete_unwanted_submissions)
-    schedule.every(20).seconds.do(inbox_responder.respond_to_inbox)
+    schedule.every(20).seconds.do(inbox_responder.respond_to_inbox) #TODO switch implementation to stream
+    schedule.every(60).minutes.do(low_score_comments_remover.delete_comments_with_low_score)
     if not environment.LISTEN_ONLY:
         schedule.every(6).minutes.do(replier.respond_to_saved_comments)
 
@@ -98,7 +100,6 @@ def main():
 def listen_to_comment_stream():
     reddit = reddit_instantiator.get_reddit_instance()
     scanned_subreddits = 'all'
-    # scanned_subreddits = 'test+test9'
     subreddit_object = reddit.subreddit(scanned_subreddits)
 
     logging.info('Listening to comment stream...')
@@ -121,4 +122,3 @@ if __name__ == '__main__':
     
 
 # TODO Change title of crossposts specific subreddits according to their rules (e.g. when crossposting into /r/TIHI rename the post to "Thanks I hate it")
-# TODO Replace tinydb with something else that's more efficient to work with tables with hundereds of thousands of entries
