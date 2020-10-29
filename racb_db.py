@@ -38,7 +38,7 @@ def instantiate_database():
         cur.execute(sql)
         conn.commit()
 
-DATABASE_URL = os.environ['DATABASE_URL']
-sslmode = None if environment.DEBUG else 'require'
-conn = psycopg2.connect(dsn=os.environ['DATABASE_URL'], sslmode=sslmode)
+conn = psycopg2.connect(
+    dsn=os.environ['DATABASE_URL'], 
+    sslmode='require' if not environment.DEBUG else None)
 instantiate_database()

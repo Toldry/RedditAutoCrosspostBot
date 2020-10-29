@@ -18,8 +18,10 @@ I am looking for a way to solve this problem. Suggestions are welcome.
 
 # Requierments
 Python 3.X
+PostgreSQL
+Heroku (for production)
 
-# How to install
+# How to install for local development
 
 `pip install -r requirements.txt`
 
@@ -29,9 +31,30 @@ Development:
 `python3 reddit_auto_crosspost_bot.py`
 
 Production:
-
 `python3 reddit_auto_crosspost_bot.py --production`
 
 
 # Heroku
 I use Heroku to host/run this app
+TODO write more about this later
+
+```
+git clone https://github.com/Toldry/RedditAutoCrosspostBot.git
+cd reddit_auto_crosspost_bot
+heroku login
+heroku ps:scale worker=1
+```
+
+
+# PostgreSQL
+This bot stores its data in a postgres database
+TODO write more about this later
+
+# Environment variables
+```
+PASSWORD=redacted
+APP_CLIENT_SECRET=redacted
+DATABASE_URL=redacted
+```
+TODO write more about this later
+TODO combine .env and environment.py
