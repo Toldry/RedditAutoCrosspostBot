@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS scraped_comments (
 CREATE INDEX IF NOT EXISTS idx_time_limits_scraped_time
 ON scraped_comments (scraped_time);
 
+ALTER TABLE scraped_comments
+ADD COLUMN IF NOT EXISTS score_checked BOOLEAN DEFAULT FALSE NOT NULL;
+
 
 DROP VIEW IF EXISTS scraped_comments_expanded;
 CREATE OR REPLACE VIEW scraped_comments_expanded AS
@@ -64,9 +67,6 @@ BEGIN
 END;
 $$ 
 LANGUAGE plpgsql;
-
-ALTER TABLE scraped_comments
-ADD COLUMN IF NOT EXISTS score_checked BOOLEAN DEFAULT FALSE NOT NULL;
 
 CREATE OR REPLACE FUNCTION set_comment_checked(p_id INTEGER) 
 RETURNS 
