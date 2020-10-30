@@ -38,7 +38,9 @@ def configure_logging():
     stream_handler = logging.StreamHandler()
 
     file_handler.setLevel(logging.INFO)
-    stream_handler.setLevel(logging.DEBUG)
+    stream_handler.setLevel(logging.INFO)
+    if environment.DEBUG:
+        stream_handler.setLevel(logging.DEBUG)
 
     logging_blacklist = ['prawcore', 'urllib3.connectionpool', 'schedule']
     for item in logging_blacklist:
