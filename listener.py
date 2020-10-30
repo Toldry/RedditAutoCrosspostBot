@@ -28,7 +28,7 @@ def handle_incoming_comment(comment):
     if other_subreddit.lower() in consts.SUB_BLACKLIST or comment.subreddit.title.lower() in consts.SUB_BLACKLIST:
         return
 
-    logging.debug(f'Match found: {comment.permalink}')
+    logging.info(f'Match found: {comment.permalink}')
     racb_db.add_comment(comment)
 
 
