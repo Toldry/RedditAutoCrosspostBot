@@ -3,11 +3,11 @@
 
 import logging
 import textwrap
+import os
 
 import praw
 
 import consts
-import environment
 import listener
 import racb_db
 import reddit_instantiator
@@ -17,8 +17,9 @@ import repost_detector
 
 def respond_to_saved_comments():
     logging.info('Responding to saved comments')
-    waiting_period_in_seconds = 60 * 60 * 24 * 30 * consts.WAITING_PERIOD_MONTHS
-    comment_entries = racb_db.get_comments_older_than(waiting_period_in_seconds)
+    waiting_period_months = int(os.environ.get('WAITING_PERIOD_MONTHS'))
+    waiting_period_seconds = 60 * 60 * 24 * 30 * waiting_period_months
+    comment_entries = racb_db.get_comments_older_than(waiting_period_seconds)
     for comment_entry in comment_entries:
         logging.info(
             f"Begin processing saved comment: {comment_entry['permalink']}")
@@ -80,11 +81,12 @@ def get_existing_crosspost(source_comment, target_subreddit):
 
 
 def handle_comment(source_comment):
-    if source_comment.score < consts.COMMENT_SCORE_THRESHOLD:
-        logging.info(f'comment score = {source_comment.score} < {consts.COMMENT_SCORE_THRESHOLD} = threshold. Passing this comment.')
+    comment_score_threshold = int(os.environ.get('COMMENT_SCORE_THRESHOLD'))
+    if source_comment.score < comment_score_threshold:
+        logging.info(f'comment score = {source_comment.score} < {comment_score_threshold} = threshold. Passing this comment.')
         return
     else:
-        logging.info(f'comment score = {source_comment.score} >= {consts.COMMENT_SCORE_THRESHOLD} = threshold. Continuing.')
+        logging.info(f'comment score = {source_comment.score} >= {comment_score_threshold} = threshold. Continuing.')
 
 
     target_subreddit = listener.check_pattern(source_comment)
@@ -111,8 +113,6 @@ def handle_comment(source_comment):
     try:
         cross_post = source_comment.submission.crosspost(subreddit=target_subreddit, send_replies=False)
         logging.info(f'Crosspost succesful. link to post: www.reddit.com{cross_post.permalink}')
-        # reply_to_crosspost_suggestion_comment(comment, cross_post, target_subreddit)
-        # I commented the above line out because people seem to negatively react to these comments.
         reply_to_crosspost(source_comment, cross_post, target_subreddit)
     except Exception as e:
         handled_with_grace = handle_crosspost_exception(e, source_comment, target_subreddit)
@@ -120,29 +120,20 @@ def handle_comment(source_comment):
             logging.error(f'Crosspost failed due to a problem: {str(e)}' + '\n\n'
                           + f'This occured while attempting to crosspost based on this comment: {source_comment.permalink}')
             logging.exception(e)
-            if environment.DEBUG:
+            debug = bool(os.environ.get('DEBUG'))
+            if debug:
                 raise
-
-
-def reply_to_crosspost_suggestion_comment(source_comment, cross_post, target_subreddit):
-    text = f'''\
-    It looks like you think this post also fits in r/{target_subreddit}:'
-
-
-    So I took the liberty and crossposted this link there. Here's a [link](www.reddit.com{cross_post.permalink})'''
-    text = textwrap.dedent(text)
-    text += consts.POST_SUFFIX_TEXT
-    return source_comment.reply(text)
 
 
 def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     text = i18n.get_translated_string('REPLY_TO_CROSSPOST', target_subreddit)
+    waiting_period_months = int(os.environ.get('WAITING_PERIOD_MONTHS'))
     text = text.format(source_subreddit_name_prefixed=source_comment.subreddit_name_prefixed,
                        target_subreddit=target_subreddit,
                        source_comment_permalink=source_comment.permalink,
                        source_comment_score=source_comment.score,
                        source_submission_id=source_comment.submission.id,
-                       waiting_period_months=consts.WAITING_PERIOD_MONTHS,
+                       waiting_period_months=waiting_period_months,
                        source_comment_author_name=source_comment.author.name,)
     return cross_post.reply(text)
 

@@ -7,8 +7,6 @@ import time
 import psycopg2
 import psycopg2.extras
 
-import environment
-
 def add_comment(comment):
     with conn.cursor() as cur:
         permalink = comment.permalink
@@ -48,7 +46,8 @@ def instantiate_database():
         cur.execute(sql)
         conn.commit()
 
+debug = bool(os.environ.get('DEBUG'))
 conn = psycopg2.connect(
     dsn=os.environ['DATABASE_URL'], 
-    sslmode='require' if not environment.DEBUG else None)
+    sslmode='require' if not debug else None)
 instantiate_database()

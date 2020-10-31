@@ -57,4 +57,3 @@ APP_CLIENT_SECRET=redacted
 DATABASE_URL=redacted
 ```
 TODO write more about this later
-TODO combine .env and environment.py

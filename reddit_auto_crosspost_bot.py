@@ -10,8 +10,8 @@ import requests
 import schedule
 import prawcore
 import urllib3
+import os
 
-import environment
 import inbox_responder
 import listener
 import reddit_instantiator
@@ -27,8 +27,8 @@ def handle_commandline_arguments():
     parser.add_argument("--listen_only", default=False, action="store_true" , help="When set, the bot only listens to the comment stream but does not reply to items")
 
     args = parser.parse_args()
-    environment.DEBUG = not args.production
-    environment.LISTEN_ONLY = args.listen_only
+    os.environ['DEBUG'] = str(not args.production)
+    os.environ['LISTEN_ONLY'] = str(args.listen_only)
 
 
 def configure_logging():
@@ -39,7 +39,8 @@ def configure_logging():
 
     file_handler.setLevel(logging.INFO)
     stream_handler.setLevel(logging.INFO)
-    if environment.DEBUG:
+    debug = bool(os.environ.get('DEBUG'))
+    if debug:
         stream_handler.setLevel(logging.DEBUG)
 
     logging_blacklist = ['prawcore', 'urllib3.connectionpool', 'schedule']
@@ -61,10 +62,12 @@ def main():
     schedule.every(7).minutes.do(unwated_submission_remover.delete_unwanted_submissions)
     schedule.every(20).seconds.do(inbox_responder.respond_to_inbox) #TODO switch implementation to stream
     schedule.every(60).minutes.do(low_score_comments_remover.delete_comments_with_low_score)
-    if not environment.LISTEN_ONLY:
+    listen_only = bool(os.environ.get('LISTEN_ONLY'))
+    if not listen_only:
         schedule.every(6).minutes.do(replier.respond_to_saved_comments)
 
-    if environment.DEBUG:
+    debug = bool(os.environ.get('DEBUG'))
+    if debug:
         schedule.run_all()
     
     while True:
@@ -74,7 +77,7 @@ def main():
                 prawcore.exceptions.Forbidden,
                 requests.exceptions.ConnectTimeout,
                 ) as e:
-            if environment.DEBUG:
+            if debug:
                 raise
             else:
                 # Sometimes the reddit service fails (e.g. error 503)
@@ -111,7 +114,8 @@ def listen_to_comment_stream():
             schedule.run_pending()
         except Exception as e:
             logging.exception(e)
-            if environment.DEBUG:
+            debug = bool(os.environ.get('DEBUG'))
+            if debug:
                 raise
 
 handle_commandline_arguments()

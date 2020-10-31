@@ -7,7 +7,6 @@ import textwrap
 import praw
 import prawcore
 
-import consts
 import reddit_instantiator
 import my_i18n as i18n
 
