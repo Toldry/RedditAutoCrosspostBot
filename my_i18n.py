@@ -94,6 +94,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     }
 }
 
+# TODO: use language detection algorithms to automate this
 subreddit_language_map = {
     'ani_bm'            :'he',
     'israel'            :'he',

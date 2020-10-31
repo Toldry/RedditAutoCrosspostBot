@@ -40,7 +40,7 @@ def configure_logging():
     debug = bool(os.environ.get('DEBUG'))
     level = logging.INFO
     if debug:
-        level = loggig.DEBUG
+        level = logging.DEBUG
 
     file_handler.setLevel(logging.INFO)
     stream_handler.setLevel(level)
