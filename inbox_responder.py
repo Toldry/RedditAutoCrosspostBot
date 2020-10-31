@@ -42,6 +42,7 @@ def respond_to_inbox():
                 reddit.inbox.mark_read([comment])
             else:
                 raise
+    logging.debug('Finished checking inbox')
 
 
 def check_sentiment(text):
