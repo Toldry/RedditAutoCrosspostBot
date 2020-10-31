@@ -7,8 +7,8 @@ import racb_db
 
 def delete_comments_with_low_score():
     logging.info('Removing comments with low score')
-    waiting_period_for_low_score_comment_removal_days = int(os.environ.get('WAITING_PERIOD_FOR_LOW_SCORE_COMMENT_REMOVAL_DAYS'))
-    waiting_period_seconds = 60*60*24*waiting_period_for_low_score_comment_removal_days
+    waiting_period_for_low_score_comment_removal_hours = int(os.environ.get('WAITING_PERIOD_FOR_LOW_SCORE_COMMENT_REMOVAL_HOURS'))
+    waiting_period_seconds = 60*60*waiting_period_for_low_score_comment_removal_hours
     comment_entries = racb_db.get_unchecked_comments_older_than(waiting_period_seconds)
     logging.info(f'Found {len(comment_entries)} unchecked comments.')
     if len(comment_entries) == 0:
