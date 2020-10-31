@@ -37,18 +37,20 @@ def configure_logging():
                                        backupCount=1, encoding='utf-8')
     stream_handler = logging.StreamHandler()
 
-    file_handler.setLevel(logging.INFO)
-    stream_handler.setLevel(logging.INFO)
     debug = bool(os.environ.get('DEBUG'))
+    level = logging.INFO
     if debug:
-        stream_handler.setLevel(logging.DEBUG)
+        level = loggig.DEBUG
+
+    file_handler.setLevel(logging.INFO)
+    stream_handler.setLevel(level)
 
     logging_blacklist = ['prawcore', 'urllib3.connectionpool', 'schedule']
     for item in logging_blacklist:
         logging.getLogger(item).disabled = True
 
     logging.basicConfig(format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s',
-                        level=logging.DEBUG,
+                        level=level,
                         handlers=[
                             file_handler,
                             stream_handler
