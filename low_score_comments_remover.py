@@ -16,13 +16,11 @@ def delete_comments_with_low_score():
         return
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-        executor.map(process_comment_entry, comment_entries[:2])
+        executor.map(process_comment_entry, comment_entries)
     logging.info('Finished removing comments with low score')
 
 
 def process_comment_entry(comment_entry):
-    prince = print
-    prince("ori")
     comment = replier.get_full_comment_from_reddit(comment_entry)
     available = replier.check_comment_availability(comment)
     comment_score_threshold = int(os.environ.get('COMMENT_SCORE_THRESHOLD'))
