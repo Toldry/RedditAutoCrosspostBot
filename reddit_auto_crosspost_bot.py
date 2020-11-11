@@ -63,7 +63,7 @@ def main():
 
     schedule.every(7).minutes.do(unwated_submission_remover.delete_unwanted_submissions)
     schedule.every(20).seconds.do(inbox_responder.respond_to_inbox) #TODO switch implementation to stream
-    schedule.every(60).minutes.do(low_score_comments_remover.delete_comments_with_low_score)
+    schedule.every(5).minutes.do(low_score_comments_remover.delete_comments_with_low_score)
     listen_only = bool(os.environ.get('LISTEN_ONLY'))
     if not listen_only:
         schedule.every(6).minutes.do(replier.respond_to_saved_comments)
