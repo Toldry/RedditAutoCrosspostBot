@@ -12,7 +12,7 @@ translations = {
 ---
 ^^🤖 ^^this ^^comment ^^was ^^written ^^by ^^a ^^bot. ^^beep ^^boop ^^🤖
 
-^^feel ^^welcome ^^to ^^respond ^^'Bad ^^bot'/'Good ^^bot', ^^it's ^^useful ^^feedback'''
+^^feel ^^welcome ^^to ^^respond ^^'Bad ^^bot'/'Good ^^bot', ^^it's ^^useful ^^feedback. [^^github](https://github.com/Toldry/RedditAutoCrosspostBot)'''
 ,
     'es':'''
 
