@@ -17,14 +17,14 @@ import my_i18n as i18n
 
 
 def process_comment_entries():
-    logging.info('Processing comment entries')
+    logging.info('Beginning phase 3 processing')
     PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD')
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE3_WAITING_PERIOD)
     comment_entries = racb_db.get_comments_older_than(waiting_period_seconds)
     for comment_entry in comment_entries:
         handle_comment(comment_entry)
         racb_db.delete_comment(comment_entry)
-
+    logging.info('BegiFinished phase 3 processing')
 
 def handle_comment(comment_entry):
     logging.info(f'Begin processing comment entry : {comment_entry["permalink"]}')

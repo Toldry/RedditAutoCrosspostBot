@@ -14,7 +14,7 @@ import repost_detector
 import phase1_handler
 
 def filter_comments_from_db():
-    logging.info('Running phase 1 comment filter')
+    logging.info('Running phase 2 comment filter')
     PHASE2_WAITING_PERIOD = os.environ.get('PHASE2_WAITING_PERIOD')
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE2_WAITING_PERIOD)
     comment_entries = racb_db.get_unchecked_comments_older_than(waiting_period_seconds)
@@ -24,7 +24,7 @@ def filter_comments_from_db():
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
         executor.map(process_comment_entry, comment_entries)
-    logging.info('Finished running phase 1 comment filter')
+    logging.info('Finished running phase 2 comment filter')
 
 
 def run_filters(comment_entry):
