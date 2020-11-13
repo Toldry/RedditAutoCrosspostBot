@@ -8,7 +8,7 @@ import datetime
 from distutils import util
 
 import praw
-import humanize
+import pytimeparse
 
 import consts
 import phase2_handler
@@ -19,8 +19,9 @@ import my_i18n as i18n
 
 def process_comment_entries():
     logging.info('Processing comment entries')
-    PHASE3_WAITING_PERIOD_SECONDS = int(os.environ.get('PHASE3_WAITING_PERIOD_SECONDS'))
-    comment_entries = racb_db.get_comments_older_than(PHASE3_WAITING_PERIOD_SECONDS)
+    PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD')
+    waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE3_WAITING_PERIOD)
+    comment_entries = racb_db.get_comments_older_than(waiting_period_seconds)
     for comment_entry in comment_entries:
         handle_comment(comment_entry)
         racb_db.delete_comment(comment_entry)
@@ -50,9 +51,8 @@ def handle_comment(comment_entry):
 
 def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     text = i18n.get_translated_string('REPLY_TO_CROSSPOST', target_subreddit)
-    PHASE3_WAITING_PERIOD_SECONDS = int(os.environ.get('PHASE3_WAITING_PERIOD_SECONDS'))
-    dt = datetime.timedelta(seconds=PHASE3_WAITING_PERIOD_SECONDS)
-    timedelta_string = humanize.naturaldelta(dt)
+    PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD')
+    timedelta_string = PHASE3_WAITING_PERIOD
     text = text.format(source_subreddit_name_prefixed=source_comment.subreddit_name_prefixed,
                        target_subreddit=target_subreddit,
                        source_comment_permalink=source_comment.permalink,
