@@ -23,8 +23,7 @@ BEGIN
     AND EXISTS(
         SELECT *
         FROM information_schema.columns
-        WHERE table_name='scraped_comments' and column_name='phase2_checked') 
-    )
+        WHERE table_name='scraped_comments' and column_name='phase2_checked')
   THEN
     ALTER TABLE scraped_comments DROP COLUMN score_checked;
   ELSE
