@@ -7,7 +7,7 @@ CREATE INDEX IF NOT EXISTS idx_time_limits_scraped_time
 ON scraped_comments (scraped_time);
 
 ALTER TABLE scraped_comments
-ADD COLUMN IF NOT EXISTS phase2_checked BOOLEAN DEFAULT FALSE NOT NULL;
+ADD COLUMN IF NOT EXISTS score_checked BOOLEAN DEFAULT FALSE NOT NULL;
 
 -- ALTER TABLE scraped_comments 
 -- RENAME COLUMN IF EXISTS score_checked TO phase2_checked;
@@ -19,9 +19,16 @@ DO $$
 BEGIN
   IF EXISTS(SELECT *
     FROM information_schema.columns
-    WHERE table_name='scraped_comments' and column_name='score_checked')
+    WHERE table_name='scraped_comments' and column_name='score_checked') 
+    AND EXISTS(
+        SELECT *
+        FROM information_schema.columns
+        WHERE table_name='scraped_comments' and column_name='phase2_checked') 
+    )
   THEN
-      ALTER TABLE "scraped_comments" RENAME COLUMN "score_checked" TO "phase2_checked";
+    ALTER TABLE scraped_comments DROP COLUMN score_checked;
+  ELSE
+    ALTER TABLE "scraped_comments" RENAME COLUMN "score_checked" TO "phase2_checked";
   END IF;
 END $$;
 
