@@ -1,5 +1,4 @@
-"""Maintains a singleton instcáe of the `praw.reddit` class
-"""
+"""Maintains a singleton instance of the `praw.reddit` class"""
 
 __all__ = ['get_reddit_instance']
 

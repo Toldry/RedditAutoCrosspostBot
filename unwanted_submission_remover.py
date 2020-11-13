@@ -1,4 +1,5 @@
 """Removes unwanted submissions according to score"""
+
 import logging
 
 import reddit_instantiator

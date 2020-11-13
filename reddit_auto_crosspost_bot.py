@@ -1,5 +1,4 @@
-"""Main entry point of the program
-"""
+"""Main entry point of the program"""
 
 import logging
 from logging.handlers import RotatingFileHandler

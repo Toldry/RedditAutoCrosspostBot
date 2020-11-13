@@ -1,3 +1,5 @@
+"""Attempts to detect whether a submission has already been posted"""
+
 import logging
 from http import HTTPStatus
 

@@ -1,5 +1,4 @@
-"""Replies to processed comment entries
-"""
+"""Retrieves aged comment entries from the DB and crossposts them"""
 
 import logging
 import textwrap

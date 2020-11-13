@@ -1,4 +1,4 @@
-"""Listens to incoming comments from reddit"""
+"""Listens to incoming comments from reddit, checks if they match the 'subreddit recommendation' pattern, and saves them to the DB"""
 
 import logging
 import re

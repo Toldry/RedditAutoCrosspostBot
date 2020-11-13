@@ -1,3 +1,6 @@
+"""Retrieves aged comment entries from the DB and checks whether they pass required filters to be crossposted, but does not crosspost them yet.
+The objective is to reduce database space usage"""
+
 import logging
 import os
 import concurrent.futures
