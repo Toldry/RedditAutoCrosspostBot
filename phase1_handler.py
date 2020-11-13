@@ -59,5 +59,5 @@ def check_pattern(comment):
 
     groups = search_result.groups()
 
-    other_subreddit = groups[1]
-    return other_subreddit
+    target_subreddit = groups[1]
+    return target_subreddit

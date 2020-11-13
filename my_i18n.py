@@ -56,7 +56,7 @@ I crossposted this from {source_subreddit_name_prefixed} to r/{target_subreddit}
     
 I checked on [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^^2 before crossposting, to make sure this wasn't already posted before in r/{target_subreddit}.
 
-I also waited {waiting_period_months} months^^3 before crossposting, in case a human might've wanted to crosspost this themselves.
+I also waited {timedelta_string}^^3 before crossposting, in case a human might've wanted to crosspost this themselves.
 
 If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
 

@@ -4,7 +4,6 @@ from http import HTTPStatus
 import requests
 
 def check_if_posted_before(source_comment, target_subreddit):
-    source_subreddit = source_comment.subreddit.display_name
     post_id = source_comment.submission.id
     posts = search_reposts(post_id)
     subreddits = [post['subreddit'] for post in posts]

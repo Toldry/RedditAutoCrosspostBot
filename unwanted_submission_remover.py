@@ -3,7 +3,7 @@ import logging
 
 import reddit_instantiator
 
-MINIMUM_SCORE = 0 #TODO: move this to env ?
+MINIMUM_SCORE = 0
 
 
 def get_latest_submissions(limit=40):

@@ -3,6 +3,7 @@
 import os
 from datetime import datetime
 import time
+from distutils import util
 
 import psycopg2
 import psycopg2.extras
@@ -46,7 +47,7 @@ def instantiate_database():
         cur.execute(sql)
         conn.commit()
 
-debug = bool(os.environ.get('DEBUG'))
+debug = bool(util.strtobool(os.environ.get('DEBUG')))
 conn = psycopg2.connect(
     dsn=os.environ['DATABASE_URL'], 
     sslmode='require' if not debug else None)

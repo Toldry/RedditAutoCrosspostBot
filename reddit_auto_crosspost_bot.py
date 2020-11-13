@@ -5,6 +5,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import argparse
 import time
+from distutils import util
 
 import requests
 import schedule
@@ -12,24 +13,16 @@ import prawcore
 import urllib3
 import os
 
-import inbox_responder
-import listener
 import reddit_instantiator
-import replier
-import unwated_submission_remover
-import low_score_comments_remover
+import unwanted_submission_remover
+import inbox_handler
+import phase1_handler
+import phase2_handler
+import phase3_handler
 
-# https://www.pythonforengineers.com/build-a-reddit-bot-part-1/
 
-def handle_commandline_arguments():
-    parser = argparse.ArgumentParser(description='Run the reddit AutoCrosspostBot.')
-    parser.add_argument("--production", default=False, action="store_true" , help="Set when running in production environment")
-    parser.add_argument("--listen_only", default=False, action="store_true" , help="When set, the bot only listens to the comment stream but does not reply to items")
-
-    args = parser.parse_args()
-    os.environ['DEBUG'] = str(not args.production)
-    os.environ['LISTEN_ONLY'] = str(args.listen_only)
-
+comment_stream = None
+inbox_stream = None
 
 def configure_logging():
     file_handler = RotatingFileHandler("app.log", mode='a', delay=0,
@@ -37,7 +30,7 @@ def configure_logging():
                                        backupCount=1, encoding='utf-8')
     stream_handler = logging.StreamHandler()
 
-    debug = bool(os.environ.get('DEBUG'))
+    debug = bool(util.strtobool(os.environ.get('DEBUG')))
     level = logging.INFO
     if debug:
         level = logging.DEBUG
@@ -56,77 +49,87 @@ def configure_logging():
                             stream_handler
                         ])
 
+def init_streams():
+    reddit = reddit_instantiator.get_reddit_instance()
+    scanned_subreddits = 'all'
+    subreddit = reddit.subreddit(scanned_subreddits)
+    comment_stream = subreddit.stream.comments(skip_existing=True, pause_after=-1)
+    inbox_stream = reddit.inbox.stream(mark_read=False, pause_after=-1)
+    return (comment_stream, inbox_stream)
+
+def set_schedule():
+    schedule.every(7).minutes.do(unwanted_submission_remover.delete_unwanted_submissions)
+    schedule.every(20).minutes.do(phase2_handler.filter_comments_from_db)
+    listen_only = bool(util.strtobool(os.environ.get('LISTEN_ONLY')))
+    if not listen_only:
+        schedule.every(6).minutes.do(phase3_handler.process_comment_entries)
+
+    debug = bool(util.strtobool(os.environ.get('DEBUG')))
+    if debug:
+        schedule.run_all()
 
 def main():
     configure_logging()
     logging.info('Running reddit_auto_crosspost_bot')
 
-    schedule.every(7).minutes.do(unwated_submission_remover.delete_unwanted_submissions)
-    schedule.every(20).seconds.do(inbox_responder.respond_to_inbox) #TODO switch implementation to stream
-    schedule.every(5).minutes.do(low_score_comments_remover.delete_comments_with_low_score)
-    listen_only = bool(os.environ.get('LISTEN_ONLY'))
-    if not listen_only:
-        schedule.every(6).minutes.do(replier.respond_to_saved_comments)
+    set_schedule()
 
-    debug = bool(os.environ.get('DEBUG'))
-    if debug:
-        schedule.run_all()
+    comment_stream, inbox_stream = init_streams()
     
     while True:
         try:
-            listen_to_comment_stream()
-        except (prawcore.exceptions.ServerError,
-                prawcore.exceptions.Forbidden,
-                requests.exceptions.ConnectTimeout,
-                ) as e:
-            if debug:
-                raise
-            else:
-                # Sometimes the reddit service fails (e.g. error 503)
-                # One time I got an error 403 (unaothorized) for no apparent reason
-                # Other times the internet connection fails
-                # just wait a bit a try again
-                logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
-                time.sleep(30)
-        except prawcore.exceptions.RequestException as e:
-            is_max_retry_or_read_timeout_error = (
-                e.original_exception and 
-                e.original_exception.args and 
-                len(e.original_exception.args) > 0 and 
-                (   isinstance(e.original_exception.args[0], urllib3.exceptions.MaxRetryError) or
-                    isinstance(e.original_exception.args[0], urllib3.exceptions.ReadTimeoutError)
-                )
-            )
-            if is_max_retry_or_read_timeout_error:
-                logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
-                time.sleep(30)
-            else:
-                raise
-
-
-def listen_to_comment_stream():
-    reddit = reddit_instantiator.get_reddit_instance()
-    scanned_subreddits = 'all'
-    subreddit_object = reddit.subreddit(scanned_subreddits)
-
-    logging.info('Listening to comment stream...')
-    for comment in subreddit_object.stream.comments(skip_existing=True):
-        try:
-            listener.handle_incoming_comment(comment)
-            schedule.run_pending()
+            main_loop(comment_stream, inbox_stream)
         except Exception as e:
-            logging.exception(e)
-            debug = bool(os.environ.get('DEBUG'))
-            if debug:
+            should_raise = handle_exception(e)
+            if should_raise:
                 raise
 
-handle_commandline_arguments()
-if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
+def handle_exception(e):
+    should_raise = True
+    debug = bool(util.strtobool(os.environ.get('DEBUG')))
+    if debug:
+        return should_raise
+    if type(e) in (prawcore.exceptions.ServerError,
+                   prawcore.exceptions.Forbidden,
+                   requests.exceptions.ConnectTimeout,):
+        # Sometimes the reddit service fails (e.g. error 503)
+        # One time I got an error 403 (unaothorized) for no apparent reason
+        # Other times the internet connection fails
+        # just wait a bit a try again
+        logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
+        time.sleep(30)
+        should_raise = False
+    elif type(e) is prawcore.exceptions.RequestException:
+        is_max_retry_or_read_timeout_error = (
+            e.original_exception and 
+            e.original_exception.args and 
+            len(e.original_exception.args) > 0 and 
+            (   isinstance(e.original_exception.args[0], urllib3.exceptions.MaxRetryError) or
+                isinstance(e.original_exception.args[0], urllib3.exceptions.ReadTimeoutError)
+            )
+        )
+        if is_max_retry_or_read_timeout_error:
+            logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
+            time.sleep(30)
+            should_raise = False
+
+    if should_raise:
         logging.exception(e)
-        raise
+    return should_raise
+
+def main_loop(comment_stream, inbox_stream):
+    for comment in comment_stream:
+        if comment is None:
+            break
+        phase1_handler.handle_incoming_comment(comment)
+    for comment in inbox_stream:
+        if comment is None:
+            break
+        inbox_handler.respond_to_comment(comment)
+    schedule.run_pending()
+
+if __name__ == '__main__':
+    main()
     
 
 # TODO Change title of crossposts specific subreddits according to their rules (e.g. when crossposting into /r/TIHI rename the post to "Thanks I hate it")
