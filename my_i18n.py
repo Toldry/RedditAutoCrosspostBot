@@ -1,4 +1,4 @@
-"""Translates strings according to the target subreddit""""
+"""Translates strings according to the target subreddit"""
 
 # I've intentionally decided not to use `gettext` or `i18n` because their implementations appear to be overly complex for my simple use case
 
