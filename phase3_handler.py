@@ -60,8 +60,7 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
                        source_submission_id=source_comment.submission.id,
                        timedelta_string=timedelta_string,
                        source_comment_author_name=source_comment.author.name,)
-    #TODO uncomment
-    # return cross_post.reply(text)
+    return cross_post.reply(text)
 
 
 def handle_crosspost_exception(e, comment, target_subreddit):
