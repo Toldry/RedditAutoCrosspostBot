@@ -1,2 +1,0 @@
-DEBUG = True
-LISTEN_ONLY = False
