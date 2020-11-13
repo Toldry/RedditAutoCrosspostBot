@@ -24,7 +24,7 @@ def process_comment_entries():
     for comment_entry in comment_entries:
         handle_comment(comment_entry)
         racb_db.delete_comment(comment_entry)
-    logging.info('BegiFinished phase 3 processing')
+    logging.info('Finished phase 3 processing')
 
 def handle_comment(comment_entry):
     logging.info(f'Begin processing comment entry : {comment_entry["permalink"]}')
