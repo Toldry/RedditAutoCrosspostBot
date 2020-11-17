@@ -82,6 +82,8 @@ def main():
             should_raise = handle_exception(e)
             if should_raise:
                 raise
+            else:
+                comment_stream, inbox_stream = init_streams()
 
 def handle_exception(e):
     should_raise = True
