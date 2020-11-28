@@ -93,7 +93,14 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
   
 אם אתה חושב שזו טעות, הרגישו חופשי להצביע-מטה; אסיר פוסטים עם ניקד שלילי.
     ''',
-    }
+    },
+    'THE_USER_WHO_COMMENTED':{
+    'en':'''the user who commented''',
+    'es':None,
+    'de':None,
+    'fr':None,
+    'he':None,
+    },
 }
 
 # TODO: use language detection algorithms to automate this

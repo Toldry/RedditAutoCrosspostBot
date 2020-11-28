@@ -52,13 +52,18 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     text = i18n.get_translated_string('REPLY_TO_CROSSPOST', target_subreddit)
     PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD')
     timedelta_string = PHASE3_WAITING_PERIOD
+    if source_comment.author:
+        source_comment_author_name = source_comment.author.name
+    else:
+        source_comment_author_name = i18n.get_translated_string('THE_USER_WHO_COMMENTED', target_subreddit)
+    
     text = text.format(source_subreddit_name_prefixed=source_comment.subreddit_name_prefixed,
                        target_subreddit=target_subreddit,
                        source_comment_permalink=source_comment.permalink,
                        source_comment_score=source_comment.score,
                        source_submission_id=source_comment.submission.id,
                        timedelta_string=timedelta_string,
-                       source_comment_author_name=source_comment.author.name,)
+                       source_comment_author_name=source_comment_author_name,)
     return cross_post.reply(text)
 
 
