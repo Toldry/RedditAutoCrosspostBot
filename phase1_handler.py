@@ -24,7 +24,7 @@ def handle_incoming_comment(comment):
     if title_contains_prohibited_phrases(comment):
         return
 
-    source_subreddit = comment.subreddit.title.lower()
+    source_subreddit = comment.subreddit.display_name.lower()
     if target_subreddit.lower() in consts.SUB_BLACKLIST or source_subreddit in consts.SUB_BLACKLIST:
         return
     

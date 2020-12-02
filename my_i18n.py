@@ -139,7 +139,7 @@ subreddit_language_map = {
     # 'rance'             :'fr',
 }
 
-def get_translated_string(string_key, target_subreddit):
+def get_translated_string(string_key, target_subreddit, add_suffix=True):
     if target_subreddit in subreddit_language_map:
         target_language = subreddit_language_map[target_subreddit]
         if target_language in translations[string_key] and translations[string_key][target_language] is not None:
@@ -148,7 +148,10 @@ def get_translated_string(string_key, target_subreddit):
             return ret
     
     ret = translations[string_key][DEFAULT_LANGUAGE]
-    ret += translations['POST_SUFFIX_TEXT'][DEFAULT_LANGUAGE]
+    
+    if add_suffix:
+        ret += translations['POST_SUFFIX_TEXT'][DEFAULT_LANGUAGE]
+
     return ret
 
     

@@ -55,7 +55,7 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     if source_comment.author:
         source_comment_author_name = source_comment.author.name
     else:
-        source_comment_author_name = i18n.get_translated_string('THE_USER_WHO_COMMENTED', target_subreddit)
+        source_comment_author_name = i18n.get_translated_string('THE_USER_WHO_COMMENTED', target_subreddit, add_suffix=False)
     
     text = text.format(source_subreddit_name_prefixed=source_comment.subreddit_name_prefixed,
                        target_subreddit=target_subreddit,
