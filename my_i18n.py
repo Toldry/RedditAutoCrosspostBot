@@ -101,21 +101,42 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'fr':None,
     'he':None,
     },
+    'THATS_WHERE_WE_ARE':{
+    'en':'''Yes, that's where we are.''',
+    'es':None,
+    'de':None,
+    'fr':None,
+    'he':None,
+    },
+    'NONEXISTENT_SUBREDDIT':{
+    'en':'''The subreddit r/{target_subreddit} does not exist. Consider [creating it](/subreddits/create?name={target_subreddit}).''',
+    'es':None,
+    'de':None,
+    'fr':None,
+    'he':None,
+    },
+    'FOUND_EXISTING_CROSSPOST':{
+    'en':'''I found [this post]({original_post_url}) in r/{target_subreddit} with the same link as the original post.''',
+    'es':None,
+    'de':None,
+    'fr':None,
+    'he':None,
+    },
 }
 
 # TODO: use language detection algorithms to automate this
 subreddit_language_map = {
-    'ani_bm'            :'he',
-    'israel'            :'he',
-    'yo_elvr'           :'es',
-    'ich_iel'           :'de',
-    'LTB_iel'           :'de',
-    'schkreckl'         :'de',
-    'wasletztepreis'    :'de',
-    'OkBrudiMongo'      :'de',
-    'GeschichtsMaimais' :'de',
-    'moi_dlvv'          :'fr',
-    'rance'             :'fr',
+    # 'ani_bm'            :'he',
+    # 'israel'            :'he',
+    # 'yo_elvr'           :'es',
+    # 'ich_iel'           :'de',
+    # 'LTB_iel'           :'de',
+    # 'schkreckl'         :'de',
+    # 'wasletztepreis'    :'de',
+    # 'OkBrudiMongo'      :'de',
+    # 'GeschichtsMaimais' :'de',
+    # 'moi_dlvv'          :'fr',
+    # 'rance'             :'fr',
 }
 
 def get_translated_string(string_key, target_subreddit):

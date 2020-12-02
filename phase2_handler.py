@@ -48,12 +48,12 @@ def run_filters(comment_entry):
         return False
 
     logging.debug('Checking for existing crosspost in target subreddit')
-    result = get_existing_crosspost(comment, target_subreddit)
-    if result is not None and not isinstance(result, str):
+    gec_result = phase1_handler.get_existing_crosspost(comment, target_subreddit)
+    if gec_result is not None and not isinstance(gec_result, str):
         logging.debug('Existing crosspost found')
         return False
-    elif result is not None and isinstance(result, str):
-        crosspost_is_impossible_reason_string = result
+    elif gec_result is not None and isinstance(gec_result, str):
+        crosspost_is_impossible_reason_string = gec_result
         logging.debug(f'Cannot crosspost to subreddit \'{target_subreddit}\' because {crosspost_is_impossible_reason_string}')
         return False
 
@@ -67,50 +67,6 @@ def run_filters(comment_entry):
 def get_full_comment_from_reddit(comment_info):
     reddit = reddit_instantiator.get_reddit_instance()
     return reddit.comment(url=r'https://www.reddit.com' + comment_info['permalink'])
-
-
-def get_existing_crosspost(source_comment, target_subreddit):
-    """Attempts to find whether an existing crosspost
-    already exists in target_subreddit.
-    Returns the oldest replica submission if found.
-    Returns `None` if no existing crosspost exists.
-    Returns a `string_reason` if it is impossible to
-    crosspost to the other sub (due to it not existing,
-    or being private, or otherwise)
-    """
-    reddit = reddit_instantiator.get_reddit_instance()
-    try:
-        # See git isseue to understand why this is necessary
-        # https://github.com/praw-dev/praw/issues/880
-        query = f'url:\"{source_comment.submission.url}\"'
-        submissions = reddit.subreddit(target_subreddit).search(query=query,
-                                                               sort='new',
-                                                               time_filter='all')
-        # iterate over submissions to fetch them
-        submissions = [s for s in submissions]
-    except Exception as e:
-        error_message = e.args[0]
-        # when reddit tries redirecting a search query of
-        # a link to the submission page,
-        # that means 0 results were found for the search query
-        if error_message == 'Redirect to /submit':
-            return None
-        # when reddit redirects to /subreddits/search that means
-        # the subreddit `target_subreddit` doesn't exist
-        elif (error_message == 'Redirect to /subreddits/search'
-              or error_message == 'received 404 HTTP response'):
-            return 'SUBREDDIT_DOES_NOT_EXIST'
-        # this error is recieved when the target_subreddit is private
-        # "You must be invited to visit this community"
-        elif error_message == 'received 403 HTTP response':
-            return 'SUBREDDIT_IS_PRIVATE'
-        else:
-            raise
-
-    if len(submissions) == 0:
-        return None
-    oldest_submission = submissions[-1]
-    return oldest_submission
 
 
 def check_comment_availability(comment):

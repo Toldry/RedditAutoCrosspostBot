@@ -5,12 +5,14 @@ import re
 
 import consts
 import racb_db
+import reddit_instantiator
+import my_i18n as i18n
 
 
 def handle_incoming_comment(comment):
     logging.debug(f'Handling a comment: {comment.permalink}')
-    other_subreddit = check_pattern(comment)
-    if other_subreddit is None:
+    target_subreddit = check_pattern(comment)
+    if target_subreddit is None:
         return
 
     if is_mod_post(comment):
@@ -19,13 +21,26 @@ def handle_incoming_comment(comment):
     if not is_top_level_comment(comment):
         return
         
-    if other_subreddit.lower() == comment.subreddit.title.lower():
-        return
-
     if title_contains_prohibited_phrases(comment):
         return
 
-    if other_subreddit.lower() in consts.SUB_BLACKLIST or comment.subreddit.title.lower() in consts.SUB_BLACKLIST:
+    source_subreddit = comment.subreddit.title.lower()
+    if target_subreddit.lower() in consts.SUB_BLACKLIST or source_subreddit in consts.SUB_BLACKLIST:
+        return
+    
+    if target_subreddit.lower() == source_subreddit:
+        logging.info('Found "source_subreddit=target_subreddt" comment. Replying to source comment.')
+        reply_to_source_equals_target_comment(comment, target_subreddit)
+        return
+
+    gec_result = get_existing_crosspost(comment, target_subreddit)
+    if gec_result is not None and not isinstance(gec_result, str):
+        logging.info('Found existing crosspost. Replying to source comment.')
+        reply_to_existing_crosspost_comment(comment, target_subreddit, existing_crosspost=gec_result)
+        return
+    elif gec_result == 'SUBREDDIT_DOES_NOT_EXIST':
+        logging.info('Found a reference to a subreddit that does not exist. Replying to source comment.')
+        reply_to_nonexistant_target_subreddit_comment(comment, target_subreddit)
         return
 
     logging.info(f'Match found: {comment.permalink}')
@@ -50,9 +65,10 @@ def title_contains_prohibited_phrases(comment):
 
 subreddit_regex = re.compile(r'^(/)?r/([a-zA-Z0-9-_]+)$')  # compile once
 
-# Checks if the comment's body contains only a reference to a subreddit,
-# and return the subreddit name if there's a match
 def check_pattern(comment):
+    '''Checks if the comment's body contains only a reference to a subreddit,
+    and return the subreddit name if there's a match
+    '''
     search_result = subreddit_regex.search(comment.body)
     if search_result is None:
         return None
@@ -61,3 +77,61 @@ def check_pattern(comment):
 
     target_subreddit = groups[1]
     return target_subreddit
+
+def get_existing_crosspost(source_comment, target_subreddit):
+    '''Attempts to find whether an existing crosspost
+    already exists in target_subreddit.
+    Returns the oldest replica submission if found.
+    Returns `None` if no existing crosspost exists.
+    Returns a `string_reason` if it is impossible to
+    crosspost to the other sub (due to it not existing,
+    or being private, or otherwise)
+    '''
+    reddit = reddit_instantiator.get_reddit_instance()
+    try:
+        # See git isseue to understand why this is necessary
+        # https://github.com/praw-dev/praw/issues/880
+        query = f'url:\"{source_comment.submission.url}\"'
+        submissions = reddit.subreddit(target_subreddit).search(query=query,
+                                                               sort='new',
+                                                               time_filter='all')
+        # iterate over submissions to fetch them
+        submissions = [s for s in submissions]
+    except Exception as e:
+        error_message = e.args[0]
+        # when reddit tries redirecting a search query of a link to the submission page, that means 0 results were found for the search query
+        if error_message == 'Redirect to /submit':
+            return None
+        # when reddit redirects to /subreddits/search that means the subreddit `target_subreddit` doesn't exist
+        elif (error_message == 'Redirect to /subreddits/search'
+              or error_message == 'received 404 HTTP response'):
+            return 'SUBREDDIT_DOES_NOT_EXIST'
+        # this error is recieved when the target_subreddit is private
+        # "You must be invited to visit this community"
+        elif error_message == 'received 403 HTTP response':
+            return 'SUBREDDIT_IS_PRIVATE'
+        else:
+            raise
+
+    if len(submissions) == 0:
+        return None
+    oldest_submission = submissions[-1]
+    return oldest_submission
+
+def reply_to_source_equals_target_comment(source_comment, target_subreddit):
+    text = i18n.get_translated_string('THATS_WHERE_WE_ARE', target_subreddit)
+    source_comment.reply(text)
+    return
+
+def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
+    text = i18n.get_translated_string('NONEXISTENT_SUBREDDIT', target_subreddit)
+    text = text.format(target_subreddit=target_subreddit,)
+    source_comment.reply(text)
+    return
+
+def reply_to_existing_crosspost_comment(source_comment, target_subreddit, existing_crosspost):
+    text = i18n.get_translated_string('FOUND_EXISTING_CROSSPOST', target_subreddit)
+    text = text.format(original_post_url=existing_crosspost.permalink,
+                        target_subreddit=target_subreddit,)
+    source_comment.reply(text)
+    return
