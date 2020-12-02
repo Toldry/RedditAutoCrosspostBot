@@ -40,7 +40,7 @@ def handle_incoming_comment(comment):
         return
     elif gec_result == 'SUBREDDIT_DOES_NOT_EXIST':
         logging.info('Found a reference to a subreddit that does not exist. Replying to source comment.')
-        reply_to_nonexistant_target_subreddit_comment(comment, target_subreddit)
+        reply_to_nonexistent_target_subreddit_comment(comment, target_subreddit)
         return
 
     logging.info(f'Match found: {comment.permalink}')
