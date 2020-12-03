@@ -8,11 +8,15 @@ import racb_db
 import reddit_instantiator
 import my_i18n as i18n
 
+SUBREDDIT_NAME_LENGTH_LIMIT = 24
 
 def handle_incoming_comment(comment):
     logging.debug(f'Handling a comment: {comment.permalink}')
     target_subreddit = check_pattern(comment)
     if target_subreddit is None:
+        return
+
+    if len(target_subreddit) > SUBREDDIT_NAME_LENGTH_LIMIT:
         return
 
     if is_mod_post(comment):
