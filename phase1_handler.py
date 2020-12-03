@@ -2,6 +2,7 @@
 
 import logging
 import re
+import json
 
 import consts
 import racb_db
@@ -107,8 +108,11 @@ def get_existing_crosspost(source_comment, target_subreddit):
         if error_message == 'Redirect to /submit':
             return None
         # when reddit redirects to /subreddits/search that means the subreddit `target_subreddit` doesn't exist
-        elif (error_message == 'Redirect to /subreddits/search'
-              or error_message == 'received 404 HTTP response'):
+        elif error_message in ['Redirect to /subreddits/search', 'received 404 HTTP response']:
+            if e.response.text:
+                response_obj = json.loads(e.response.text)
+                if response_obj['reason'] == 'banned':
+                    return 'SUBREDDIT_BANNED'
             return 'SUBREDDIT_DOES_NOT_EXIST'
         # this error is recieved when the target_subreddit is private
         # "You must be invited to visit this community"
