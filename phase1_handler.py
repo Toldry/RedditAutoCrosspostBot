@@ -17,9 +17,6 @@ def handle_incoming_comment(comment):
 
     if is_mod_post(comment):
         return
-
-    if not is_top_level_comment(comment):
-        return
         
     if title_contains_prohibited_phrases(comment):
         return
@@ -41,6 +38,9 @@ def handle_incoming_comment(comment):
     elif gec_result == 'SUBREDDIT_DOES_NOT_EXIST':
         logging.info('Found a reference to a subreddit that does not exist. Replying to source comment.')
         reply_to_nonexistent_target_subreddit_comment(comment, target_subreddit)
+        return
+
+    if not is_top_level_comment(comment):
         return
 
     logging.info(f'Match found: {comment.permalink}')
@@ -120,13 +120,17 @@ def get_existing_crosspost(source_comment, target_subreddit):
 
 def reply_to_source_equals_target_comment(source_comment, target_subreddit):
     text = i18n.get_translated_string('THATS_WHERE_WE_ARE', target_subreddit)
-    source_comment.reply(text)
+    reddit_SSB = reddit_instantiator.get_reddit_instance(username = reddit_instantiator.SAME_SUBREDDIT_BOT_NAME)
+    source_comment_SSB = reddit_SSB.comment(id=source_comment.id)
+    source_comment_SSB.reply(text)
     return
 
 def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
     text = i18n.get_translated_string('NONEXISTENT_SUBREDDIT', target_subreddit)
     text = text.format(target_subreddit=target_subreddit,)
-    source_comment.reply(text)
+    reddit_SDE = reddit_instantiator.get_reddit_instance(username = reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME)
+    source_comment_SDE = reddit_SDE.comment(id=source_comment.id)
+    source_comment_SDE.reply(text)
     return
 
 def reply_to_existing_crosspost_comment(source_comment, target_subreddit, existing_crosspost):

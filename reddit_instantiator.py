@@ -11,30 +11,24 @@ import time
 import praw
 import dotenv
 
-reddit = None
+praw_instances = None
+AUTO_CROSSPOST_BOT_NAME = 'AutoCrosspostBot'
+SUB_DOESNT_EXIST_BOT_NAME = 'sub_doesnt_exist_bot'
+SAME_SUBREDDIT_BOT_NAME = 'same_subreddit_bot'
 
 
-def _instantiate_reddit():
-    username = 'AutoCrosspostBot'
+def _instantiate_praw(username, app_client_id,password, app_client_secret, version):
     clientname = username
-    app_client_id = 'UwKgkrvtl9fpUw'
-    # password = 'REDACTED'
-    # app_client_secret = 'REDACTED'
-    version = '0.5'
     developername = 'orqa'
     useragent = f'{clientname}/{version} by /u/{developername}'
 
-    dotenv.load_dotenv()
-    password = os.environ.get('PASSWORD')
-    app_client_secret = os.environ.get('APP_CLIENT_SECRET')
-    
-    logging.info('Connecting to reddit via praw to instantiate connection instance')
-    global reddit
+    logging.info(f'Connecting to reddit via praw to instantiate connection instance. username={username}')
     reddit = praw.Reddit(client_id=app_client_id,
                          client_secret=app_client_secret,
                          user_agent=useragent,
                          username=username,
                          password=password)
+    return reddit
 
 
 def _decorate_praw():
@@ -62,10 +56,31 @@ def _wait_and_retry_when_ratelimit_reached(func):
     return wrapper
 
 
-def get_reddit_instance():
+def get_reddit_instance(username=AUTO_CROSSPOST_BOT_NAME):
     """ Returns a singleton instance of the `praw.reddit` object
     """
-    if not reddit:
+    global praw_instances
+    if not praw_instances:
         _decorate_praw()
-        _instantiate_reddit()
-    return reddit
+        praw_instances = {}
+        dotenv.load_dotenv()
+        reddit1 = _instantiate_praw(username=AUTO_CROSSPOST_BOT_NAME,
+                                    app_client_id='UwKgkrvtl9fpUw',
+                                    password=os.environ.get('PASSWORD'), 
+                                    app_client_secret=os.environ.get('APP_CLIENT_SECRET'),
+                                    version='0.5')
+        reddit2 = _instantiate_praw(username=SUB_DOESNT_EXIST_BOT_NAME,
+                                    app_client_id='Vf4yyKKLXa6zzg',
+                                    password=os.environ.get('PASSWORD__SUB_DOESNT_EXIST'), 
+                                    app_client_secret=os.environ.get('APP_CLIENT_SECRET__SUB_DOESNT_EXIST'),
+                                    version='0.1')
+        reddit3 = _instantiate_praw(username=SAME_SUBREDDIT_BOT_NAME,
+                                    app_client_id='odiQgdKS4qBfNQ',
+                                    password=os.environ.get('PASSWORD__SAME_SUBREDDIT'), 
+                                    app_client_secret=os.environ.get('APP_CLIENT_SECRET__SAME_SUBREDDIT'),
+                                    version='0.1')
+
+        praw_instances[AUTO_CROSSPOST_BOT_NAME] = reddit1
+        praw_instances[SUB_DOESNT_EXIST_BOT_NAME] = reddit2
+        praw_instances[SAME_SUBREDDIT_BOT_NAME] = reddit3
+    return praw_instances[username]
