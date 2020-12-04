@@ -6,6 +6,7 @@ import argparse
 import time
 from distutils import util
 
+import praw
 import requests
 import schedule
 import prawcore
@@ -112,6 +113,10 @@ def handle_exception(e):
         if is_max_retry_or_read_timeout_error:
             logging.info(f'Ecnountered network error {e}. Waiting and retrying.')
             time.sleep(30)
+            should_raise = False
+    elif type(e) is praw.exceptions.RedditAPIException:
+        if e.error_type == 'DELETED_COMMENT':
+            logging.info(f'Attempted to interact with a deleted comment. {e}')
             should_raise = False
 
     if should_raise:
