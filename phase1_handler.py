@@ -137,7 +137,7 @@ def get_posts_with_same_content(comment, subreddit):
     prior_posts = repost_detector.get_reposts_in_sub(comment, subreddit)
     if prior_posts:
         result.posts_found = True
-        result.posts = [reddit.comment(id=p['id']) for p in prior_posts]
+        result.posts = [reddit.comment(id=p['post_id']) for p in prior_posts]
 
     return result
 
