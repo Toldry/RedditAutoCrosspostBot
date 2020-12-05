@@ -137,7 +137,7 @@ def get_posts_with_same_content(comment, subreddit):
     prior_posts = repost_detector.get_reposts_in_sub(comment, subreddit)
     if prior_posts:
         result.posts_found = True
-        result.posts = prior_posts #TODO maybe transform the post object into a praw-wrapped submission object?
+        result.posts = [reddit.comment(id=p['id']) for p in prior_posts]
 
     return result
 
