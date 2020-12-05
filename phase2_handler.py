@@ -10,7 +10,6 @@ import pytimeparse
 
 import racb_db
 import reddit_instantiator
-import repost_detector
 import phase1_handler
 
 def filter_comments_from_db():
