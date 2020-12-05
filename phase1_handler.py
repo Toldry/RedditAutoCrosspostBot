@@ -8,6 +8,7 @@ import consts
 import racb_db
 import reddit_instantiator
 import my_i18n as i18n
+import repost_detector
 
 SUBREDDIT_NAME_LENGTH_LIMIT = 24
 
@@ -35,12 +36,13 @@ def handle_incoming_comment(comment):
         reply_to_source_equals_target_comment(comment, target_subreddit)
         return
 
-    gec_result = get_existing_crosspost(comment, target_subreddit)
-    if gec_result is not None and not isinstance(gec_result, str):
-        logging.info('Found existing crosspost. Replying to source comment.')
-        reply_to_existing_crosspost_comment(comment, target_subreddit, existing_crosspost=gec_result)
+    result_obj = get_posts_with_same_content(comment, target_subreddit)
+    if result_obj.posts_found:
+        logging.info('Found post with same content. Replying to source comment.')
+        post_with_same_content=result_obj.posts[0] 
+        reply_to_same_content_post_comment(comment, target_subreddit, post_with_same_content)
         return
-    elif gec_result == 'SUBREDDIT_DOES_NOT_EXIST':
+    elif result_obj.unable_to_search and result_obj.unable_to_search_reason == 'SUBREDDIT_DOES_NOT_EXIST':
         logging.info('Found a reference to a subreddit that does not exist. Replying to source comment.')
         reply_to_nonexistent_target_subreddit_comment(comment, target_subreddit)
         return
@@ -83,51 +85,61 @@ def check_pattern(comment):
     target_subreddit = groups[1]
     return target_subreddit
 
-def get_existing_crosspost(source_comment, target_subreddit):
-    '''Attempts to find whether an existing crosspost
-    already exists in target_subreddit.
-    Returns the oldest replica submission if found.
-    Returns `None` if no existing crosspost exists.
-    Returns a `string_reason` if it is impossible to
-    crosspost to the other sub (due to it not existing,
-    or being private, or otherwise)
-    '''
+def get_posts_with_same_content(comment, subreddit):
+    class Result:
+        posts_found =False
+        posts = []
+        unable_to_search = False
+        unable_to_search_reason = None
+
+    result = Result()
+
     reddit = reddit_instantiator.get_reddit_instance()
     try:
-        # See git isseue to understand why this is necessary
-        # https://github.com/praw-dev/praw/issues/880
-        query = f'url:\"{source_comment.submission.url}\"'
-        submissions = reddit.subreddit(target_subreddit).search(query=query,
-                                                               sort='new',
-                                                               time_filter='all')
+        # The format of the query string is explained here: https://github.com/praw-dev/praw/issues/880
+        query = f'url:\"{comment.submission.url}\"'
+        submissions = reddit.subreddit(subreddit).search(query=query, sort='new', time_filter='all')
         # iterate over submissions to fetch them
         submissions = [s for s in submissions]
-    except Exception as e:
+    except Exception as e: #TODO change exception type to be specific
         error_message = e.args[0]
         # when reddit tries redirecting a search query of a link to the submission page, that means 0 results were found for the search query
         if error_message == 'Redirect to /submit':
-            return None
-        # when reddit redirects to /subreddits/search that means the subreddit `target_subreddit` doesn't exist
+            return result
+        # when reddit redirects to /subreddits/search that means the subreddit doesn't exist
         elif error_message in ['Redirect to /subreddits/search', 'received 404 HTTP response']:
             if e.response.text:
                 try:
                     response_obj = json.loads(e.response.text)
                     if response_obj['reason'] == 'banned':
-                        return 'SUBREDDIT_BANNED'
+                        result.unable_to_search = True
+                        result.unable_to_search_reason = 'SUBREDDIT_IS_BANNED'
+                        return result
                 except json.JSONDecodeError:
                     pass
-            return 'SUBREDDIT_DOES_NOT_EXIST'
-        # this error is recieved when the target_subreddit is private
+            result.unable_to_search = True
+            result.unable_to_search_reason = 'SUBREDDIT_DOES_NOT_EXIST'
+            return result
+        # this error is recieved when the subreddit is private
         # "You must be invited to visit this community"
         elif error_message == 'received 403 HTTP response':
-            return 'SUBREDDIT_IS_PRIVATE'
+            result.unable_to_search = True
+            result.unable_to_search_reason = 'SUBREDDIT_IS_PRIVATE'
+            return result
         else:
             raise
 
-    if len(submissions) == 0:
-        return None
-    oldest_submission = submissions[-1]
-    return oldest_submission
+    if len(submissions) > 0:
+        result.posts_found = True
+        result.posts = submissions
+        return result
+
+    prior_posts = repost_detector.get_reposts_in_sub(comment, subreddit)
+    if prior_posts:
+        result.posts_found = True
+        result.posts = prior_posts #TODO maybe transform the post object into a praw-wrapped submission object?
+
+    return result
 
 def reply_to_source_equals_target_comment(source_comment, target_subreddit):
     text = i18n.get_translated_string('THATS_WHERE_WE_ARE', target_subreddit)
@@ -144,9 +156,10 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     source_comment_SDE.reply(text)
     return
 
-def reply_to_existing_crosspost_comment(source_comment, target_subreddit, existing_crosspost):
-    text = i18n.get_translated_string('FOUND_EXISTING_CROSSPOST', target_subreddit)
-    text = text.format(original_post_url=existing_crosspost.permalink,
-                        target_subreddit=target_subreddit,)
+# TODO: make up a better name for this function
+def reply_to_same_content_post_comment(source_comment, target_subreddit, post_with_same_content):
+    text = i18n.get_translated_string('FOUND_POST_WITH_SAME_CONTENT', target_subreddit)
+    text = text.format(same_content_post_url=post_with_same_content.permalink,
+                       target_subreddit=target_subreddit,)
     source_comment.reply(text)
     return

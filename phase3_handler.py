@@ -29,24 +29,42 @@ def process_comment_entries():
 def handle_comment(comment_entry):
     logging.info(f'Begin processing comment entry : {comment_entry["permalink"]}')
     result = phase2_handler.run_filters(comment_entry)
-    if result == False:
+    if not result.passes_filter:
         return
 
-    source_comment, target_subreddit = result
+    source_comment = result.comment
+    target_subreddit = result.target_subreddit
+    exec_crosspost(source_comment, target_subreddit)
+
+def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag = True):
+    class Result:
+        success = False
+        crosspost = None
+        failure_reason = None
+
+    result = Result()
+
     try:
         cross_post = source_comment.submission.crosspost(subreddit=target_subreddit, send_replies=False)
         logging.info(f'Crosspost succesful. link to post: www.reddit.com{cross_post.permalink}')
-        reply_to_crosspost(source_comment, cross_post, target_subreddit)
+        result.success = True
+        result.crosspost = cross_post
     except Exception as e:
-        handled_with_grace = handle_crosspost_exception(e, source_comment, target_subreddit)
-        if not handled_with_grace:
+        hce_res = handle_crosspost_exception(e, source_comment, target_subreddit)
+        if hce_res.handled_with_grace:
+            result.failure_reason = hce_res.error_type
+        else: 
             logging.error(f'Crosspost failed due to a problem: {str(e)}' + '\n\n'
                           + f'This occured while attempting to crosspost based on this comment: {source_comment.permalink}')
             logging.exception(e)
             debug = bool(util.strtobool(os.environ.get('DEBUG')))
             if debug:
                 raise
-
+    
+    if reply_to_crosspost_flag:
+        reply_to_crosspost(source_comment, cross_post, target_subreddit)
+    
+    return result
 
 def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     text = i18n.get_translated_string('REPLY_TO_CROSSPOST', target_subreddit)
@@ -67,38 +85,20 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     return cross_post.reply(text)
 
 
-def handle_crosspost_exception(e, comment, target_subreddit):
-    """Attempts to handle exceptions that arise while crossposting. Returns True if the error was handled gracefully
-    """
-    if not isinstance(e, praw.exceptions.RedditAPIException):
-        return False
 
-    if e.error_type == 'NO_CROSSPOSTS':
-        logging.info(f'Crossposts are not allowed in /r/{target_subreddit}')
-        return True
-    # wtf does this even mean, reddit? why are some urls considered invalid for crossposting?
-    elif e.error_type == 'INVALID_CROSSPOST_THING':
-        logging.info(f'Got that weird unhelpful INVALID_CROSSPOST_THING message again: {e.message}')
-        return True
-    elif e.error_type == 'SUBREDDIT_NOTALLOWED':
-        logging.info(f'Not allowed to post in /r/{target_subreddit}')
-        return True
-    elif e.error_type == 'NO_IMAGES':
-        logging.info(f'Not allowed to post images in /r/{target_subreddit}')
-        return True
-    elif e.error_type == 'NO_LINKS':
-        logging.info(f'Not allowed to post links in /r/{target_subreddit}')
-        return True
-    elif e.error_type == 'NO_SELFS':
-        logging.info(f'Not allowed to post text posts in /r/{target_subreddit}')
-        return True
-    elif e.error_type == 'NO_VIDEOS':
-        logging.info(f'Not allowed to post videos in /r/{target_subreddit}')
-        return True
-    elif e.error_type == 'OVER18_SUBREDDIT_CROSSPOST':
-        logging.info(f'Not allowed to crosspost 18+ content in /r/{target_subreddit}')
-        return True
-    else:
-        # Unfamiliar reddit error
-        return False
+def handle_crosspost_exception(e, comment, target_subreddit):
+    class Result:
+        handled_with_grace = False
+        error_type = None
+    result = Result()
+
+    if not isinstance(e, praw.exceptions.RedditAPIException):
+        return result
+
+    familiar_error_types = ['NO_CROSSPOSTS','INVALID_CROSSPOST_THING','SUBREDDIT_NOTALLOWED','NO_IMAGES','NO_LINKS','NO_SELFS','NO_VIDEOS','OVER18_SUBREDDIT_CROSSPOST',]
+    if e.error_type in familiar_error_types:
+        result.handled_with_grace = True
+        result.error_type = e.error_type
+        
+    return result
 

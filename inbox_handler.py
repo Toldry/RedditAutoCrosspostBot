@@ -22,6 +22,13 @@ POSITIVE_PHRASES = [
 
 
 def respond_to_comment(comment):
+    if comment.type == 'username_mention':
+        pass
+    elif comment.type == 'comment_reply':
+        handle_comment_reply(comment)
+
+
+def handle_comment_reply(comment):
     author = None
     if comment.distinguished == 'moderator':
         author = 'moderator'

@@ -5,13 +5,11 @@ from http import HTTPStatus
 
 import requests
 
-def check_if_posted_before(source_comment, target_subreddit):
+def get_reposts_in_sub(source_comment, target_subreddit):
     post_id = source_comment.submission.id
     posts = search_reposts(post_id)
-    subreddits = [post['subreddit'] for post in posts]
-    was_posted_before = target_subreddit.upper() in [sub.upper() for sub in subreddits]
-    return was_posted_before
-
+    posts_in_target_sub = [p for p in posts if p['subreddit'].lower() == target_subreddit.lower()]
+    return posts_in_target_sub
 
 def search_reposts(post_id):
     logging.info(f'Using api.repostsleuth.com with post_id={post_id} to check ')

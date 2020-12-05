@@ -28,45 +28,51 @@ def filter_comments_from_db():
 
 
 def run_filters(comment_entry):
-    """Returns False if the comment does not pass all the filters required for crossposting.
-    otherwise returns a tuple with the comment itself (praw.models.Comment) and the target subreddit (str)
-    """
-    comment = get_full_comment_from_reddit(comment_entry)
+    class Result:
+        passes_filter = False
+        reason = None
+        comment = None
+        target_subreddit = target_subreddit
+        post_with_same_content = None
+
+    result = Result()
+
+    comment = get_full_comment_from_reddit(comment_entry['permalink'])
+    result.comment = comment
     available = check_comment_availability(comment)
+
     if not available:
-        return False
+        result.reason = 'COMMENT_UNAVAILABLE'
+        return result
 
     comment_score_threshold = int(os.environ.get('COMMENT_SCORE_THRESHOLD'))
     if comment.score < comment_score_threshold:
-        logging.debug(f'comment score = {comment.score} < {comment_score_threshold} = threshold. Passing this comment.')
-        return False
-    logging.debug(f'comment score = {comment.score} >= {comment_score_threshold} = threshold. Continuing.')
+        result.reason = 'COMMENT_SCORE_TOO_LOW'
+        return result
 
     target_subreddit = phase1_handler.check_pattern(comment)
+    result.target_subreddit = target_subreddit
     if target_subreddit is None:
-        logging.debug('Re-checked the source comment for the target subreddit, and no match was found. The comment was probably edited since it was scraped. Passing.')
-        return False
+        # this can happen when the source comment was edited since it was scraped
+        result.reason = 'TARGET_SUBREDDIT_NOT_FOUND'
+        return result
 
-    logging.debug('Checking for existing crosspost in target subreddit')
-    gec_result = phase1_handler.get_existing_crosspost(comment, target_subreddit)
-    if gec_result is not None and not isinstance(gec_result, str):
-        logging.debug('Existing crosspost found')
-        return False
-    elif gec_result is not None and isinstance(gec_result, str):
-        crosspost_is_impossible_reason_string = gec_result
-        logging.debug(f'Cannot crosspost to subreddit \'{target_subreddit}\' because {crosspost_is_impossible_reason_string}')
-        return False
-
-    was_posted_before = repost_detector.check_if_posted_before(comment, target_subreddit)
-    logging.debug(f'was_posted_before = {was_posted_before}')
-    if was_posted_before:
-        return False
+    gpwsc_result = phase1_handler.get_posts_with_same_content(comment, target_subreddit)
+    if gpwsc_result.posts_found:
+        result.reason = 'POST_WITH_SAME_CONTENT_FOUND'
+        result.post_with_same_content = gpwsc_result.posts[0]
+        return result
+    elif gpwsc_result.unable_to_search:
+        unable_to_search_reason = gpwsc_result.unable_to_search_reason
+        result.reason = f'UNABLE_TO_SEARCH_TARGET_SUBREDDIT_BECAUSE__{unable_to_search_reason}'
+        return result
     
-    return (comment,target_subreddit,)
+    result.passes_filter = True
+    return result
 
-def get_full_comment_from_reddit(comment_info):
+def get_full_comment_from_reddit(permalink_without_prefix):
     reddit = reddit_instantiator.get_reddit_instance()
-    return reddit.comment(url=r'https://www.reddit.com' + comment_info['permalink'])
+    return reddit.comment(url=r'https://www.reddit.com' + permalink_without_prefix)
 
 
 def check_comment_availability(comment):

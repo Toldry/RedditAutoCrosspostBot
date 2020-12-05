@@ -115,8 +115,8 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'fr':None,
     'he':None,
     },
-    'FOUND_EXISTING_CROSSPOST':{
-    'en':'''I found [this post]({original_post_url}) in r/{target_subreddit} with the same link as the original post.''',
+    'FOUND_POST_WITH_SAME_CONTENT':{
+    'en':'''I found [this post]({same_content_post_url}) in r/{target_subreddit} with the same link as this post.''',
     'es':None,
     'de':None,
     'fr':None,
