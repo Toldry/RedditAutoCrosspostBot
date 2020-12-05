@@ -15,7 +15,6 @@ def get_reposts_in_sub(source_comment, target_subreddit):
 
 
 def search_reposts(post_id):
-    logging.info(f'Using api.repostsleuth.com with post_id={post_id} to check ')
     parameters = {
         'filter':True,
         'post_id':post_id,
