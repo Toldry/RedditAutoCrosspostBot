@@ -32,7 +32,7 @@ def run_filters(comment_entry):
         passes_filter = False
         reason = None
         comment = None
-        target_subreddit = target_subreddit
+        target_subreddit = None
         post_with_same_content = None
 
     result = Result()
