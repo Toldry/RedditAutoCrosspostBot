@@ -43,7 +43,7 @@ translations = {
     },
     'RESPOND_TO_NEGATIVE_SENTIMENT':{
         'en':'''
-Thanks for the feedback, would you mind detailing why this crosspost was inappropriate?
+Thanks for the feedback, would you mind detailing why this post/comment was inappropriate?
 
 The creator of this bot will look at the responses and try to change the code to reduce the incidences like these.'''
 ,
