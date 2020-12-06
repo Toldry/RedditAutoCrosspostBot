@@ -49,6 +49,8 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag = T
         logging.info(f'Crosspost succesful. link to post: www.reddit.com{cross_post.permalink}')
         result.success = True
         result.crosspost = cross_post
+        if reply_to_crosspost_flag:
+            reply_to_crosspost(source_comment, cross_post, target_subreddit)
     except Exception as e:
         hce_res = handle_crosspost_exception(e, source_comment, target_subreddit)
         if hce_res.handled_with_grace:
@@ -60,9 +62,6 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag = T
             debug = bool(util.strtobool(os.environ.get('DEBUG')))
             if debug:
                 raise
-    
-    if reply_to_crosspost_flag:
-        reply_to_crosspost(source_comment, cross_post, target_subreddit)
     
     return result
 
