@@ -143,17 +143,15 @@ def get_posts_with_same_content(comment, subreddit):
 
 def reply_to_source_equals_target_comment(source_comment, target_subreddit):
     text = i18n.get_translated_string('THATS_WHERE_WE_ARE', target_subreddit)
-    reddit_SSB = reddit_instantiator.get_reddit_instance(username = reddit_instantiator.SAME_SUBREDDIT_BOT_NAME)
-    source_comment_SSB = reddit_SSB.comment(id=source_comment.id)
-    source_comment_SSB.reply(text)
+    comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SAME_SUBREDDIT_BOT_NAME)
+    comment2.reply(text)
     return
 
 def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
     text = i18n.get_translated_string('NONEXISTENT_SUBREDDIT', target_subreddit)
     text = text.format(target_subreddit=target_subreddit,)
-    reddit_SDE = reddit_instantiator.get_reddit_instance(username = reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME)
-    source_comment_SDE = reddit_SDE.comment(id=source_comment.id)
-    source_comment_SDE.reply(text)
+    comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME)
+    comment2.reply(text)
     return
 
 # TODO: make up a better name for this function
@@ -161,5 +159,11 @@ def reply_to_same_content_post_comment(source_comment, target_subreddit, post_wi
     text = i18n.get_translated_string('FOUND_POST_WITH_SAME_CONTENT', target_subreddit)
     text = text.format(same_content_post_url=post_with_same_content.permalink,
                        target_subreddit=target_subreddit,)
-    source_comment.reply(text)
+    comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SAME_POST_BOT_NAME)
+    comment2.reply(text)
     return
+
+def get_comment_with_different_praw_instance(comment, username):
+    reddit2 = reddit_instantiator.get_reddit_instance(username = username)
+    comment2 = reddit2.comment(id=comment.id)
+    return comment2

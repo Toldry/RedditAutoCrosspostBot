@@ -118,10 +118,15 @@ def handle_exception(e):
         if e.error_type == 'DELETED_COMMENT':
             logging.info(f'Attempted to interact with a deleted comment. {e}')
             should_raise = False
+        elif e.error_type == 'THREAD_LOCKED':
+            logging.info(f'Attempted to comment in a locked thread. {e}')
+            should_raise = False
 
     if should_raise:
         logging.exception(e)
     return should_raise
+
+
 
 def main_loop(comment_stream, inbox_stream):
     for comment in comment_stream:
@@ -139,3 +144,6 @@ if __name__ == '__main__':
     
 
 # TODO Change title of crossposts specific subreddits according to their rules (e.g. when crossposting into /r/TIHI rename the post to "Thanks I hate it")
+# TODO Investigate what caused this bug: 
+# https://www.reddit.com/r/MightyHarvest/comments/k6sj6v/this_is_our_8_year_old_pear_tree_puts_out_one/
+# https://www.reddit.com/r/MightyHarvest/comments/inordb/my_pear_tree_one_yearly_perfect_pear_no_leaves/
