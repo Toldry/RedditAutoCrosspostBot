@@ -88,6 +88,7 @@ def check_comment_availability(comment):
 
 def process_comment_entry(comment_entry):
     result = run_filters(comment_entry)
+    print(f'result.passes_filter: {result.passes_filter}. permalink: {result.comment.permalink}')
     if result.passes_filter:
         racb_db.set_comment_checked(comment_entry)
     else:
