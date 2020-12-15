@@ -72,6 +72,16 @@ def main():
     configure_logging()
     logging.info('Running reddit_auto_crosspost_bot')
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--only-phase2', action='store_true')
+    args = parser.parse_args()
+    if args.only_phase2:
+        phase2_handler.filter_comments_from_db()
+        return
+
+    start_bot()
+
+def start_bot():
     set_schedule()
 
     comment_stream, inbox_stream = init_streams()
