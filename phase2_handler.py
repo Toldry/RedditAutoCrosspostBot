@@ -13,15 +13,12 @@ import reddit_instantiator
 import phase1_handler
 
 def filter_comments_from_db(verbose=False):
-    comment_score_threshold = int(os.environ.get('COMMENT_SCORE_THRESHOLD'))
-    print(f'comment_score_threshold: {comment_score_threshold}')
-
     logging.info('Running phase 2 comment filter')
     PHASE2_WAITING_PERIOD = os.environ.get('PHASE2_WAITING_PERIOD')
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE2_WAITING_PERIOD)
     comment_entries = racb_db.get_unchecked_comments_older_than(waiting_period_seconds)
     logging.info(f'Found {len(comment_entries)} unchecked comments')
-    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         executor.map(process_comment_entry, comment_entries, [verbose]*len(comment_entries))
     logging.info('Finished running phase 2 comment filter')
 
