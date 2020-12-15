@@ -17,6 +17,7 @@ def add_comment(comment):
             conn.commit()
     except (psycopg2.errors.InsufficientPrivilege, psycopg2.errors.InFailedSqlTransaction):
         logging.error('Cannot insert row, probably because heroku blocked access to the table.')
+        conn.rollback()
         debug = bool(util.strtobool(os.environ.get('DEBUG')))
         if debug:
             raise
