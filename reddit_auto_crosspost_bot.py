@@ -76,7 +76,7 @@ def main():
     parser.add_argument('--only-phase2', action='store_true')
     args = parser.parse_args()
     if args.only_phase2:
-        phase2_handler.filter_comments_from_db()
+        phase2_handler.filter_comments_from_db(verbose=True)
         return
 
     start_bot()

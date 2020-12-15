@@ -12,7 +12,7 @@ import racb_db
 import reddit_instantiator
 import phase1_handler
 
-def filter_comments_from_db():
+def filter_comments_from_db(verbose=False):
     comment_score_threshold = int(os.environ.get('COMMENT_SCORE_THRESHOLD'))
     print(f'comment_score_threshold: {comment_score_threshold}')
 
@@ -22,7 +22,7 @@ def filter_comments_from_db():
     comment_entries = racb_db.get_unchecked_comments_older_than(waiting_period_seconds)
     logging.info(f'Found {len(comment_entries)} unchecked comments')
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        executor.map(process_comment_entry, comment_entries)
+        executor.map(process_comment_entry, comment_entries, verbose)
     logging.info('Finished running phase 2 comment filter')
 
 
@@ -86,9 +86,12 @@ def check_comment_availability(comment):
             raise
 
 
-def process_comment_entry(comment_entry):
+def process_comment_entry(comment_entry, verbose):
     result = run_filters(comment_entry)
-    print(f'result.passes_filter: {result.passes_filter}. permalink: {result.comment.permalink}')
+    if(verbose):
+        score = result.comment.score if result.comment else 'NA'
+        logging.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={comment_entry.permalink}')
+
     if result.passes_filter:
         racb_db.set_comment_checked(comment_entry)
     else:
