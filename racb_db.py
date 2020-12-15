@@ -1,5 +1,6 @@
 """Accesses a database to store scraped comments"""
 
+import logging
 import os
 from datetime import datetime
 import time
@@ -9,10 +10,17 @@ import psycopg2
 import psycopg2.extras
 
 def add_comment(comment):
-    with conn.cursor() as cur:
-        permalink = comment.permalink
-        cur.callproc('insert_scraped_comment', (permalink,))
-        conn.commit()
+    try:
+        with conn.cursor() as cur:
+            permalink = comment.permalink
+            cur.callproc('insert_scraped_comment', (permalink,))
+            conn.commit()
+    except psycopg2.errors.InsufficientPrivilege:
+        logging.error('Cannot insert row, probably because heroku blocked access to the table.')
+        debug = bool(util.strtobool(os.environ.get('DEBUG')))
+        if debug:
+            raise
+
 
 
 def get_comments_older_than(num_seconds):
