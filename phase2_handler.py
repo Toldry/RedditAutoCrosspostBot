@@ -18,9 +18,6 @@ def filter_comments_from_db():
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE2_WAITING_PERIOD)
     comment_entries = racb_db.get_unchecked_comments_older_than(waiting_period_seconds)
     logging.info(f'Found {len(comment_entries)} unchecked comments')
-    if len(comment_entries) == 0:
-        return
-    
     with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
         executor.map(process_comment_entry, comment_entries)
     logging.info('Finished running phase 2 comment filter')
@@ -88,8 +85,7 @@ def check_comment_availability(comment):
 
 def process_comment_entry(comment_entry):
     result = run_filters(comment_entry)
-    passed = result != False
-    if passed:
+    if result.passes_filter:
         racb_db.set_comment_checked(comment_entry)
     else:
         racb_db.delete_comment(comment_entry)
