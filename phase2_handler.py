@@ -18,8 +18,12 @@ def filter_comments_from_db(verbose=False):
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE2_WAITING_PERIOD)
     comment_entries = racb_db.get_unchecked_comments_older_than(waiting_period_seconds)
     logging.info(f'Found {len(comment_entries)} unchecked comments')
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        executor.map(process_comment_entry, comment_entries, [verbose]*len(comment_entries))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        futures = [executor.submit(process_comment_entry, ce, verbose) for ce in comment_entries[:2]]
+        for future in concurrent.futures.as_completed(futures):
+            # Iterating over the futures and invoking result() causes interior errors to be raised if there are any
+            result = future.result()
+
     logging.info('Finished running phase 2 comment filter')
 
 
@@ -85,11 +89,12 @@ def check_comment_availability(comment):
 
 def process_comment_entry(comment_entry, verbose):
     result = run_filters(comment_entry)
-    if(verbose):
+    if verbose:
         score = result.comment.score if result.comment else 'NA'
-        logging.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={comment_entry.permalink}')
+        logging.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={comment_entry["permalink"]}')
 
     if result.passes_filter:
         racb_db.set_comment_checked(comment_entry)
     else:
         racb_db.delete_comment(comment_entry)
+    return result.passes_filter
