@@ -19,7 +19,7 @@ def filter_comments_from_db(verbose=False):
     comment_entries = racb_db.get_unchecked_comments_older_than(waiting_period_seconds)
     logging.info(f'Found {len(comment_entries)} unchecked comments')
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        futures = [executor.submit(process_comment_entry, ce, verbose) for ce in comment_entries[:2]]
+        futures = [executor.submit(process_comment_entry, ce, verbose) for ce in comment_entries]
         for future in concurrent.futures.as_completed(futures):
             # Iterating over the futures and invoking result() causes interior errors to be raised if there are any
             result = future.result()
