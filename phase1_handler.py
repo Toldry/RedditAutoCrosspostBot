@@ -12,15 +12,10 @@ import reddit_instantiator
 import my_i18n as i18n
 import repost_detector
 
-SUBREDDIT_NAME_LENGTH_LIMIT = 24
-
 def handle_incoming_comment(comment):
     logging.debug(f'Handling a comment: {comment.permalink}')
     target_subreddit = check_pattern(comment)
     if target_subreddit is None:
-        return
-
-    if len(target_subreddit) > SUBREDDIT_NAME_LENGTH_LIMIT:
         return
 
     if is_mod_post(comment):
@@ -72,19 +67,15 @@ def title_contains_prohibited_phrases(comment):
     title = comment.submission.title
     return prohibited_phrases.search(title) is not None
 
-subreddit_regex = re.compile(r'^(/)?r/([a-zA-Z0-9-_]+)$')  # compile once
+# subreddit name length must be between 2 and 24 characters
+subreddit_regex = re.compile(r'^(/)?r/(?P<sub_name>[a-zA-Z0-9_]{2,24})$')  # compile once
 
 def check_pattern(comment):
-    '''Checks if the comment's body contains only a reference to a subreddit,
-    and return the subreddit name if there's a match
-    '''
     search_result = subreddit_regex.search(comment.body)
     if search_result is None:
         return None
 
-    groups = search_result.groups()
-
-    target_subreddit = groups[1]
+    target_subreddit = search_result.group('sub_name')
     return target_subreddit
 
 def get_posts_with_same_content(comment, subreddit):
@@ -103,10 +94,6 @@ def get_posts_with_same_content(comment, subreddit):
         submissions = reddit.subreddit(subreddit).search(query=query, sort='new', time_filter='all')
         # iterate over submissions to fetch them
         submissions = [s for s in submissions]
-    except prawcore.exceptions.BadRequest:
-        logging.error(f'The following query caused "bad request" error: {query}')
-        logging.error(f'This was caused by this comment : {comment.permalink}')
-        raise
     except Exception as e: #TODO change exception type to be specific
         error_message = e.args[0]
         # when reddit tries redirecting a search query of a link to the submission page, that means 0 results were found for the search query
