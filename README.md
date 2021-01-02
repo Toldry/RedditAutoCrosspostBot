@@ -8,6 +8,24 @@ This reddit bot listens to comments and looks for ones that match the pattern
 It then saves the link to that comment for later processing.
 After some waiting period  (e.g. 3 months), the bot checks the same comment, and if it has accrued enough upvotes, the bot will crosspost the submission that the comment replied to, to the target subreddit.
 
+This project also shares the code for three additional bots:
+
+## sub_doesnt_exist_bot
+https://www.reddit.com/user/sub_doesnt_exist_bot
+
+Replies to the same type of comments and informs that the sub they linked does not exist.
+
+
+## same_subreddit_bot
+https://www.reddit.com/user/same_subreddit_bot
+
+Replies to comments that link to the same subreddit that comment was posted on.
+
+## same_post_bot
+https://www.reddit.com/user/same_post_bot
+
+Replies to comments that link to a subreddit that already has a post with the same content as the source submission.
+
 # Known problem: Reposts
 This bot has two methods for preventing reposts. It first checks whether the source submission link was already posted to the target subreddit, and then it uses [repostsleuth.com](https://www.repostsleuth.com) to check whether anything similar to that link was already posted to the target subreddit.
 
