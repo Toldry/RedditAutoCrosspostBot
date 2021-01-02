@@ -109,7 +109,14 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'he':None,
     },
     'NONEXISTENT_SUBREDDIT':{
-    'en':'''The subreddit r/{target_subreddit} does not exist. Consider [creating it](/subreddits/create?name={target_subreddit}).''',
+    'en':'''The subreddit r/{target_subreddit} does not exist. ''',
+    'es':None,
+    'de':None,
+    'fr':None,
+    'he':None,
+    },
+    'PROMPT_NONEXISTENT_SUBREDDIT_CREATION':{
+    'en':'''Consider [creating it](/subreddits/create?name={target_subreddit}).''',
     'es':None,
     'de':None,
     'fr':None,
