@@ -94,7 +94,7 @@ def handle_crosspost_exception(e, comment, target_subreddit):
     if not isinstance(e, praw.exceptions.RedditAPIException):
         return result
 
-    familiar_error_types = ['NO_CROSSPOSTS','INVALID_CROSSPOST_THING','SUBREDDIT_NOTALLOWED','NO_IMAGES','NO_LINKS','NO_SELFS','NO_VIDEOS','OVER18_SUBREDDIT_CROSSPOST', 'THREAD_LOCKED']
+    familiar_error_types = ['NO_CROSSPOSTS','INVALID_CROSSPOST_THING','SUBREDDIT_NOTALLOWED','NO_IMAGES','NO_LINKS','NO_SELFS','NO_VIDEOS','OVER18_SUBREDDIT_CROSSPOST', 'THREAD_LOCKED', 'IMAGES_NOTALLOWED']
     if e.error_type in familiar_error_types:
         result.handled_with_grace = True
         result.error_type = e.error_type
