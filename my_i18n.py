@@ -45,7 +45,7 @@ translations = {
         'en':'''
 Thanks for the feedback, would you mind detailing why this post/comment was inappropriate?
 
-The creator of this bot will look at the responses and try to change the code to reduce the incidences like these.'''
+The creator of this bot will look at the responses and try to change the code to reduce incidences like these.'''
 ,
     'es':None,
     'de':None,
