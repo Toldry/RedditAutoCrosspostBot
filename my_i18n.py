@@ -26,7 +26,7 @@ translations = {
 ---
 ^^🤖 ^^Dieser ^^Kommentar ^^wurde ^^von ^^einem ^^Bot ^^geschrieben. ^^Beep ^^Boop ^^🤖
 
-^^Fühlen ^^Sie ^^sich ^^willkommen, ^^auf ^^"Schlechter ^^Bot" ^^/ ^^"Guter ^^Bot" ^^zu ^^antworten. ^^Es ^^ist ^^ein ^^nützliches ^^Feedback'''
+^^Gerne ^^kannst ^^du ^^mit ^^"Schlechter ^^Bot" ^^/ ^^"Guter ^^Bot" ^^antworten. ^^Es ^^ist ^^ein ^^nützliches ^^Feedback.'''
 ,
     'fr':'''
 
@@ -77,9 +77,9 @@ Publiqué esto de {source_subreddit_name_prefixed} a r/{target_subreddit} despu�
 Si cree que esto fue un error, siga adelante y vote en contra; Eliminaré las publicaciones con puntuaciones negativas.
 ''',
     'de':'''
-Ich habe dies von {source_subreddit_name_prefixed} auf r/{target_subreddit} gekreuzt, nachdem ich [diesen anständig hochgestuften  von Menschen gemachten  Kommentar] ({source_comment_permalink}) (score={source_comment_score}) gesehen habe schlagen vor, dass dieser Beitrag auch hier gut passen würde.
+Ich habe diesen Pfosten von {source_subreddit_name_prefixed} nach r/{target_subreddit} gekreuzt, nachdem ich [diesen anständig hoochgewählten und von Menschen gemachten Kommentar] ({source_comment_permalink}) (score={source_comment_score}) gesehen habe und mir dachte, dass dieser Beitrag auch hier gut passen würde.
 
-Wenn Sie der Meinung sind, dass dies ein Fehler war, stimmen Sie ab. Ich werde Beiträge mit negativen Ergebnissen entfernen.
+Wenn du der Meinung bist, dass es hier nicht passt, downvote den Post. Ich werde Beiträge mit negativen Ergebnissen entfernen.
 '''
 ,
     'fr':'''
@@ -97,35 +97,35 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'THE_USER_WHO_COMMENTED':{
     'en':'''the user who commented''',
     'es':None,
-    'de':None,
+    'de':'''der Nutzer, der geantwortet hat''',
     'fr':None,
     'he':None,
     },
     'THATS_WHERE_WE_ARE':{
     'en':'''Yes, that's where we are.''',
     'es':None,
-    'de':None,
+    'de':'''Ja, hier sind wir''',
     'fr':None,
     'he':None,
     },
     'NONEXISTENT_SUBREDDIT':{
     'en':'''The subreddit r/{target_subreddit} does not exist. ''',
     'es':None,
-    'de':None,
+    'de':'''Das Unter r/{target_subreddit} existiert nicht''',
     'fr':None,
     'he':None,
     },
     'PROMPT_NONEXISTENT_SUBREDDIT_CREATION':{
     'en':'''Consider [creating it](/subreddits/create?name={target_subreddit}).''',
     'es':None,
-    'de':None,
+    'de':'''Vielleicht [sollte es erstellen](/subreddits/create?name={target_subreddit}).''',
     'fr':None,
     'he':None,
     },
     'FOUND_POST_WITH_SAME_CONTENT':{
     'en':'''I found [this post]({same_content_post_url}) in r/{target_subreddit} with the same link as this post.''',
     'es':None,
-    'de':None,
+    'de':'''Ich habe [diesen Post]({same_content_post_url}) in r/{target_subreddit} gefunden, der den selben Link enthält.''',
     'fr':None,
     'he':None,
     },
