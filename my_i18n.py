@@ -147,19 +147,18 @@ subreddit_language_map = {
 }
 
 def get_translated_string(string_key, target_subreddit, add_suffix=True):
+    language = DEFAULT_LANGUAGE
     if target_subreddit in subreddit_language_map:
         target_language = subreddit_language_map[target_subreddit]
         if target_language in translations[string_key] and translations[string_key][target_language] is not None:
-            ret = translations[string_key][target_language]
-            ret += translations['POST_SUFFIX_TEXT'][target_language]
-            return ret
+            language = target_language
     
-    ret = translations[string_key][DEFAULT_LANGUAGE]
-    
+    translated_string = translations[string_key][language]
     if add_suffix:
-        ret += translations['POST_SUFFIX_TEXT'][DEFAULT_LANGUAGE]
+        suffix_language = DEFAULT_LANGUAGE
+        if translations['POST_SUFFIX_TEXT'][language] is not None:
+            suffix_language = language
+        translated_string += translations['POST_SUFFIX_TEXT'][suffix_language]
 
-    return ret
+    return translated_string
 
-    
-        
