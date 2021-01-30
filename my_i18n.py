@@ -118,7 +118,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'PROMPT_NONEXISTENT_SUBREDDIT_CREATION':{
     'en':'''Consider [creating it](/subreddits/create?name={target_subreddit}).''',
     'es':None,
-    'de':'''Vielleicht [sollte es erstellen](/subreddits/create?name={target_subreddit}).''',
+    'de':'''Vielleicht [sollte man es erstellen](/subreddits/create?name={target_subreddit}).''',
     'fr':None,
     'he':None,
     },
