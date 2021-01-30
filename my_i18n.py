@@ -4,7 +4,7 @@
 
 DEFAULT_LANGUAGE = 'en'
 
-# I used google translate for these as placeholders, gonna need native speakers to do proper translations here
+# I used google translate for some of these as placeholders, gonna need native speakers to do proper translations here
 translations = {
     'POST_SUFFIX_TEXT':{
         'en':'''
@@ -133,33 +133,67 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
 
 # TODO: use language detection algorithms to automate this
 subreddit_language_map = {
-    # 'ani_bm'            :'he',
-    # 'israel'            :'he',
-    # 'yo_elvr'           :'es',
-    # 'ich_iel'           :'de',
-    # 'LTB_iel'           :'de',
-    # 'schkreckl'         :'de',
-    # 'wasletztepreis'    :'de',
-    # 'OkBrudiMongo'      :'de',
-    # 'GeschichtsMaimais' :'de',
-    # 'moi_dlvv'          :'fr',
-    # 'rance'             :'fr',
+    'ani_bm'            :'he',
+    'israel'            :'he',
+    #
+    'yo_elvr'           :'es',
+    #
+    'ich_iel'           :'de',
+    'LTB_iel'           :'de',
+    'schkreckl'         :'de',
+    'wasletztepreis'    :'de',
+    'OkBrudiMongo'      :'de',
+    'GeschichtsMaimais' :'de',
+    'de_IAmA': 'de',
+    'Bundesliga': 'de',
+    'de': 'de',
+    'GermanAustriaberlin': 'de',
+    'Switzerland': 'de',
+    'Rammstein': 'de',
+    'borussiadortmundwien': 'de',
+    'Munich': 'de',
+    'berlinsocialclub': 'de',
+    'GermanPractice': 'de',
+    'kreiswichsFragReddit': 'de',
+    'SCHLAND': 'de',
+    'GermanRap': 'de',
+    'BUENZLI': 'de',
+    'schweiz': 'de',
+    'hamburg': 'de',
+    'germanmusic': 'de',
+    'frankfurt': 'de',
+    'zurichEasy_German': 'de',
+    'GermanFacts': 'de',
+    'Dokumentationen': 'de',
+    'cologne': 'de',
+    'schalke04': 'de',
+    'germantrees': 'de',
+    'stuttgart': 'de',
+    'de_podcasts': 'de',
+    'germanpuns': 'de',
+    'GermanMovies': 'de',
+    'Wissenschaft': 'de',
+    'dtm': 'de',
+    'Kochen': 'de',
+    #
+    'moi_dlvv'          :'fr',
+    'rance'             :'fr',
+    #
 }
 
 def get_translated_string(string_key, target_subreddit, add_suffix=True):
+    language = DEFAULT_LANGUAGE
     if target_subreddit in subreddit_language_map:
         target_language = subreddit_language_map[target_subreddit]
         if target_language in translations[string_key] and translations[string_key][target_language] is not None:
-            ret = translations[string_key][target_language]
-            ret += translations['POST_SUFFIX_TEXT'][target_language]
-            return ret
+            language = target_language
     
-    ret = translations[string_key][DEFAULT_LANGUAGE]
-    
+    translated_string = translations[string_key][language]
     if add_suffix:
-        ret += translations['POST_SUFFIX_TEXT'][DEFAULT_LANGUAGE]
+        suffix_language = DEFAULT_LANGUAGE
+        if translations['POST_SUFFIX_TEXT'][language] is not None:
+            suffix_language = language
+        translated_string += translations['POST_SUFFIX_TEXT'][suffix_language]
 
-    return ret
+    return translated_string
 
-    
-        
