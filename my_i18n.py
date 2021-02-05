@@ -175,6 +175,7 @@ subreddit_language_map = {
     'Wissenschaft': 'de',
     'dtm': 'de',
     'Kochen': 'de',
+    'NettHier': 'de',
     #
     'moi_dlvv'          :'fr',
     'rance'             :'fr',
