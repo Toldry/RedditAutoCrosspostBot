@@ -29,12 +29,12 @@ def respond_to_comment(comment):
 
 
 def handle_comment_reply(comment):
-    author = None
-    if comment.distinguished == 'moderator':
-        author = 'moderator'
-    else:
-        author = f'/u/{comment.author.name}'
-    logging.info(f'Received inbox comment by {author}: {comment.body}')
+    # author = None
+    # if comment.distinguished == 'moderator':
+    #     author = 'moderator'
+    # else:
+    #     author = f'/u/{comment.author.name}'
+    # logging.info(f'Received inbox comment by {author}: {comment.body}')
     reddit = reddit_instantiator.get_reddit_instance()
     if not isinstance(comment, praw.models.Comment):
         return
