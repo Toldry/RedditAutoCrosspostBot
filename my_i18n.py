@@ -36,6 +36,7 @@ translations = {
 ^^N'hésitez ^^pas ^^à ^^répondre ^^'Mauvais ^^bot' ^^/ ^^'Bon ^^bot', ^^c'est ^^un ^^retour ^^utile'''
 ,
     'he':'''
+    
 ---
 ^^🤖 ^^תגובה ^^זו ^^נכתבה ^^על ^^ידי ^^בוט. ^^ביפ ^^בופ ^^🤖
 
@@ -54,7 +55,7 @@ The creator of this bot will look at the responses and try to change the code to
     },
     'REPLY_TO_CROSSPOST':{
         'en':'''
-I crossposted this from {source_subreddit_name_prefixed} to r/{target_subreddit} after seeing [this decently upvoted **human-made**^^1 comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.
+I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted **human-made**^^1 comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.
     
 I checked on [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^^2 before crossposting, to make sure this wasn't already posted before in r/{target_subreddit}.
 
@@ -69,30 +70,42 @@ If you think this was a mistake, go ahead and downvote; I'll remove posts with n
 
 ^^3 ^^- ^^This ^^value ^^was ^^chosen ^^arbitrarily
 
-'''
-,
+''',
     'es':'''
-Publiqué esto de {source_subreddit_name_prefixed} a r/{target_subreddit} después de ver [este comentario **hecho por humanos** con una votación decente] ({source_comment_permalink}) (score={source_comment_score}), que parece Sugiero que esta publicación también encajaría bien aquí.
+Publiqué esto de r/{source_subreddit} a r/{target_subreddit} después de ver [este comentario **hecho por humanos** con una votación decente] ({source_comment_permalink}) (score={source_comment_score}), que parece Sugiero que esta publicación también encajaría bien aquí.
   
 Si cree que esto fue un error, siga adelante y vote en contra; Eliminaré las publicaciones con puntuaciones negativas.
 ''',
     'de':'''
-Ich habe diesen Pfosten von {source_subreddit_name_prefixed} nach r/{target_subreddit} gekreuzt, nachdem ich [diesen anständig hoochgewählten und von Menschen gemachten Kommentar] ({source_comment_permalink}) (score={source_comment_score}) gesehen habe und mir dachte, dass dieser Beitrag auch hier gut passen würde.
+Ich habe diesen Pfosten von r/{source_subreddit} nach r/{target_subreddit} gekreuzt, nachdem ich [diesen anständig hoochgewählten und von Menschen gemachten Kommentar] ({source_comment_permalink}) (score={source_comment_score}) gesehen habe und mir dachte, dass dieser Beitrag auch hier gut passen würde.
 
 Wenn du der Meinung bist, dass es hier nicht passt, downvote den Post. Ich werde Beiträge mit negativen Ergebnissen entfernen.
 '''
 ,
     'fr':'''
-J'ai croisé ceci de {source_subreddit_name_prefixed} à r/{target_subreddit} après avoir vu [ce commentaire  fait par l'homme  décemment voté] ({source_comment_permalink}) (score={source_comment_score}), cela semble suggèrent que cet article conviendrait également ici.
+J'ai croisé ceci de r/{source_subreddit} à r/{target_subreddit} après avoir vu [ce commentaire  fait par l'homme  décemment voté] ({source_comment_permalink}) (score={source_comment_score}), cela semble suggèrent que cet article conviendrait également ici.
   
 Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai les messages avec des scores négatifs.
 '''
     ,
     'he':'''
-עשיתי קרוספוסט מ- {source_subreddit_name_prefixed} ל- r/{target_subreddit} אחרי שראיתי את [התגובה הזו **שנכתבה על ידי בן-אדם** עם ניקוד נאות] ({source_comment_permalink}) (ניקוד = {source_comment_score}), שמרמזת כי פוסט זה מתאים גם לכאן.
-  
-אם אתה חושב שזו טעות, הרגישו חופשי להצביע-מטה; אסיר פוסטים עם ניקד שלילי.
-    ''',
+עשיתי קרוספוסט מ־ r/{source_subreddit} ל־ r/{target_subreddit} אחרי שראיתי את [הקומענט הזה **שנכתב על ידי בן אדם**^^1]({source_comment_permalink}) (ניקוד={source_comment_score}), שמרמז כי הפוסט הזה מתאים גם לכאן.
+    
+בדקתי ב־ [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^^2 לפני שקריספסטתי, על מנת לוודא שלא כבר קריספסטו את זה ל־ r/{target_subreddit}.
+
+בנוסף, חיכיתי {timedelta_string}^^3 לפני שקריספסטתי, במקרה ובן אדם היה רוצה לקרספסט את זה בעצמו.
+
+אם לדכתך זו טעות, את.ה מוזמן להצביע־מטה; אסיר פוסטים עם ניקוד שלילי.
+
+---
+^^1 ^^- ^^Assuming ^^/u/{source_comment_author_name} ^^is ^^human
+^^1 ^^- ^^בהנחה ^^ש ^^/u/{source_comment_author_name} ^^בן־אנוש
+
+^^2 ^^- ^^אלול ^^לא ^^לעבוד ^^בסוגי ^^פוסטים ^^מסוימים, ^^כגון ^^סרטונים.
+
+^^3 ^^- ^^ערך ^^זה ^^נבחר ^^באקראי
+
+''',
     },
     'THE_USER_WHO_COMMENTED':{
     'en':'''the user who commented''',
@@ -106,35 +119,52 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'es':None,
     'de':'''Ja, hier sind wir''',
     'fr':None,
-    'he':None,
+    'he':'''כן, זה איפו שאנחנו.''',
     },
     'NONEXISTENT_SUBREDDIT':{
     'en':'''The subreddit r/{target_subreddit} does not exist. ''',
     'es':None,
     'de':'''Das Unter r/{target_subreddit} existiert nicht''',
     'fr':None,
-    'he':None,
+    'he':'''הסאברעדיט r/{target_subreddit} לא קיים. ''',
     },
     'PROMPT_NONEXISTENT_SUBREDDIT_CREATION':{
     'en':'''Consider [creating it](/subreddits/create?name={target_subreddit}).''',
     'es':None,
     'de':'''Vielleicht [sollte man es erstellen](/subreddits/create?name={target_subreddit}).''',
     'fr':None,
-    'he':None,
+    'he':'''תשקול [ליצור אותו](/subreddits/create?name={target_subreddit}).''',
     },
     'FOUND_POST_WITH_SAME_CONTENT':{
-    'en':'''I found [this post]({same_content_post_url}) in r/{target_subreddit} with the same link as this post.''',
+    'en':'''I found [this post]({same_content_post_url}) in r/{target_subreddit} with the same content as the current post.''',
     'es':None,
     'de':'''Ich habe [diesen Post]({same_content_post_url}) in r/{target_subreddit} gefunden, der den selben Link enthält.''',
     'fr':None,
-    'he':None,
+    'he':'''מצאתי את  [הפוסט הזה]({same_content_post_url}) ב־ r/{target_subreddit} עם אותו התוכן כמו הפוסט הנוכחי.''',
     },
 }
 
 # TODO: use language detection algorithms to automate this
 subreddit_language_map = {
-    'ani_bm'            :'he',
-    'israel'            :'he',
+    'ani_bm':'he',
+    'israel':'he',
+    'sabamba':'he',
+    'hebrew' : 'he',
+    'yeladim_kamoni':'he',
+    'besederhavertipesh':'he',
+    'okhavermugbal':'he',
+    'ISR_historymemes':'he',
+    'IshKiriatGat':'he',
+    'ISR_copypasta':'he',
+    'HayaLiSHabatz':'he',
+    'hmmm_but_in_hebrew':'he',
+    'yapanfasha':'he',
+    'HibatGufotComedit':'he',
+    'mischakim':'he',
+    'TmonotMekolalot':'he',
+    'ani_bmcirclejerk':'he',
+    'Arsim':'he',
+    'memim':'he',
     #
     'yo_elvr'           :'es',
     #
@@ -182,12 +212,15 @@ subreddit_language_map = {
     #
 }
 
-def get_translated_string(string_key, target_subreddit, add_suffix=True):
+subreddit_language_map=dict((k.lower(), v) for k,v in subreddit_language_map.items()) #change keys to lower-case for later string comparison
+
+def get_translated_string(string_key, source_subreddit, add_suffix=True):
     language = DEFAULT_LANGUAGE
-    if target_subreddit in subreddit_language_map:
-        target_language = subreddit_language_map[target_subreddit]
-        if target_language in translations[string_key] and translations[string_key][target_language] is not None:
-            language = target_language
+    source_subreddit = source_subreddit.lower()
+    if source_subreddit in subreddit_language_map:
+        source_subreddit_language = subreddit_language_map[source_subreddit]
+        if source_subreddit_language in translations[string_key] and translations[string_key][source_subreddit_language] is not None:
+            language = source_subreddit_language
     
     translated_string = translations[string_key][language]
     if add_suffix:

@@ -30,7 +30,7 @@ def handle_incoming_comment(comment):
     
     if target_subreddit.lower() == source_subreddit:
         logging.info('Found "source_subreddit=target_subreddt" comment. Replying to source comment.')
-        reply_to_source_equals_target_comment(comment, target_subreddit)
+        reply_to_source_equals_target_comment(comment)
         return
 
     result_obj = get_posts_with_same_content(comment, target_subreddit)
@@ -135,21 +135,23 @@ def get_posts_with_same_content(comment, subreddit):
 
     return result
 
-def reply_to_source_equals_target_comment(source_comment, target_subreddit):
-    text = i18n.get_translated_string('THATS_WHERE_WE_ARE', target_subreddit)
+def reply_to_source_equals_target_comment(source_comment):
+    source_subreddit = source_comment.subreddit.display_name
+    text = i18n.get_translated_string('THATS_WHERE_WE_ARE', source_subreddit)
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SAME_SUBREDDIT_BOT_NAME)
     comment2.reply(text)
     return
 
 def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
+    source_subreddit = source_comment.subreddit.display_name
     NEW_SUBREDDIT_NAME_MINIMUM_LENGTH = 3
     NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH = 24
     target_subreddit_length_valid = NEW_SUBREDDIT_NAME_MINIMUM_LENGTH <= len(target_subreddit) <= NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH
-    text = i18n.get_translated_string('NONEXISTENT_SUBREDDIT', target_subreddit, add_suffix= not target_subreddit_length_valid)
+    text = i18n.get_translated_string('NONEXISTENT_SUBREDDIT', source_subreddit, add_suffix= not target_subreddit_length_valid)
     text = text.format(target_subreddit=target_subreddit,)
 
     if target_subreddit_length_valid:
-        text2 = i18n.get_translated_string('PROMPT_NONEXISTENT_SUBREDDIT_CREATION', target_subreddit, add_suffix=True)
+        text2 = i18n.get_translated_string('PROMPT_NONEXISTENT_SUBREDDIT_CREATION', source_subreddit, add_suffix=True)
         text2 = text2.format(target_subreddit=target_subreddit,)
         text = text + text2
 
@@ -159,7 +161,8 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
 
 # TODO: make up a better name for this function
 def reply_to_same_content_post_comment(source_comment, target_subreddit, post_with_same_content):
-    text = i18n.get_translated_string('FOUND_POST_WITH_SAME_CONTENT', target_subreddit)
+    source_subreddit = source_comment.subreddit.display_name
+    text = i18n.get_translated_string('FOUND_POST_WITH_SAME_CONTENT', source_subreddit)
     text = text.format(same_content_post_url=post_with_same_content.permalink,
                        target_subreddit=target_subreddit,)
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SAME_POST_BOT_NAME)
