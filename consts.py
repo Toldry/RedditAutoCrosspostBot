@@ -3,4 +3,5 @@
 SUB_BLACKLIST = [
     'suddenlysexoffender',
     'cringetopia',
+    'ReviewsByRetards',
 ]
