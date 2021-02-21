@@ -74,6 +74,8 @@ def _wait_and_retry_when_ratelimit_reached(func):
             except praw.exceptions.RedditAPIException as e:
                 if e.error_type != 'RATELIMIT':
                     raise
+                logging.info(f'e.message = \"{e.message}\"')
+                logging.info(f'e = {str(e)}')
                 amount, timeunit = re.compile(
                     r'you are doing that too much\. try again in (\d+) (second|minute)s?\.').search(e.message).groups()
                 amount = int(amount)
