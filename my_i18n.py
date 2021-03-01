@@ -122,18 +122,18 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'he':'''כן, זה איפו שאנחנו.''',
     },
     'NONEXISTENT_SUBREDDIT':{
-    'en':'''The subreddit r/{target_subreddit} does not exist. ''',
+    'en':'''The subreddit r/{target_subreddit} does not exist. Maybe there's a typo? ''',
     'es':None,
     'de':'''Das Unter r/{target_subreddit} existiert nicht''',
     'fr':None,
-    'he':'''הסאברעדיט r/{target_subreddit} לא קיים. ''',
+    'he':'''הסאברעדיט r/{target_subreddit} לא קיים. אולי יש תקלדה? ''',
     },
     'PROMPT_NONEXISTENT_SUBREDDIT_CREATION':{
-    'en':'''Consider [creating it](/subreddits/create?name={target_subreddit}).''',
+    'en':'''If not, consider [creating it](/subreddits/create?name={target_subreddit}).''',
     'es':None,
     'de':'''Vielleicht [sollte man es erstellen](/subreddits/create?name={target_subreddit}).''',
     'fr':None,
-    'he':'''תשקול [ליצור אותו](/subreddits/create?name={target_subreddit}).''',
+    'he':'''אם לא, תשקול [ליצור אותו](/subreddits/create?name={target_subreddit}).''',
     },
     'FOUND_POST_WITH_SAME_CONTENT':{
     'en':'''I found [this post]({same_content_post_url}) in r/{target_subreddit} with the same content as the current post.''',
