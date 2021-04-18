@@ -41,6 +41,14 @@ translations = {
 ^🤖 ^תגובה ^זו ^נכתבה ^על ^ידי ^בוט. ^ביפ ^בופ ^🤖
 
 ^תרגישו ^חופשי ^להגיב ^'בוט ^רע' ^/ ^'בוט ^טוב', ^זה ^משוב ^שימושי'''
+,
+    'totallynotrobots':'''
+
+---
+^🧑 ^THIS ^COMMENT ^WAS ^WRITTEN ^BY ^A ^HUMAN. ^SCHLERP ^SCHLORP ^🧑
+
+^FEEL ^WELCOME ^TO ^RESPOND ^'BAD ^HUMAN'/'GOOD ^HUMAN', ^IT'S ^USEFUL ^FEEDBACK. [^GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot)'''
+,
     },
     'RESPOND_TO_NEGATIVE_SENTIMENT':{
         'en':'''
@@ -106,6 +114,23 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
 ^3 ^- ^ערך ^זה ^נבחר ^באקראי
 
 ''',
+        'totallynotrobots':'''
+I CROSSPOSTED THIS FROM r/{source_subreddit} TO r/{target_subreddit} AFTER SEEING [THIS DECENTLY UPVOTED **HUMAN-MADE**^1 COMMENT]({source_comment_permalink}) (SCORE={source_comment_score}), THAT SEEMS TO SUGGEST THAT THIS POST WOULD BE A GOOD FIT HERE TOO.
+    
+I CHECKED ON [REPOSTSLEUTH.COM](https://repostsleuth.com/search?postId={source_submission_id})^2 BEFORE CROSSPOSTING, TO MAKE SURE THIS WASN'T ALREADY POSTED BEFORE IN r/{TARGET_SUBREDDIT}.
+
+I ALSO WAITED {timedelta_string}^3 BEFORE CROSSPOSTING, TO GIVE OTHER HUMANS A CHANCE TO CROSSPOST THIS THEMSELVES.
+
+IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH NEGATIVE SCORES.
+
+---
+^1 ^- ^ASSUMING ^/u/{source_comment_author_name} ^IS ^HUMAN
+
+^2 ^- ^MIGHT ^NOT ^WORK ^FOR ^SOME ^TYPES ^OF ^SUBMISSIONS, ^SUCH ^AS ^VIDEOS
+
+^3 ^- ^THIS ^VALUE ^WAS ^CHOSEN ^ARBITRARILY
+
+''',
     },
     'THE_USER_WHO_COMMENTED':{
     'en':'''the user who commented''',
@@ -113,6 +138,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'de':'''der Nutzer, der geantwortet hat''',
     'fr':None,
     'he':None,
+    'totallynotrobots':'''THE USER WHO COMMENTED''',
     },
     'THATS_WHERE_WE_ARE':{
     'en':'''Yes, that's where we are.''',
@@ -120,6 +146,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'de':'''Ja, hier sind wir''',
     'fr':None,
     'he':'''כן, זה איפו שאנחנו.''',
+    'totallynotrobots':'''YES, THAT'S WHERE WE ARE.''',
     },
     'NONEXISTENT_SUBREDDIT':{
     'en':'''The subreddit r/{target_subreddit} does not exist. Maybe there's a typo? ''',
@@ -127,6 +154,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'de':'''Das Unter r/{target_subreddit} existiert nicht''',
     'fr':None,
     'he':'''הסאברעדיט r/{target_subreddit} לא קיים. אולי יש תקלדה? ''',
+    'totallynotrobots':'''THE SUBREDDIT r/{target_subreddit} DOES NOT EXIST. MAYBE THERE'S A TYPO? ''',
     },
     'PROMPT_NONEXISTENT_SUBREDDIT_CREATION':{
     'en':'''If not, consider [creating it](/subreddits/create?name={target_subreddit}).''',
@@ -134,6 +162,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'de':'''Vielleicht [sollte man es erstellen](/subreddits/create?name={target_subreddit}).''',
     'fr':None,
     'he':'''אם לא, תשקול [ליצור אותו](/subreddits/create?name={target_subreddit}).''',
+    'totallynotrobots':'''IF NOT, CONSIDER [CREATING IT](/subreddits/create?name={target_subreddit}).''',
     },
     'FOUND_POST_WITH_SAME_CONTENT':{
     'en':'''I found [this post]({same_content_post_url}) in r/{target_subreddit} with the same content as the current post.''',
@@ -141,6 +170,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     'de':'''Ich habe [diesen Post]({same_content_post_url}) in r/{target_subreddit} gefunden, der den selben Link enthält.''',
     'fr':None,
     'he':'''מצאתי את  [הפוסט הזה]({same_content_post_url}) ב־ r/{target_subreddit} עם אותו התוכן כמו הפוסט הנוכחי.''',
+    'totallynotrobots':'''I FOUND [THIS POST]({same_content_post_url}) IN r/{target_subreddit} WITH THE SAME CONTENT AS THE CURRENT POST.''',
     },
 }
 
@@ -210,6 +240,7 @@ subreddit_language_map = {
     'moi_dlvv'          :'fr',
     'rance'             :'fr',
     #
+    'totallynotrobots'  :'totallynotrobots',
 }
 
 subreddit_language_map=dict((k.lower(), v) for k,v in subreddit_language_map.items()) #change keys to lower-case for later string comparison
