@@ -44,8 +44,10 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag = T
 
     result = Result()
 
+    crosspost_title = get_crosspost_title_for_crosspost(source_comment.submission, target_subreddit)
+
     try:
-        cross_post = source_comment.submission.crosspost(subreddit=target_subreddit, send_replies=False)
+        cross_post = source_comment.submission.crosspost(subreddit=target_subreddit, title=crosspost_title, send_replies=False)
         logging.info(f'Crosspost succesful. link to post: www.reddit.com{cross_post.permalink}')
         result.success = True
         result.crosspost = cross_post
@@ -64,6 +66,15 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag = T
                 raise
     
     return result
+
+def get_crosspost_title_for_crosspost(submission, target_subreddit):
+    if target_subreddit.lower() == 'totallynotrobots':
+        return submission.title.upper()
+    else:
+        # Will use this submission’s title if None (default: None).
+        # https://praw.readthedocs.io/en/latest/code_overview/models/submission.html#praw.models.Submission.crosspost
+        return None 
+
 
 def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     source_subreddit = source_comment.subreddit.display_name
