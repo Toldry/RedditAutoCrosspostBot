@@ -116,7 +116,16 @@ def handle_crosspost_exception(e, comment, target_subreddit):
                             'OVER18_SUBREDDIT_CROSSPOST',
                             'THREAD_LOCKED', 
                             'IMAGES_NOTALLOWED', 
-                            'SUBMIT_VALIDATION_FLAIR_REQUIRED']
+                            'SUBMIT_VALIDATION_BODY_BLACKLISTED_STRING',
+                            'SUBMIT_VALIDATION_TITLE_BLACKLISTED_STRING',
+                            'SUBMIT_VALIDATION_MIN_LENGTH',
+                            'SUBMIT_VALIDATION_MAX_LENGTH',
+                            'SUBMIT_VALIDATION_BODY_REQUIRED',
+                            'SUBMIT_VALIDATION_BODY_NOT_ALLOWED',
+                            'SUBMIT_VALIDATION_LINK_WHITELIST',
+                            'SUBMIT_VALIDATION_LINK_BLACKLIST',
+                            'SUBMIT_VALIDATION_REPOST',
+                            'SUBMIT_VALIDATION_FLAIR_REQUIRED',]
     if e.error_type in familiar_error_types:
         result.handled_with_grace = True
         result.error_type = e.error_type
