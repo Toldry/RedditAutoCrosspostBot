@@ -125,7 +125,8 @@ def handle_crosspost_exception(e, comment, target_subreddit):
                             'SUBMIT_VALIDATION_LINK_WHITELIST',
                             'SUBMIT_VALIDATION_LINK_BLACKLIST',
                             'SUBMIT_VALIDATION_REPOST',
-                            'SUBMIT_VALIDATION_FLAIR_REQUIRED',]
+                            'SUBMIT_VALIDATION_FLAIR_REQUIRED',
+                            'SUBMIT_VALIDATION_TITLE_REGEX_REQUIREMENT',]
     if e.error_type in familiar_error_types:
         result.handled_with_grace = True
         result.error_type = e.error_type
