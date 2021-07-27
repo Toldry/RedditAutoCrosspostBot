@@ -1,12 +1,20 @@
 # RedditAutoCrosspostBot
 https://www.reddit.com/user/AutoCrosspostBot
 
+
+[<img src="https://user-images.githubusercontent.com/7353619/127110170-d20f6993-ad4c-4724-bc91-f5312cb39083.png">](https://www.reddit.com/r/gatesopencomeonin/comments/o8gm9a/support_others/h34sbsr/)
+
+
+
+
 This reddit bot listens to comments and looks for ones that match the pattern 
 
 `/r/target_subreddit`
 
 It then saves the link to that comment for later processing.
 After some waiting period  (e.g. 3 months), the bot checks the same comment, and if it has accrued enough upvotes, the bot will crosspost the submission that the comment replied to, to the target subreddit.
+
+
 
 This project also shares the code for three additional bots:
 
