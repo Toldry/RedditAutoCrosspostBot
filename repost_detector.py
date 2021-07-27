@@ -19,7 +19,7 @@ def search_reposts(post_id):
         'filter':True,
         'post_id':post_id,
         'include_crossposts':True,
-        'image_match_percent':65,
+        'image_match_percent':90,
         'filter_author':False,
         # 'same_sub':'false',
         # 'only_older':'false',
