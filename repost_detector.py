@@ -38,7 +38,7 @@ def search_reposts(url):
         except:
             raise Exception(f'Encountered a problem with repostsleuth: {response.text}',
                             f'parameters={parameters}')
-        if error_details['title'] == 'Inval§id URL':
+        if error_details['title'] == 'Invalid URL':
             # This typically happens when the URL points to a video (rather than an image)
             return []
         else:
