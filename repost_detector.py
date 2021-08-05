@@ -33,12 +33,18 @@ def search_reposts(url):
         return []
 
     if response.status_code != HTTPStatus.OK:
-        error_details = response.json()
-        if error_details['title'] == 'Invalid URL':
+        try:
+            error_details = response.json()
+        except:
+            raise Exception(f'Encountered a problem with repostsleuth: {response.text}',
+                            f'parameters={parameters}')
+        if error_details['title'] == 'Inval§id URL':
             # This typically happens when the URL points to a video (rather than an image)
             return []
         else:
-            raise Exception('Encountered a problem with repostsleuth: {error_details}')
+            raise Exception(f'Encountered a problem with repostsleuth: {error_details}',
+                            f'parameters={parameters}')
+            
     
     content = response.json()
     posts = [x['post'] for x in content['matches']]
