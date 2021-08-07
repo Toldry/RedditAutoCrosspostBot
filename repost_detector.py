@@ -42,6 +42,8 @@ def search_reposts(url):
         if error_details['title'] == 'Invalid URL':
             # This typically happens when the URL points to a video (rather than an image)
             pass
+        elif error_details['title'] == 'Search API is not available.':
+            pass
         else:
             logging.warn(f'Encountered a problem with repostsleuth: {error_details}',
                          f'parameters={parameters}')
