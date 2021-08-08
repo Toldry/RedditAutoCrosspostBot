@@ -33,6 +33,7 @@ def search_reposts(url):
         logging.warn(f'Encountered error while accessing api.repostsleuth.com: {e}')
         return []
 
+    log_error = False
     if response.status_code == HTTPStatus.OK:
         content = response.json()
         posts = [x['post'] for x in content['matches']]
@@ -45,10 +46,11 @@ def search_reposts(url):
         elif error_details['title'] == 'Search API is not available.':
             pass
         else:
-            logging.warn(f'Encountered a problem with repostsleuth: {error_details}',
-                         f'parameters={parameters}')
+            log_error = True
     else:
-        logging.warn(f'Encountered a problem with repostsleuth: {response.text}',
+        log_error = True
+    if log_error:
+        logging.info(f'Encountered a problem with repostsleuth: {response.text}',
                      f'parameters={parameters}')
     return []
 
