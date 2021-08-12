@@ -30,7 +30,7 @@ def search_reposts(url):
     try:
         response = requests.get('https://api.repostsleuth.com/image', params=parameters)
     except Exception as e:
-        logging.warn(f'Encountered error while accessing api.repostsleuth.com: {e}')
+        logging.warn(f'Encountered error while accessing api.repostsleuth.com: {e}', parameters)
         return []
 
     log_error = False
@@ -50,7 +50,6 @@ def search_reposts(url):
     else:
         log_error = True
     if log_error:
-        logging.info(f'Encountered a problem with repostsleuth: {response.text}',
-                     f'parameters={parameters}')
+        logging.info(f'Encountered a problem with repostsleuth: {response.text}', parameters)
     return []
 
