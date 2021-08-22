@@ -50,6 +50,9 @@ def search_reposts(url):
     else:
         log_error = True
     if log_error:
-        logging.info(f'Encountered a problem with repostsleuth.', str(response.status_code))
+        logging.info(f'Encountered a problem with repostsleuth. \n\
+                       response.status_code={response.status_code}\n\
+                       parameters={parameters}\n\
+                       response.reason={response.reason}')
     return []
 
