@@ -128,6 +128,7 @@ def handle_crosspost_exception(e, comment, target_subreddit):
                             'SUBMIT_VALIDATION_FLAIR_REQUIRED',
                             'SUBMIT_VALIDATION_TITLE_REGEX_REQUIREMENT',
                             'SUBMIT_VALIDATION_TITLE_REQUIREMENT',
+                            'BANNED_FROM_SUBREDDIT',
                            ]
     if e.error_type in familiar_error_types:
         result.handled_with_grace = True
