@@ -82,7 +82,7 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD')
     timedelta_string = PHASE3_WAITING_PERIOD
     if source_comment.author:
-        source_comment_author_name = source_comment.author.name
+        source_comment_author_name = f'/u/{source_comment.author.name}'
     else:
         source_comment_author_name = i18n.get_translated_string('THE_USER_WHO_COMMENTED', source_subreddit, add_suffix=False)
     

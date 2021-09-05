@@ -72,7 +72,7 @@ I also waited {timedelta_string}^3 before crossposting, in case a human might've
 If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
 
 ---
-^1 ^- ^Assuming ^/u/{source_comment_author_name} ^is ^human
+^1 ^- ^Assuming {source_comment_author_name} ^is ^human
 
 ^2 ^- ^Might ^not ^work ^for ^some ^types ^of ^submissions, ^such ^as ^videos
 
@@ -106,8 +106,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
 אם לדכתך זו טעות, את.ה מוזמן להצביע־מטה; אסיר פוסטים עם ניקוד שלילי.
 
 ---
-^1 ^- ^Assuming ^/u/{source_comment_author_name} ^is ^human
-^1 ^- ^בהנחה ^ש ^/u/{source_comment_author_name} ^בן־אנוש
+^1 ^- ^בהנחה ^ש {source_comment_author_name} ^בן־אנוש
 
 ^2 ^- ^אלול ^לא ^לעבוד ^בסוגי ^פוסטים ^מסוימים, ^כגון ^סרטונים.
 
@@ -124,7 +123,7 @@ I ALSO WAITED {timedelta_string}^3 BEFORE CROSSPOSTING, TO GIVE OTHER HUMANS A C
 IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH NEGATIVE SCORES.
 
 ---
-^1 ^- ^ASSUMING ^/u/{source_comment_author_name} ^IS ^HUMAN
+^1 ^- ^ASSUMING {source_comment_author_name} ^IS ^HUMAN
 
 ^2 ^- ^MIGHT ^NOT ^WORK ^FOR ^SOME ^TYPES ^OF ^SUBMISSIONS, ^SUCH ^AS ^VIDEOS
 
@@ -133,12 +132,12 @@ IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH N
 ''',
     },
     'THE_USER_WHO_COMMENTED':{
-    'en':'''the user who commented''',
+    'en':'''^the ^user ^who ^commented''',
     'es':None,
-    'de':'''der Nutzer, der geantwortet hat''',
+    'de':'''^der ^Nutzer, ^der ^geantwortet ^hat''',
     'fr':None,
-    'he':None,
-    'totallynotrobots':'''THE USER WHO COMMENTED''',
+    'he':'''המשתמש ^שהגיב''',
+    'totallynotrobots':'''^THE ^USER ^WHO ^COMMENTED''',
     },
     'THATS_WHERE_WE_ARE':{
     'en':'''Yes, that's where we are.''',
