@@ -147,7 +147,7 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     NEW_SUBREDDIT_NAME_MINIMUM_LENGTH = 3
     NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH = 24
     target_subreddit_length_valid = NEW_SUBREDDIT_NAME_MINIMUM_LENGTH <= len(target_subreddit) <= NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH
-    text = i18n.get_translated_string('NONEXISTENT_SUBREDDIT', source_subreddit, add_suffix= not target_subreddit_length_valid)
+    text = i18n.get_translated_string('NONEXISTENT_SUBREDDIT', source_subreddit, add_suffix = not target_subreddit_length_valid)
     text = text.format(target_subreddit=target_subreddit,)
 
     if target_subreddit_length_valid:

@@ -244,13 +244,13 @@ subreddit_language_map = {
 
 subreddit_language_map=dict((k.lower(), v) for k,v in subreddit_language_map.items()) #change keys to lower-case for later string comparison
 
-def get_translated_string(string_key, source_subreddit, add_suffix=True):
+def get_translated_string(string_key, subreddit, add_suffix=True):
     language = DEFAULT_LANGUAGE
-    source_subreddit = source_subreddit.lower()
-    if source_subreddit in subreddit_language_map:
-        source_subreddit_language = subreddit_language_map[source_subreddit]
-        if source_subreddit_language in translations[string_key] and translations[string_key][source_subreddit_language] is not None:
-            language = source_subreddit_language
+    subreddit = subreddit.lower()
+    if subreddit in subreddit_language_map:
+        subreddit_language = subreddit_language_map[subreddit]
+        if subreddit_language in translations[string_key] and translations[string_key][subreddit_language] is not None:
+            language = subreddit_language
     
     translated_string = translations[string_key][language]
     if add_suffix:
