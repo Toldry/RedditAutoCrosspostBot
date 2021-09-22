@@ -12,7 +12,7 @@ translations = {
 ---
 ^🤖 ^this ^comment ^was ^written ^by ^a ^bot. ^beep ^boop ^🤖
 
-^feel ^welcome ^to ^respond ^'Bad ^bot'/'Good ^bot', ^it's ^useful ^feedback. [^github](https://github.com/Toldry/RedditAutoCrosspostBot)'''
+###### feel welcome to respond 'Bad bot'/'Good bot', it's useful feedback. [github](https://github.com/Toldry/RedditAutoCrosspostBot)'''
 ,
     'es':'''
 
@@ -47,7 +47,7 @@ translations = {
 ---
 ^🧑 ^THIS ^COMMENT ^WAS ^WRITTEN ^BY ^A ^HUMAN. ^SCHLERP ^SCHLORP ^🧑
 
-^FEEL ^WELCOME ^TO ^RESPOND ^'BAD ^HUMAN'/'GOOD ^HUMAN', ^IT'S ^USEFUL ^FEEDBACK. [^GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot)'''
+###### FEEL WELCOME TO RESPOND 'BAD HUMAN'/'GOOD HUMAN', IT'S USEFUL FEEDBACK. [GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot)'''
 ,
     },
     'RESPOND_TO_NEGATIVE_SENTIMENT':{
