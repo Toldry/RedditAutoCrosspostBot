@@ -10,9 +10,10 @@ translations = {
         'en':'''
 
 ---
-^🤖 ^this ^comment ^was ^written ^by ^a ^bot. ^beep ^boop ^🤖
+^(🤖 this comment was written by a bot. beep boop 🤖)
 
-^feel ^welcome ^to ^respond ^'Bad ^bot'/'Good ^bot', ^it's ^useful ^feedback. [^github](https://github.com/Toldry/RedditAutoCrosspostBot)'''
+^(feel welcome to respond 'Bad bot'/'Good bot', it's useful feedback.)
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
 ,
     'es':'''
 
