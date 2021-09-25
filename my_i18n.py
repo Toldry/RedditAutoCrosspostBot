@@ -10,44 +10,50 @@ translations = {
         'en':'''
 
 ---
-^🤖 ^this ^comment ^was ^written ^by ^a ^bot. ^beep ^boop ^🤖
+^(🤖 this comment was written by a bot. beep boop 🤖)
 
-^feel ^welcome ^to ^respond ^'Bad ^bot'/'Good ^bot', ^it's ^useful ^feedback. [^github](https://github.com/Toldry/RedditAutoCrosspostBot)'''
+^(feel welcome to respond 'Bad bot'/'Good bot', it's useful feedback.)
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
 ,
     'es':'''
 
 --- 
-^🤖 ^este ^comentario ^fue ^escrito ^por ^un ^bot. ^bip ^boop ^🤖
+^(🤖 este comentario fue escrito por un bot. bip boop 🤖)
 
-^siéntase ^bienvenido ^a ^responder ^'Mal ^bot' ^/ ^'Buen ^bot', ^es ^una ^retroalimentación ^útil'''
+^(siéntase bienvenido a responder 'Mal bot' / 'Buen bot', es una retroalimentación útil
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
 ,
     'de':'''
 
 ---
-^🤖 ^Dieser ^Kommentar ^wurde ^von ^einem ^Bot ^geschrieben. ^Beep ^Boop ^🤖
+^(🤖 Dieser Kommentar wurde von einem Bot geschrieben. Beep Boop 🤖)
 
-^Gerne ^kannst ^du ^mit ^"Schlechter ^Bot" ^/ ^"Guter ^Bot" ^antworten. ^Es ^ist ^ein ^nützliches ^Feedback.'''
+^(Gerne kannst du mit "Schlechter Bot" / "Guter Bot" antworten. Es ist ein nützliches Feedback.)
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
 ,
     'fr':'''
 
 ---
-^🤖 ^ce ^commentaire ^a ^été ^écrit ^par ^un ^bot. ^bip ^boop ^🤖
+^(🤖 ce commentaire a été écrit par un bot. bip boop 🤖)
 
-^N'hésitez ^pas ^à ^répondre ^'Mauvais ^bot' ^/ ^'Bon ^bot', ^c'est ^un ^retour ^utile'''
+^(N'hésitez pas à répondre 'Mauvais bot' / 'Bon bot', c'est un retour utile)
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
 ,
     'he':'''
     
 ---
-^🤖 ^תגובה ^זו ^נכתבה ^על ^ידי ^בוט. ^ביפ ^בופ ^🤖
+^(🤖 תגובה זו נכתבה על ידי בוט. ביפ בופ 🤖)
 
-^תרגישו ^חופשי ^להגיב ^'בוט ^רע' ^/ ^'בוט ^טוב', ^זה ^משוב ^שימושי'''
+^(תרגישו חופשי להגיב 'בוט רע' / 'בוט טוב', זה משוב שימושי)
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
 ,
     'totallynotrobots':'''
 
 ---
-^🧑 ^THIS ^COMMENT ^WAS ^WRITTEN ^BY ^A ^HUMAN. ^SCHLERP ^SCHLORP ^🧑
+^(🧑 THIS COMMENT WAS WRITTEN BY A HUMAN. SCHLERP SCHLORP 🧑)
 
-^FEEL ^WELCOME ^TO ^RESPOND ^'BAD ^HUMAN'/'GOOD ^HUMAN', ^IT'S ^USEFUL ^FEEDBACK. [^GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot)'''
+^(FEEL WELCOME TO RESPOND 'BAD HUMAN'/'GOOD HUMAN', IT'S USEFUL FEEDBACK.)
+^[GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[RANK](https://botranks.com?bot=same_post_bot)'''
 ,
     },
     'RESPOND_TO_NEGATIVE_SENTIMENT':{
@@ -63,7 +69,7 @@ The creator of this bot will look at the responses and try to change the code to
     },
     'REPLY_TO_CROSSPOST':{
         'en':'''
-I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted **human-made**^1 comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.
+I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted **human-made**^1 comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.)
     
 I checked on [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^2 before crossposting, to make sure this wasn't already posted before in r/{target_subreddit}.
 
@@ -72,11 +78,11 @@ I also waited {timedelta_string}^3 before crossposting, in case a human might've
 If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
 
 ---
-^1 ^- ^Assuming {source_comment_author_name} ^is ^human
+^(1 - Assuming {source_comment_author_name} is human)
 
-^2 ^- ^Might ^not ^work ^for ^some ^types ^of ^submissions, ^such ^as ^videos
+^(2 - Might not work for some types of submissions, such as videos)
 
-^3 ^- ^This ^value ^was ^chosen ^arbitrarily
+^(3 - This value was chosen arbitrarily)
 
 ''',
     'es':'''
@@ -101,16 +107,16 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
     
 בדקתי ב־ [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^2 לפני שקריספסטתי, על מנת לוודא שלא כבר קריספסטו את זה ל־ r/{target_subreddit}.
 
-בנוסף, חיכיתי {timedelta_string}^3 לפני שקריספסטתי, במקרה ובן אדם היה רוצה לקרספסט את זה בעצמו.
+בנוסף, חיכיתי {timedelta_string}^2 לפני שקריספסטתי, במקרה ובן אדם היה רוצה לקרספסט את זה בעצמו.
 
 אם לדכתך זו טעות, את.ה מוזמן להצביע־מטה; אסיר פוסטים עם ניקוד שלילי.
 
 ---
-^1 ^- ^בהנחה ^ש {source_comment_author_name} ^בן־אנוש
+^(1 - בהנחה ש {source_comment_author_name} בן־אנוש)
 
-^2 ^- ^אלול ^לא ^לעבוד ^בסוגי ^פוסטים ^מסוימים, ^כגון ^סרטונים.
+^(2 - אלול לא לעבוד בסוגי פוסטים מסוימים, כגון סרטונים.)
 
-^3 ^- ^ערך ^זה ^נבחר ^באקראי
+^(3 - ערך זה נבחר באקראי)
 
 ''',
         'totallynotrobots':'''
@@ -123,21 +129,21 @@ I ALSO WAITED {timedelta_string}^3 BEFORE CROSSPOSTING, TO GIVE OTHER HUMANS A C
 IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH NEGATIVE SCORES.
 
 ---
-^1 ^- ^ASSUMING {source_comment_author_name} ^IS ^HUMAN
+^(1 - ASSUMING {source_comment_author_name} IS HUMAN)
 
-^2 ^- ^MIGHT ^NOT ^WORK ^FOR ^SOME ^TYPES ^OF ^SUBMISSIONS, ^SUCH ^AS ^VIDEOS
+^(2 - MIGHT NOT WORK FOR SOME TYPES OF SUBMISSIONS, SUCH AS VIDEOS)
 
-^3 ^- ^THIS ^VALUE ^WAS ^CHOSEN ^ARBITRARILY
+^(3 - THIS VALUE WAS CHOSEN ARBITRARILY)
 
 ''',
     },
     'THE_USER_WHO_COMMENTED':{
-    'en':'''^the ^user ^who ^commented''',
+    'en':'''the user who commented''',
     'es':None,
-    'de':'''^der ^Nutzer, ^der ^geantwortet ^hat''',
+    'de':'''der Nutzer, der geantwortet hat''',
     'fr':None,
-    'he':'''המשתמש ^שהגיב''',
-    'totallynotrobots':'''^THE ^USER ^WHO ^COMMENTED''',
+    'he':'''המשתמש שהגיב''',
+    'totallynotrobots':'''THE USER WHO COMMENTED''',
     },
     'THATS_WHERE_WE_ARE':{
     'en':'''Yes, that's where we are.''',
