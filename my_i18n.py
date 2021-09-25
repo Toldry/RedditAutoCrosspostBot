@@ -13,7 +13,7 @@ translations = {
 ^(🤖 this comment was written by a bot. beep boop 🤖)
 
 ^(feel welcome to respond 'Bad bot'/'Good bot', it's useful feedback.)
-^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})'''
 ,
     'es':'''
 
@@ -21,7 +21,7 @@ translations = {
 ^(🤖 este comentario fue escrito por un bot. bip boop 🤖)
 
 ^(siéntase bienvenido a responder 'Mal bot' / 'Buen bot', es una retroalimentación útil
-^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})'''
 ,
     'de':'''
 
@@ -29,7 +29,7 @@ translations = {
 ^(🤖 Dieser Kommentar wurde von einem Bot geschrieben. Beep Boop 🤖)
 
 ^(Gerne kannst du mit "Schlechter Bot" / "Guter Bot" antworten. Es ist ein nützliches Feedback.)
-^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})'''
 ,
     'fr':'''
 
@@ -37,7 +37,7 @@ translations = {
 ^(🤖 ce commentaire a été écrit par un bot. bip boop 🤖)
 
 ^(N'hésitez pas à répondre 'Mauvais bot' / 'Bon bot', c'est un retour utile)
-^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})'''
 ,
     'he':'''
     
@@ -45,7 +45,7 @@ translations = {
 ^(🤖 תגובה זו נכתבה על ידי בוט. ביפ בופ 🤖)
 
 ^(תרגישו חופשי להגיב 'בוט רע' / 'בוט טוב', זה משוב שימושי)
-^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot=same_post_bot)'''
+^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})'''
 ,
     'totallynotrobots':'''
 
@@ -53,7 +53,7 @@ translations = {
 ^(🧑 THIS COMMENT WAS WRITTEN BY A HUMAN. SCHLERP SCHLORP 🧑)
 
 ^(FEEL WELCOME TO RESPOND 'BAD HUMAN'/'GOOD HUMAN', IT'S USEFUL FEEDBACK.)
-^[GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[RANK](https://botranks.com?bot=same_post_bot)'''
+^[GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[RANK](https://botranks.com?bot={bot_name})'''
 ,
     },
     'RESPOND_TO_NEGATIVE_SENTIMENT':{
@@ -250,7 +250,7 @@ subreddit_language_map = {
 
 subreddit_language_map=dict((k.lower(), v) for k,v in subreddit_language_map.items()) #change keys to lower-case for later string comparison
 
-def get_translated_string(string_key, subreddit, add_suffix=True):
+def get_translated_string(string_key, subreddit, add_suffix=True, bot_name = None):
     language = DEFAULT_LANGUAGE
     subreddit = subreddit.lower()
     if subreddit in subreddit_language_map:
@@ -263,6 +263,11 @@ def get_translated_string(string_key, subreddit, add_suffix=True):
         suffix_language = DEFAULT_LANGUAGE
         if translations['POST_SUFFIX_TEXT'][language] is not None:
             suffix_language = language
+
+        suffix_text = translations['POST_SUFFIX_TEXT'][suffix_language]
+        if bot_name is not None:
+            suffix_text = suffix_text.format(bot_name=bot_name)
+            
         translated_string += translations['POST_SUFFIX_TEXT'][suffix_language]
 
     return translated_string

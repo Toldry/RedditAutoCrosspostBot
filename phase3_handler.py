@@ -78,7 +78,11 @@ def get_crosspost_title_for_crosspost(submission, target_subreddit):
 
 def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     source_subreddit = source_comment.subreddit.display_name
-    text = i18n.get_translated_string('REPLY_TO_CROSSPOST', target_subreddit)
+    text = i18n.get_translated_string(
+        'REPLY_TO_CROSSPOST',
+        target_subreddit,
+        bot_name=reddit_instantiator.AUTO_CROSSPOST_BOT_NAME,
+        )
     PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD')
     timedelta_string = PHASE3_WAITING_PERIOD
     if source_comment.author:

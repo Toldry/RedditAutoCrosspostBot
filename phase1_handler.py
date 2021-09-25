@@ -137,7 +137,11 @@ def get_posts_with_same_content(comment, subreddit):
 
 def reply_to_source_equals_target_comment(source_comment):
     source_subreddit = source_comment.subreddit.display_name
-    text = i18n.get_translated_string('THATS_WHERE_WE_ARE', source_subreddit)
+    text = i18n.get_translated_string(
+        'THATS_WHERE_WE_ARE', 
+        source_subreddit, 
+        bot_name=reddit_instantiator.SAME_SUBREDDIT_BOT_NAME
+        )
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SAME_SUBREDDIT_BOT_NAME)
     comment2.reply(text)
     return
@@ -147,11 +151,21 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     NEW_SUBREDDIT_NAME_MINIMUM_LENGTH = 3
     NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH = 24
     target_subreddit_length_valid = NEW_SUBREDDIT_NAME_MINIMUM_LENGTH <= len(target_subreddit) <= NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH
-    text = i18n.get_translated_string('NONEXISTENT_SUBREDDIT', source_subreddit, add_suffix = not target_subreddit_length_valid)
+    text = i18n.get_translated_string(
+        'NONEXISTENT_SUBREDDIT', 
+        source_subreddit, 
+        add_suffix = not target_subreddit_length_valid,
+        bot_name=reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME,
+        )
     text = text.format(target_subreddit=target_subreddit,)
 
     if target_subreddit_length_valid:
-        text2 = i18n.get_translated_string('PROMPT_NONEXISTENT_SUBREDDIT_CREATION', source_subreddit, add_suffix=True)
+        text2 = i18n.get_translated_string(
+            'PROMPT_NONEXISTENT_SUBREDDIT_CREATION', 
+            source_subreddit, 
+            add_suffix=True,
+            bot_name=reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME,
+            )
         text2 = text2.format(target_subreddit=target_subreddit,)
         text = text + text2
 
@@ -162,7 +176,11 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
 # TODO: make up a better name for this function
 def reply_to_same_content_post_comment(source_comment, target_subreddit, post_with_same_content):
     source_subreddit = source_comment.subreddit.display_name
-    text = i18n.get_translated_string('FOUND_POST_WITH_SAME_CONTENT', source_subreddit)
+    text = i18n.get_translated_string(
+        'FOUND_POST_WITH_SAME_CONTENT', 
+        source_subreddit,
+        bot_name=reddit_instantiator.SAME_POST_BOT_NAME,
+        )
     text = text.format(same_content_post_url=post_with_same_content.permalink,
                        target_subreddit=target_subreddit,)
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SAME_POST_BOT_NAME)
