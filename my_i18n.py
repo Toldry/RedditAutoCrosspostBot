@@ -268,7 +268,7 @@ def get_translated_string(string_key, subreddit, add_suffix=True, bot_name = Non
         if bot_name is not None:
             suffix_text = suffix_text.format(bot_name=bot_name)
             
-        translated_string += translations['POST_SUFFIX_TEXT'][suffix_language]
+        translated_string += suffix_text
 
     return translated_string
 
