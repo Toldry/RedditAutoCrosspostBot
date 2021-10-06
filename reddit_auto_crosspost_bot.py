@@ -19,7 +19,7 @@ import inbox_handler
 import phase1_handler
 import phase2_handler
 import phase3_handler
-import sub_name_string_match
+import sub_name_string_matc
 
 
 comment_stream = None
@@ -84,7 +84,6 @@ def main():
 
 def start_bot():
     set_schedule()
-    sub_name_string_match.prepare_subreddits_name_list() #TODO: run this in parallel in a separate thread
     comment_stream, inbox_stream = init_streams()
     
     while True:
