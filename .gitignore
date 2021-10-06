@@ -5,3 +5,4 @@ app.log*
 db.json
 *.pyc
 /venv/
+*.csv

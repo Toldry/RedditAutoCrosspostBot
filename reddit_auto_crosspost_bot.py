@@ -5,13 +5,13 @@ from logging.handlers import RotatingFileHandler
 import argparse
 import time
 from distutils import util
+import os
 
 import praw
 import requests
 import schedule
 import prawcore
 import urllib3
-import os
 
 import reddit_instantiator
 import unwanted_submission_remover
@@ -19,6 +19,7 @@ import inbox_handler
 import phase1_handler
 import phase2_handler
 import phase3_handler
+import sub_name_string_match
 
 
 comment_stream = None
@@ -83,7 +84,7 @@ def main():
 
 def start_bot():
     set_schedule()
-
+    sub_name_string_match.prepare_subreddits_name_list() #TODO: run this in parallel in a separate thread
     comment_stream, inbox_stream = init_streams()
     
     while True:

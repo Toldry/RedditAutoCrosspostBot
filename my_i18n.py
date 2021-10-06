@@ -69,7 +69,7 @@ The creator of this bot will look at the responses and try to change the code to
     },
     'REPLY_TO_CROSSPOST':{
         'en':'''
-I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted **human-made**^1 comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.)
+I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted **human-made**^1 comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.
     
 I checked on [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^2 before crossposting, to make sure this wasn't already posted before in r/{target_subreddit}.
 
@@ -154,15 +154,31 @@ IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH N
     'totallynotrobots':'''YES, THAT'S WHERE WE ARE.''',
     },
     'NONEXISTENT_SUBREDDIT':{
-    'en':'''The subreddit r/{target_subreddit} does not exist. Maybe there's a typo? ''',
+    'en':'''The subreddit r/{target_subreddit} does not exist.''',
     'es':None,
     'de':'''Das Unter r/{target_subreddit} existiert nicht''',
     'fr':None,
-    'he':'''הסאברעדיט r/{target_subreddit} לא קיים. אולי יש תקלדה? ''',
-    'totallynotrobots':'''THE SUBREDDIT r/{target_subreddit} DOES NOT EXIST. MAYBE THERE'S A TYPO? ''',
+    'he':'''הסאברעדיט r/{target_subreddit} לא קיים.''',
+    'totallynotrobots':'''THE SUBREDDIT r/{target_subreddit} DOES NOT EXIST.''',
+    },
+    'ALTERNATE_SUBS_SUGGESTION': {
+        'en':'''Did you mean?:
+
+{alternate_subreddits_string}''',
+        'he':'''אולי התכוונת?:
+
+{alternate_subreddits_string}''',
+        'totallynotrobots':'''DID YOU MEAN?:
+
+{alternate_subreddits_string}'''
+    },
+    'MAYBE_TYPO': {
+        'en': '''Maybe there's a typo?''',
+        'he': '''אולי יש תקלדה?''',
+        'totallynotrobots': '''MAYBE THERE'S A TYPO?''',
     },
     'PROMPT_NONEXISTENT_SUBREDDIT_CREATION':{
-    'en':'''If not, consider [creating it](/subreddits/create?name={target_subreddit}).''',
+    'en':'''Consider [**creating a new subreddit** r/{target_subreddit}](/subreddits/create?name={target_subreddit}).''',
     'es':None,
     'de':'''Vielleicht [sollte man es erstellen](/subreddits/create?name={target_subreddit}).''',
     'fr':None,
@@ -272,3 +288,16 @@ def get_translated_string(string_key, subreddit, add_suffix=True, bot_name = Non
 
     return translated_string
 
+def get_suffix(subreddit, bot_name):
+    language = DEFAULT_LANGUAGE
+    subreddit = subreddit.lower()
+    if subreddit in subreddit_language_map:
+        subreddit_language = subreddit_language_map[subreddit]
+        if subreddit_language in translations['POST_SUFFIX_TEXT'] and translations['POST_SUFFIX_TEXT'][subreddit_language] is not None:
+            language = subreddit_language
+    
+    suffix_text = translations['POST_SUFFIX_TEXT'][language]
+    if bot_name is not None:
+        suffix_text = suffix_text.format(bot_name=bot_name)
+    
+    return suffix_text

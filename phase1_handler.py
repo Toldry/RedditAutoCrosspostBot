@@ -4,13 +4,12 @@ import logging
 import re
 import json
 
-import prawcore
-
 import consts
 import racb_db
 import reddit_instantiator
 import my_i18n as i18n
 import repost_detector
+import sub_name_string_match
 
 def handle_incoming_comment(comment):
     logging.debug(f'Handling a comment: {comment.permalink}')
@@ -154,21 +153,45 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     text = i18n.get_translated_string(
         'NONEXISTENT_SUBREDDIT', 
         source_subreddit, 
-        add_suffix = not target_subreddit_length_valid,
-        bot_name=reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME,
+        add_suffix = False,
         )
     text = text.format(target_subreddit=target_subreddit,)
 
-    if target_subreddit_length_valid:
+    matches = sub_name_string_match.get_matches(target_subreddit)
+
+    if len(matches) == 0:
         text2 = i18n.get_translated_string(
+            'MAYBE_TYPO', 
+            source_subreddit, 
+            add_suffix=False,
+            )
+        text = f'{text} {text2}'
+    else:
+        text2 = i18n.get_translated_string(
+            'ALTERNATE_SUBS_SUGGESTION', 
+            source_subreddit, 
+            add_suffix=False,
+            )
+
+        formatted_matches = [f'* r/{sub}' for sub in matches]
+        alternate_subreddits_string = '\n'.join(formatted_matches)
+        text2 = text2.format(alternate_subreddits_string=alternate_subreddits_string)
+        text = f'{text}\n\n{text2}'
+
+    if target_subreddit_length_valid:
+        text3 = i18n.get_translated_string(
             'PROMPT_NONEXISTENT_SUBREDDIT_CREATION', 
             source_subreddit, 
-            add_suffix=True,
+            add_suffix=False,
             bot_name=reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME,
             )
-        text2 = text2.format(target_subreddit=target_subreddit,)
-        text = text + text2
+        text3 = text3.format(target_subreddit=target_subreddit,)
+        text = f'{text}\n\n{text3}'
 
+    text += i18n.get_suffix(
+        subreddit=target_subreddit, 
+        bot_name=reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME,
+        )
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME)
     comment2.reply(text)
     return
