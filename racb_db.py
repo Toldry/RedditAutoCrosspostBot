@@ -2,8 +2,6 @@
 
 import logging
 import os
-from datetime import datetime
-import time
 from distutils import util
 
 import psycopg2
@@ -15,7 +13,7 @@ def add_comment(comment):
             permalink = comment.permalink
             cur.callproc('insert_scraped_comment', (permalink,))
             conn.commit()
-    except (psycopg2.errors.InsufficientPrivilege, psycopg2.errors.InFailedSqlTransaction):
+    except (psycopg2.errors.InsufficientPrivilege, psycopg2.errors.InFailedSqlTransaction,):
         logging.error('Cannot insert row, probably because heroku blocked access to the table.')
         conn.rollback()
         debug = bool(util.strtobool(os.environ.get('DEBUG')))

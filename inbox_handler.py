@@ -2,7 +2,6 @@
 
 import logging
 import re
-import textwrap
 
 import praw
 import prawcore
