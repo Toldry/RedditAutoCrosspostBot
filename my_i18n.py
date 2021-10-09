@@ -69,7 +69,7 @@ The creator of this bot will look at the responses and try to change the code to
     },
     'REPLY_TO_CROSSPOST':{
         'en':'''
-I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted comment]({source_comment_permalink}) (score={source_comment_score}) written {timedelta_string} ago by u/{source_comment_author_name}, that seems to suggest that this post would be a good fit here too.
+I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted comment]({source_comment_permalink}) (score={source_comment_score}) written {timedelta_string} ago by {source_comment_author_name}, that seems to suggest that this post would be a good fit here too.
     
 I waited {timedelta_string}^1 before crossposting in case a human might've wanted to crosspost this themselves.
 
