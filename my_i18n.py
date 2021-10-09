@@ -69,20 +69,19 @@ The creator of this bot will look at the responses and try to change the code to
     },
     'REPLY_TO_CROSSPOST':{
         'en':'''
-I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted **human-made**^1 comment]({source_comment_permalink}) (score={source_comment_score}), that seems to suggest that this post would be a good fit here too.
+I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted comment]({source_comment_permalink}) (score={source_comment_score}) written {timedelta_string} ago by u/{source_comment_author_name}, that seems to suggest that this post would be a good fit here too.
     
-I checked on [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^2 before crossposting, to make sure this wasn't already posted before in r/{target_subreddit}.
+I waited {timedelta_string}^1 before crossposting in case a human might've wanted to crosspost this themselves.
 
-I also waited {timedelta_string}^3 before crossposting, in case a human might've wanted to crosspost this themselves.
+I also checked on [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^2 before crossposting, to make sure this wasn't already posted before in r/{target_subreddit}.
 
-If you think this was a mistake, go ahead and downvote; I'll remove posts with negative scores.
+
+If you think this was a mistake, please downvote the OP; I'll remove posts with negative scores.
 
 ---
-^(1 - Assuming {source_comment_author_name} is human)
+^(1 - This value was chosen arbitrarily)
 
 ^(2 - Might not work for some types of submissions, such as videos)
-
-^(3 - This value was chosen arbitrarily)
 
 ''',
     'es':'''
