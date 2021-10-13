@@ -1,7 +1,9 @@
+import logging
+
 from thefuzz import process
 import pandas as pd
 
-# this file is created by processing and filtering the files provided by https://frontpagemetrics.com/list-all-subreddits
+# this file is created by processing and filtering the files provided by https://frontpagemetrics.com/list-all-subreddits 
 FILTERED_SUBREDDITS_FILENAME = 'subreddit_names.csv' 
 
 MINIMUM_SUBS = 5000
@@ -17,11 +19,20 @@ def get_matches(subreddit_name):
     extracted = process.extract(subreddit_name, subreddit_names, limit=EXTRACT_LIMIT, )
     n = len(subreddit_name)
 
+
+    # delete this try block once the "'float' has no len()" bug is resolved
+    try:
+        names = [name for name,score,key in extracted]
+        for name in names:
+            logging.info(f'Name: {name}, name type: {type(name)}')
+    except: 
+        pass
+
     results = [
         name for name,score,key 
         in extracted
         if score >= MINIMUM_MATCH_SCORE
-        and (abs(len(name) - n))/n <= MAX_STRING_LEN_RATIO_DELTA
+        and ( (abs( len(name) - n))/n <= MAX_STRING_LEN_RATIO_DELTA)
     ]
 
     results = results[:RESULTS_LIMIT]
