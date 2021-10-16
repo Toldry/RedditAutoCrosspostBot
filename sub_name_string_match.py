@@ -14,7 +14,8 @@ RESULTS_LIMIT = 4
 
 
 def get_matches(subreddit_name):
-    df = pd.read_csv(FILTERED_SUBREDDITS_FILENAME)
+    df = pd.read_csv(FILTERED_SUBREDDITS_FILENAME) 
+    # df = pd.read_csv(FILTERED_SUBREDDITS_FILENAME, keep_default_na=False) 
     subreddit_names = df['subreddit_name']
     extracted = process.extract(subreddit_name, subreddit_names, limit=EXTRACT_LIMIT, )
     n = len(subreddit_name)
@@ -22,6 +23,7 @@ def get_matches(subreddit_name):
 
     # delete this try block once the "'float' has no len()" bug is resolved
     try:
+        logging.info(f'subreddit_name: {subreddit_name}')
         names = [name for name,score,key in extracted]
         for name in names:
             logging.info(f'Name: {name}, name type: {type(name)}')
