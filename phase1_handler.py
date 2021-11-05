@@ -158,8 +158,9 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     text = text.format(target_subreddit=target_subreddit,)
 
     matches = sub_name_string_match.get_matches(target_subreddit)
+    filtered_matches = [sub for sub in matches if is_subreddit_available(sub)]
 
-    if len(matches) == 0:
+    if len(filtered_matches) == 0:
         text2 = i18n.get_translated_string(
             'MAYBE_TYPO', 
             source_subreddit, 
@@ -172,8 +173,7 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
             source_subreddit, 
             add_suffix=False,
             )
-
-        formatted_matches = [f'* r/{sub}' for sub in matches]
+        formatted_matches = [get_subreddit_suggestion_list_line(sub) for sub in filtered_matches]
         alternate_subreddits_string = '\n'.join(formatted_matches)
         text2 = text2.format(alternate_subreddits_string=alternate_subreddits_string)
         text = f'{text}\n\n{text2}'
@@ -195,6 +195,26 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME)
     comment2.reply(text)
     return
+
+def is_subreddit_available(subreddit_name):
+    reddit = reddit_instantiator.get_reddit_instance()
+    try:
+        sub_obj = reddit.subreddit(subreddit_name)
+        subscribers = sub_obj.subscribers
+        return True
+    except:
+        return False 
+
+def get_subreddit_suggestion_list_line(subreddit_name):
+    ret_val = f'* r/{subreddit_name} ('
+    reddit = reddit_instantiator.get_reddit_instance()
+    sub_obj = reddit.subreddit(subreddit_name)
+    if sub_obj.over18:
+        ret_val += '**NSFW**, '
+
+    ret_val += f'subscribers: {sub_obj.subscribers:,})'
+
+    return ret_val
 
 # TODO: make up a better name for this function
 def reply_to_same_content_post_comment(source_comment, target_subreddit, post_with_same_content):
