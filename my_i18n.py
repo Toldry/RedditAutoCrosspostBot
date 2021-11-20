@@ -121,7 +121,7 @@ Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai 
         'totallynotrobots':'''
 I CROSSPOSTED THIS FROM r/{source_subreddit} TO r/{target_subreddit} AFTER SEEING [THIS DECENTLY UPVOTED **HUMAN-MADE**^1 COMMENT]({source_comment_permalink}) (SCORE={source_comment_score}), THAT SEEMS TO SUGGEST THAT THIS POST WOULD BE A GOOD FIT HERE TOO.
     
-I CHECKED ON [REPOSTSLEUTH.COM](https://repostsleuth.com/search?postId={source_submission_id})^2 BEFORE CROSSPOSTING, TO MAKE SURE THIS WASN'T ALREADY POSTED BEFORE IN r/{TARGET_SUBREDDIT}.
+I CHECKED ON [REPOSTSLEUTH.COM](https://repostsleuth.com/search?postId={source_submission_id})^2 BEFORE CROSSPOSTING, TO MAKE SURE THIS WASN'T ALREADY POSTED BEFORE IN r/{target_subreddit}.
 
 I ALSO WAITED {timedelta_string}^3 BEFORE CROSSPOSTING, TO GIVE OTHER HUMANS A CHANCE TO CROSSPOST THIS THEMSELVES.
 
