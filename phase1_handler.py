@@ -147,9 +147,6 @@ def reply_to_source_equals_target_comment(source_comment):
 
 def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
     source_subreddit = source_comment.subreddit.display_name
-    NEW_SUBREDDIT_NAME_MINIMUM_LENGTH = 3
-    NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH = 24
-    target_subreddit_length_valid = NEW_SUBREDDIT_NAME_MINIMUM_LENGTH <= len(target_subreddit) <= NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH
     text = i18n.get_translated_string(
         'NONEXISTENT_SUBREDDIT', 
         source_subreddit, 
@@ -178,7 +175,7 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
         text2 = text2.format(alternate_subreddits_string=alternate_subreddits_string)
         text = f'{text}\n\n{text2}'
 
-    if target_subreddit_length_valid:
+    if is_subreddit_name_length_valid(target_subreddit):
         text3 = i18n.get_translated_string(
             'PROMPT_NONEXISTENT_SUBREDDIT_CREATION', 
             source_subreddit, 
@@ -195,6 +192,11 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit_instantiator.SUB_DOESNT_EXIST_BOT_NAME)
     comment2.reply(text)
     return
+
+def is_subreddit_name_length_valid(subreddit_name):
+    NEW_SUBREDDIT_NAME_MINIMUM_LENGTH = 3
+    NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH = 24
+    return NEW_SUBREDDIT_NAME_MINIMUM_LENGTH <= len(subreddit_name) <= NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH
 
 def is_subreddit_available(subreddit_name):
     reddit = reddit_instantiator.get_reddit_instance()

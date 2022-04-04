@@ -130,6 +130,9 @@ def handle_exception(e):
         elif e.error_type == 'THREAD_LOCKED':
             logging.info(f'Attempted to comment in a locked thread. {e}')
             should_raise = False
+        elif e.error_type == 'SOMETHING_IS_BROKEN':
+            logging.info(f'Got that weird unhelpful "Something is broken" API exception from reddit. {e}')
+            should_raise = False
 
     if should_raise:
         logging.exception(e)
