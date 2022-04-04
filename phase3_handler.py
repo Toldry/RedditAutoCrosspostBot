@@ -92,7 +92,7 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     
     text = text.format(source_subreddit=source_subreddit,
                        target_subreddit=target_subreddit,
-                       source_comment_permalink=f'reddit.com{source_comment.permalink}',
+                       source_comment_permalink=f'https://reddit.com{source_comment.permalink}',
                        source_comment_score=source_comment.score,
                        source_submission_id=source_comment.submission.id,
                        timedelta_string=timedelta_string,
