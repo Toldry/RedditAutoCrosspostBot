@@ -19,11 +19,17 @@ The assumption I make when I see such a comment, is that the user is implying so
 
 When my bot finds such a comment, it saves the link to that comment for later processing.\
 After waiting 3 months, the bot checks the same comment, and if it has accrued enough upvotes (and passed a few other filters), the bot will crosspost the submission that the comment replied to, to the target subreddit.\
-(in our example, it crossposts from r/wholesomememes to r/gatesopencomeonin)
+(in our example, it crossposts from r/wholesomememes to r/gatesopencomeonin. [Here](https://www.reddit.com/r/gatesopencomeonin/comments/o8gm9a/support_others/h34sbsr/) is the crosspost that the bot made)
 
 
 
+
+<!--
 [<img src="https://user-images.githubusercontent.com/7353619/127110170-d20f6993-ad4c-4724-bc91-f5312cb39083.png">](https://www.reddit.com/r/gatesopencomeonin/comments/o8gm9a/support_others/h34sbsr/)
+-->
+
+
+![image](https://user-images.githubusercontent.com/7353619/202482938-dcf929f4-df8f-4394-8fc4-c07a3f17e943.png)
 
 
 
