@@ -69,7 +69,8 @@ def respond_to_positive_sentiment(comment):
 
 
 def respond_to_negative_sentiment(comment):
-    source_subreddit = comment.subreddit.display_name
-    text = i18n.get_translated_string('RESPOND_TO_NEGATIVE_SENTIMENT', subreddit=source_subreddit)
+    # source_subreddit = comment.subreddit.display_name
+    # text = i18n.get_translated_string('RESPOND_TO_NEGATIVE_SENTIMENT', subreddit=source_subreddit)
 
-    return comment.reply(text)
+    # return comment.reply(text)
+    pass
