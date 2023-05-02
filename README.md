@@ -56,7 +56,7 @@ As far as I know, RepostSleuth doesn't support videos or any other non-image fil
 
 I am looking for a way to solve this problem. Suggestions are welcome.
 
-# Requierments
+# Requirements
 Python 3.X
 PostgreSQL
 Heroku (for production)
