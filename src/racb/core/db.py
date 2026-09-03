@@ -36,9 +36,17 @@ def _mask_db_url(url_str):
 def get_db_connection():
     db_url = os.environ.get('DATABASE_URL', '').strip()
     if not db_url:
-        err_msg = 'DATABASE_URL environment variable is not set or empty.'
-        logging.error(err_msg)
-        raise ValueError(err_msg)
+        user = os.environ.get('POSTGRES_USER', 'racb_user')
+        password = os.environ.get('POSTGRES_PASSWORD', '')
+        host = os.environ.get('POSTGRES_HOST', 'localhost')
+        port = os.environ.get('POSTGRES_PORT', '5432')
+        dbname = os.environ.get('POSTGRES_DB', 'racb')
+        if password:
+            db_url = f'postgresql://{user}:{password}@{host}:{port}/{dbname}'
+        else:
+            err_msg = 'Neither DATABASE_URL nor POSTGRES_PASSWORD is set in environment.'
+            logging.error(err_msg)
+            raise ValueError(err_msg)
 
     debug = env_bool('DEBUG', False)
     sslmode = os.environ.get('DB_SSLMODE')
