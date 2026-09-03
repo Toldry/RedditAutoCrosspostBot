@@ -2,14 +2,14 @@
 
 import logging
 import prawcore
-import reddit_instantiator
+from racb.core.reddit import get_reddit_instance
 
 RESULTS_LIMIT = 4
 
 
 def get_matches(subreddit_name):
     """Searches Reddit for existing communities similar to the given subreddit name."""
-    reddit = reddit_instantiator.get_reddit_instance()
+    reddit = get_reddit_instance()
     results = []
     try:
         search_results = reddit.subreddits.search(subreddit_name, limit=10)

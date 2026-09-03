@@ -1,14 +1,13 @@
-"""Removes unwanted submissions according to score"""
+"""Removes unwanted submissions made by the bot according to community score."""
 
 import logging
-
-import reddit_instantiator
+from racb.core.reddit import get_reddit_instance
 
 MINIMUM_SCORE = 0
 
 
 def get_latest_submissions(limit=40):
-    reddit = reddit_instantiator.get_reddit_instance()
+    reddit = get_reddit_instance()
     return reddit.redditor('AutoCrosspostBot').submissions.new(limit=limit)
 
 

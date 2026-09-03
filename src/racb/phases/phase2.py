@@ -1,5 +1,4 @@
-"""Retrieves aged comment entries from the DB and checks whether they pass required filters to be crossposted, but does not crosspost them yet.
-The objective is to reduce database space usage."""
+"""Phase 2: Retrieves aged comment entries from the DB and batch-validates them against Reddit API."""
 
 import logging
 import os
@@ -7,9 +6,8 @@ import praw
 import prawcore
 import pytimeparse
 
-import racb_db
-import reddit_instantiator
-import phase1_handler
+from racb.core import db, reddit
+from racb.phases import phase1
 
 BATCH_SIZE = 100
 
@@ -18,14 +16,14 @@ def filter_comments_from_db(verbose=False):
     logging.info('Running phase 2 comment filter')
     PHASE2_WAITING_PERIOD = os.environ.get('PHASE2_WAITING_PERIOD', '2 hours')
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE2_WAITING_PERIOD) or 7200
-    comment_entries = racb_db.get_unchecked_comments_older_than(waiting_period_seconds)
+    comment_entries = db.get_unchecked_comments_older_than(waiting_period_seconds)
     logging.info(f'Found {len(comment_entries)} unchecked comments')
 
     if not comment_entries:
         logging.info('Finished running phase 2 comment filter (0 comments)')
         return
 
-    reddit = reddit_instantiator.get_reddit_instance()
+    reddit_instance = reddit.get_reddit_instance()
 
     # Process comments in batch requests of 100 to minimize API queries
     for chunk in chunk_list(comment_entries, BATCH_SIZE):
@@ -38,7 +36,7 @@ def filter_comments_from_db(verbose=False):
         fullnames = [f't1_{cid}' for cid in id_to_entry.keys()]
         fetched_comments = {}
         try:
-            for comment in reddit.info(fullnames=fullnames):
+            for comment in reddit_instance.info(fullnames=fullnames):
                 fetched_comments[comment.id] = comment
         except (prawcore.exceptions.PrawcoreException, Exception) as e:
             logging.error(f'Error fetching batch comment info: {e}')
@@ -52,9 +50,9 @@ def filter_comments_from_db(verbose=False):
                 logging.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={ce["permalink"]}')
 
             if result.passes_filter:
-                racb_db.set_comment_checked(ce)
+                db.set_comment_checked(ce)
             else:
-                racb_db.delete_comment(ce)
+                db.delete_comment(ce)
 
     logging.info('Finished running phase 2 comment filter')
 
@@ -101,14 +99,14 @@ def run_filters(comment_entry, comment=None):
         result.reason = 'COMMENT_SCORE_TOO_LOW'
         return result
 
-    target_subreddit = phase1_handler.check_pattern(comment)
+    target_subreddit = phase1.check_pattern(comment)
     result.target_subreddit = target_subreddit
     if target_subreddit is None:
         # this can happen when the source comment was edited since it was scraped
         result.reason = 'TARGET_SUBREDDIT_NOT_FOUND'
         return result
 
-    gpwsc_result = phase1_handler.get_posts_with_same_content(comment, target_subreddit)
+    gpwsc_result = phase1.get_posts_with_same_content(comment, target_subreddit)
     if gpwsc_result.posts_found:
         result.reason = 'POST_WITH_SAME_CONTENT_FOUND'
         result.post_with_same_content = gpwsc_result.posts[0]
@@ -123,13 +121,13 @@ def run_filters(comment_entry, comment=None):
 
 
 def get_full_comment_from_reddit(permalink_without_prefix):
-    reddit = reddit_instantiator.get_reddit_instance()
-    return reddit.comment(url=r'https://www.reddit.com' + permalink_without_prefix)
+    reddit_instance = reddit.get_reddit_instance()
+    return reddit_instance.comment(url=r'https://www.reddit.com' + permalink_without_prefix)
 
 
 def check_comment_availability(comment):
     try:
-        _ = comment.score  # access a property to trigger praw to retrieve the comment
+        _ = comment.score
         return True
     except (praw.exceptions.ClientException, prawcore.exceptions.PrawcoreException, Exception) as e:
         logging.info(f'Comment unavailable ({permalink_safe(comment)}): {e}')

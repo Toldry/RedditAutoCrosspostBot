@@ -1,4 +1,4 @@
-"""Main entry point of the program"""
+"""Main application entry point for RACB."""
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -12,16 +12,8 @@ import schedule
 import prawcore
 import urllib3
 
-import reddit_instantiator
-import unwanted_submission_remover
-import inbox_handler
-import phase1_handler
-import phase2_handler
-import phase3_handler
-
-
-comment_stream = None
-inbox_stream = None
+from racb.core import reddit
+from racb.phases import phase1, phase2, phase3, inbox, cleanup
 
 
 def env_bool(key, default=False):
@@ -58,20 +50,20 @@ def configure_logging():
 
 
 def init_streams():
-    reddit = reddit_instantiator.get_reddit_instance()
+    reddit_instance = reddit.get_reddit_instance()
     scanned_subreddits = 'all'
-    subreddit = reddit.subreddit(scanned_subreddits)
+    subreddit = reddit_instance.subreddit(scanned_subreddits)
     c_stream = subreddit.stream.comments(skip_existing=True, pause_after=-1)
-    i_stream = reddit.inbox.stream(mark_read=False, pause_after=-1)
+    i_stream = reddit_instance.inbox.stream(mark_read=False, pause_after=-1)
     return (c_stream, i_stream)
 
 
 def set_schedule():
-    schedule.every(7).minutes.do(unwanted_submission_remover.delete_unwanted_submissions)
-    schedule.every(20).minutes.do(phase2_handler.filter_comments_from_db)
+    schedule.every(7).minutes.do(cleanup.delete_unwanted_submissions)
+    schedule.every(20).minutes.do(phase2.filter_comments_from_db)
     listen_only = env_bool('LISTEN_ONLY', False)
     if not listen_only:
-        schedule.every(6).minutes.do(phase3_handler.process_comment_entries)
+        schedule.every(6).minutes.do(phase3.process_comment_entries)
 
     debug = env_bool('DEBUG', False)
     if debug:
@@ -82,11 +74,11 @@ def main():
     configure_logging()
     logging.info('Running reddit_auto_crosspost_bot')
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--only-phase2', action='store_true')
+    parser = argparse.ArgumentParser(description="RedditAutoCrosspostBot runner")
+    parser.add_argument('--only-phase2', action='store_true', help="Run Phase 2 filtering only and exit")
     args = parser.parse_args()
     if args.only_phase2:
-        phase2_handler.filter_comments_from_db(verbose=True)
+        phase2.filter_comments_from_db(verbose=True)
         return
 
     start_bot()
@@ -153,11 +145,11 @@ def main_loop(c_stream, i_stream):
     for comment in c_stream:
         if comment is None:
             break
-        phase1_handler.handle_incoming_comment(comment)
+        phase1.handle_incoming_comment(comment)
     for comment in i_stream:
         if comment is None:
             break
-        inbox_handler.respond_to_comment(comment)
+        inbox.respond_to_comment(comment)
     schedule.run_pending()
 
 

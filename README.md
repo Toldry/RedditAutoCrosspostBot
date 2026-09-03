@@ -44,6 +44,8 @@ cd RedditAutoCrosspostBot
 cp .env.example .env
 # Edit .env with your Reddit account credentials and API secrets
 ```
+> [!TIP]
+> You can create and manage your Reddit bot credentials (client IDs and client secrets) via the classic developer portal at **[old.reddit.com/prefs/apps](https://old.reddit.com/prefs/apps)**.
 
 ### 2. Start the Stack (Background Daemon)
 ```bash
@@ -76,8 +78,11 @@ pip install -r requirements-dev.txt # Optional: for release management (bump-my-
 # 2. Configure .env with your local DATABASE_URL
 cp .env.example .env
 
-# 3. Run the bot
-python reddit_auto_crosspost_bot.py
+# 3. Set PYTHONPATH and run the bot module
+export PYTHONPATH=src          # Linux/macOS
+$env:PYTHONPATH="src"          # Windows PowerShell
+
+python -m racb
 ```
 
 ### Versioning & Releases
@@ -91,8 +96,8 @@ bump-my-version bump patch   # or minor / major
 ## Cloud Hosting Setup (Google Cloud Always Free)
 
 You can run this bot 100% free on Google Cloud's Always Free `e2-micro` tier:
-* Use [`cloud-init.yaml`](./cloud-init.yaml) or [`startup-script.sh`](./startup-script.sh) to automatically provision the instance with 2GB swap space, Docker, and Docker Compose.
-* See [`AGENTS.md`](./AGENTS.md) for architecture details.
+* Use [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) or [`deploy/startup-script.sh`](./deploy/startup-script.sh) to automatically provision the instance with 2GB swap space, Docker, and Docker Compose.
+* See [`AGENTS.md`](./AGENTS.md) for full architecture details.
 
 ---
 

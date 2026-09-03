@@ -1,10 +1,11 @@
-# Multi-stage / lightweight Python 3.11 image for RedditAutoCrosspostBot
+# Lightweight Python 3.11 image for RedditAutoCrosspostBot
 FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app/src
 
 WORKDIR /app
 
@@ -21,5 +22,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source
 COPY . .
 
-# Run bot entrypoint
-CMD ["python", "reddit_auto_crosspost_bot.py"]
+# Run bot module entrypoint
+CMD ["python", "-m", "racb"]

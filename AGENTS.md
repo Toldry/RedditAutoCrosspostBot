@@ -13,7 +13,7 @@ This repository hosts a suite of 4 automated Reddit bots powered by [PRAW (Pytho
 - **Workflow:** When a user suggests another subreddit in a comment, the bot tracks the comment. If the comment gains sufficient community support (score threshold) after a maturation waiting period (e.g. 3 months), the bot crossposts the parent submission to the target subreddit with an explanatory comment in the target language.
 
 ### Companion Auxiliary Bots (Phase 1 Immediate Triggers)
-All 4 bots share credentials configured in [`reddit_instantiator.py`](./reddit_instantiator.py) and operate during Phase 1:
+All 4 bots share credentials configured in [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) and operate during Phase 1:
 1. **`sub_doesnt_exist_bot`** (`u/sub_doesnt_exist_bot`):
    - Trigger: Comment links to a non-existent subreddit (HTTP 404 / redirect).
    - Behavior: Performs live community search via `reddit.subreddits.search()` to suggest close existing subreddits, or suggests creating the subreddit if the name length is 3–24 characters.
@@ -28,36 +28,36 @@ All 4 bots share credentials configured in [`reddit_instantiator.py`](./reddit_i
 
 ## 2. Architecture & Lifecycle Phases
 
-The core processing pipeline follows a 3-phase staggered lifecycle orchestrated in [`reddit_auto_crosspost_bot.py`](./reddit_auto_crosspost_bot.py):
+The core processing pipeline follows a 3-phase staggered lifecycle orchestrated in [`src/racb/main.py`](./src/racb/main.py):
 
 ```mermaid
 flowchart TD
-    A["Reddit r/all Comment Stream"] --> B["Phase 1: Ingestion & Fast Filters\n(phase1_handler.py)"]
+    A["Reddit r/all Comment Stream"] --> B["Phase 1: Ingestion & Fast Filters\n(src/racb/phases/phase1.py)"]
     B -->|Self Subreddit| C["u/same_subreddit_bot reply"]
     B -->|Duplicate Found| D["u/same_post_bot reply"]
     B -->|Nonexistent Sub| E["u/sub_doesnt_exist_bot reply"]
     B -->|Valid Recommendation| F[("PostgreSQL DB\nscraped_comments")]
     
-    F --> G["Phase 2: Batch Filter Check\n(phase2_handler.py, every 20m)"]
+    F --> G["Phase 2: Batch Filter Check\n(src/racb/phases/phase2.py, every 20m)"]
     G -->|Batch Fetch via reddit.info()| H["Validate Availability & Score"]
     H -->|Score < Threshold or Invalid| I["DELETE from DB"]
     H -->|Passes Filters| J["Set phase2_checked = true"]
     
-    J --> K["Phase 3: Final Verification & Crosspost\n(phase3_handler.py, every 6m)"]
+    J --> K["Phase 3: Final Verification & Crosspost\n(src/racb/phases/phase3.py, every 6m)"]
     K -->|Re-verify Score & Availability| L["Crosspost to Target Subreddit"]
     L --> M["Reply to Crosspost (Localized Explanation)"]
     L --> N["DELETE from DB"]
     
-    O["Scheduled Task (every 7m)\nunwanted_submission_remover.py"] --> P["Purge Bot Submissions with Score < 0"]
+    O["Scheduled Task (every 7m)\nsrc/racb/phases/cleanup.py"] --> P["Purge Bot Submissions with Score < 0"]
 ```
 
 ### Phase Details
-- **Phase 1 ([`phase1_handler.py`](./phase1_handler.py)):**
+- **Phase 1 ([`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py)):**
   - Continuous streaming from `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)`.
-  - Filters: Discards moderator comments, non-top-level comments (`comment.parent_id != comment.link_id`), submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`consts.py`](./consts.py)).
+  - Filters: Discards moderator comments, non-top-level comments (`comment.parent_id != comment.link_id`), submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`src/racb/constants.py`](./src/racb/constants.py)).
   - Qualified suggestions are stored via stored procedure `insert_scraped_comment(permalink)`.
-- **Phase 2 ([`phase2_handler.py`](./phase2_handler.py)):**
-  - Runs periodically via `schedule` (or manually via `python reddit_auto_crosspost_bot.py --only-phase2`).
+- **Phase 2 ([`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py)):**
+  - Runs periodically via `schedule` (or manually via `python -m racb --only-phase2`).
   - Fetches unchecked rows older than `PHASE2_WAITING_PERIOD` using `get_unchecked_comments_older_than(interval)`.
   - Executes **batch fetching via `reddit.info(fullnames=chunk)`** in chunks of 100 to minimize API requests by 99%:
     - Comment availability (not deleted / removed).
@@ -65,17 +65,17 @@ flowchart TD
     - Regex pattern still holds (user didn't edit comment).
     - Target subreddit availability and duplicate check.
   - Prunes failing entries from DB to conserve PostgreSQL table storage.
-- **Phase 3 ([`phase3_handler.py`](./phase3_handler.py)):**
+- **Phase 3 ([`src/racb/phases/phase3.py`](./src/racb/phases/phase3.py)):**
   - Runs periodically (every 6 minutes) if `LISTEN_ONLY` is false.
   - Queries records older than `PHASE3_WAITING_PERIOD` using `get_comments_older_than(interval)`.
   - Re-runs validation checks.
   - Formats submission title (e.g. uppercase for `r/totallynotrobots`).
-  - Executes `submission.crosspost()` and posts an explanatory reply using localized text templates from [`my_i18n.py`](./my_i18n.py).
+  - Executes `submission.crosspost()` and posts an explanatory reply using localized text templates from [`src/racb/i18n.py`](./src/racb/i18n.py).
   - Handles Reddit API crosspost exceptions gracefully via modern `e.items` inspection (e.g., `NO_CROSSPOSTS`, `SUBREDDIT_NOTALLOWED`, `NO_IMAGES`, `SUBMIT_VALIDATION_*`).
   - Deletes the record from PostgreSQL.
 - **Maintenance & Feedback:**
-  - [`unwanted_submission_remover.py`](./unwanted_submission_remover.py): Periodically fetches the latest 40 submissions made by `AutoCrosspostBot` and deletes any with score < 0.
-  - [`inbox_handler.py`](./inbox_handler.py): Monitors inbox stream for feedback (`good bot` / `bad bot`).
+  - [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py): Periodically fetches the latest 40 submissions made by `AutoCrosspostBot` and deletes any with score < 0.
+  - [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py): Monitors inbox stream for feedback (`good bot` / `bad bot`).
 
 ---
 
@@ -83,24 +83,25 @@ flowchart TD
 
 | File | Purpose |
 | :--- | :--- |
-| [`reddit_auto_crosspost_bot.py`](./reddit_auto_crosspost_bot.py) | Application entry point, logging setup, stream loop, exception recovery, and `schedule` runner. |
-| [`reddit_instantiator.py`](./reddit_instantiator.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. |
-| [`phase1_handler.py`](./phase1_handler.py) | Phase 1 comment matching, blacklisting, auxiliary bot dispatching, DB insertion. |
-| [`phase2_handler.py`](./phase2_handler.py) | Phase 2 batch comment filtering via `reddit.info()` and DB cleanup. |
-| [`phase3_handler.py`](./phase3_handler.py) | Phase 3 final validation, crosspost execution, comment reply, modern API exception handling. |
-| [`racb_db.py`](./racb_db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
-| [`instantiate_db.sql`](./instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on startup. |
-| [`repost_detector.py`](./repost_detector.py) | RepostSleuth API wrapper (`https://api.repostsleuth.com/image`) for reverse image & duplicate search. |
-| [`sub_name_string_match.py`](./sub_name_string_match.py) | Live Reddit community search using `reddit.subreddits.search()` for typo suggestions. |
-| [`my_i18n.py`](./my_i18n.py) | Custom localization mapping (`en`, `es`, `de`, `fr`, `he`, `totallynotrobots`) mapped by subreddit names. |
-| [`unwanted_submission_remover.py`](./unwanted_submission_remover.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
-| [`inbox_handler.py`](./inbox_handler.py) | Evaluates feedback sent to the bot's inbox. |
-| [`consts.py`](./consts.py) | Hardcoded blacklist of subreddits to ignore (`SUB_BLACKLIST`). |
+| [`src/racb/main.py`](./src/racb/main.py) | Application entry point, logging setup, stream loop, exception recovery, and `schedule` runner. |
+| [`src/racb/__main__.py`](./src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
+| [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. |
+| [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
+| [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Live Reddit community search using `reddit.subreddits.search()` for typo suggestions. |
+| [`src/racb/core/duplicate_detector.py`](./src/racb/core/duplicate_detector.py) | RepostSleuth API wrapper (`https://api.repostsleuth.com/image`) for reverse image & duplicate search. |
+| [`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py) | Phase 1 comment matching, blacklisting, auxiliary bot dispatching, DB insertion. |
+| [`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py) | Phase 2 batch comment filtering via `reddit.info()` and DB cleanup. |
+| [`src/racb/phases/phase3.py`](./src/racb/phases/phase3.py) | Phase 3 final validation, crosspost execution, comment reply, modern API exception handling. |
+| [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py) | Evaluates feedback sent to the bot's inbox. |
+| [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
+| [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on startup. |
+| [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore (`SUB_BLACKLIST`). |
+| [`src/racb/i18n.py`](./src/racb/i18n.py) | Custom localization mapping (`en`, `es`, `de`, `fr`, `he`, `totallynotrobots`) mapped by subreddit names. |
+| [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
+| [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Cloud-init configuration for provisioning cloud VMs with swap and Docker. |
+| [`deploy/startup-script.sh`](./deploy/startup-script.sh) | GCP startup script for automated VM bootstrapping. |
 | [`Dockerfile`](./Dockerfile) | Lightweight Python 3.11 container image definition. |
 | [`docker-compose.yml`](./docker-compose.yml) | Multi-container stack definition (PostgreSQL 15 + Python bot worker). |
-| [`cloud-init.yaml`](./cloud-init.yaml) | Cloud-init configuration for provisioning cloud VMs with swap and Docker. |
-| [`startup-script.sh`](./startup-script.sh) | GCP startup script for automated VM bootstrapping. |
-| [`_version.py`](./_version.py) | Application version definition (`__version__`). |
 | [`.bumpversion.toml`](./.bumpversion.toml) | Configuration for `bump-my-version` automation. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Release history following Keep a Changelog. |
 | [`.env.example`](./.env.example) | Environment variable template. |
@@ -161,14 +162,18 @@ Store these in `.env` for local development or production:
    ```
 2. **Database Setup:**
    Ensure a local PostgreSQL instance is running and set `DATABASE_URL` in `.env`.
-   When [`racb_db.py`](./racb_db.py) initializes, it automatically runs [`instantiate_db.sql`](./instantiate_db.sql) to ensure tables, views, and functions exist.
+   When [`src/racb/core/db.py`](./src/racb/core/db.py) initializes, it automatically runs [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) to ensure tables, views, and functions exist.
 3. **Run the Bot:**
    ```bash
-   python reddit_auto_crosspost_bot.py
+   # Add src directory to PYTHONPATH if running locally without editable install
+   export PYTHONPATH=src # On Linux/macOS
+   $env:PYTHONPATH="src" # On Windows PowerShell
+
+   python -m racb
    ```
 4. **Run Only Phase 2 (Manual Filter Pass):**
    ```bash
-   python reddit_auto_crosspost_bot.py --only-phase2
+   python -m racb --only-phase2
    ```
 
 ### Release & Semantic Versioning Workflow
@@ -190,13 +195,13 @@ We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Change
   ```bash
   bump-my-version bump patch --dry-run --verbose
   ```
-When run, `bump-my-version` updates [`_version.py`](./_version.py), updates [`CHANGELOG.md`](./CHANGELOG.md), generates a git commit, and tags the release with `vX.Y.Z`. Push commits and tags to GitHub with `git push --follow-tags`.
+When run, `bump-my-version` updates [`src/racb/version.py`](./src/racb/version.py), updates [`CHANGELOG.md`](./CHANGELOG.md), generates a git commit, and tags the release with `vX.Y.Z`. Push commits and tags to GitHub with `git push --follow-tags`.
 
 ### Critical Implementation Details & Gotchas
 - **PRAW Native Rate Limiting:**
-  [`reddit_instantiator.py`](./reddit_instantiator.py) configures `ratelimit_seconds=300` on all `praw.Reddit` instances. PRAW handles Reddit rate limit sleeps and retries natively.
+  [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) configures `ratelimit_seconds=300` on all `praw.Reddit` instances. PRAW handles Reddit rate limit sleeps and retries natively.
 - **PostgreSQL Stored Procedures:**
-  Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`instantiate_db.sql`](./instantiate_db.sql) and reflected in [`racb_db.py`](./racb_db.py).
+  Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](./src/racb/core/db.py).
 - **Batch Comment Processing in Phase 2:**
   To adhere to Reddit API rate limits (100 QPM), Phase 2 fetches up to 100 comments per request using `reddit.info(fullnames=...)`. Do not revert to individual per-comment HTTP requests.
 
@@ -207,4 +212,4 @@ When run, `bump-my-version` updates [`_version.py`](./_version.py), updates [`CH
 1. **Preserve Comments & Docstrings:** Do not remove existing comments, docstrings, or developer notes during edits.
 2. **Follow Existing Style:** Use clean, standard Python style matching the codebase (PEP 8 conventions, explicit error handling with `prawcore.exceptions` and `praw.exceptions.RedditAPIException`).
 3. **Graceful Reddit Exception Handling:** Any newly introduced Reddit API calls must handle potential exceptions (`Forbidden`, `ServerError`, `RedditAPIException`, sub bans, locked threads, deleted comments) without crashing the main loop.
-4. **Localization Awareness:** When adding or modifying bot comments, update translations in [`my_i18n.py`](./my_i18n.py) for all supported languages.
+4. **Localization Awareness:** When adding or modifying bot comments, update translations in [`src/racb/i18n.py`](./src/racb/i18n.py) for all supported languages.

@@ -1,11 +1,14 @@
-"""Accesses a database to store scraped comments"""
+"""Accesses a PostgreSQL database to store and retrieve scraped comments"""
 
 import logging
 import os
 import time
+from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
+
+SQL_FILE_PATH = Path(__file__).resolve().parent.parent / 'sql' / 'instantiate_db.sql'
 
 
 def env_bool(key, default=False):
@@ -84,7 +87,7 @@ def set_comment_checked(comment_entry):
 
 
 def instantiate_database():
-    with conn.cursor() as cur, open('instantiate_db.sql', 'r', encoding='utf-8') as f:
+    with conn.cursor() as cur, open(SQL_FILE_PATH, 'r', encoding='utf-8') as f:
         sql = f.read()
         cur.execute(sql)
         conn.commit()

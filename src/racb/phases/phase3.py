@@ -1,4 +1,4 @@
-"""Retrieves aged comment entries from the DB and crossposts them"""
+"""Phase 3: Final validation and execution of crossposts with localized replies."""
 
 import logging
 import os
@@ -6,10 +6,9 @@ import os
 import praw
 import pytimeparse
 
-import phase2_handler
-import racb_db
-import reddit_instantiator
-import my_i18n as i18n
+from racb.core import db, reddit
+from racb.phases import phase2
+from racb import i18n
 
 
 def process_comment_entries():
@@ -19,16 +18,16 @@ def process_comment_entries():
     if waiting_period_seconds is None:
         waiting_period_seconds = 90 * 86400
 
-    comment_entries = racb_db.get_comments_older_than(waiting_period_seconds)
+    comment_entries = db.get_comments_older_than(waiting_period_seconds)
     for comment_entry in comment_entries:
         handle_comment(comment_entry)
-        racb_db.delete_comment(comment_entry)
+        db.delete_comment(comment_entry)
     logging.info('Finished phase 3 processing')
 
 
 def handle_comment(comment_entry):
     logging.info(f'Begin processing comment entry : {comment_entry["permalink"]}')
-    result = phase2_handler.run_filters(comment_entry)
+    result = phase2.run_filters(comment_entry)
     if not result.passes_filter:
         return
 
@@ -86,7 +85,7 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
     text = i18n.get_translated_string(
         'REPLY_TO_CROSSPOST',
         target_subreddit,
-        bot_name=reddit_instantiator.AUTO_CROSSPOST_BOT_NAME,
+        bot_name=reddit.AUTO_CROSSPOST_BOT_NAME,
     )
     PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD', '3 months')
     timedelta_string = PHASE3_WAITING_PERIOD

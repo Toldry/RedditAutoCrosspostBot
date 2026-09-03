@@ -26,7 +26,7 @@ echo "==> Installing Docker, Docker Compose, and Git..."
 apt-get update -y
 apt-get install -y --no-install-recommends \
     docker.io \
-    docker-compose-v2 \
+    docker-compose \
     git \
     curl \
     ca-certificates \

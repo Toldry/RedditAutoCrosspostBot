@@ -1,6 +1,12 @@
 """Maintains a singleton instance of the `praw.Reddit` class"""
 
-__all__ = ['get_reddit_instance']
+__all__ = [
+    'get_reddit_instance',
+    'AUTO_CROSSPOST_BOT_NAME',
+    'SUB_DOESNT_EXIST_BOT_NAME',
+    'SAME_SUBREDDIT_BOT_NAME',
+    'SAME_POST_BOT_NAME',
+]
 
 import logging
 import os
@@ -8,7 +14,7 @@ import os
 import praw
 import dotenv
 
-from _version import __version__
+from racb.version import __version__
 
 praw_instances = None
 

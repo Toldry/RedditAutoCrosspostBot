@@ -9,11 +9,6 @@ ON scraped_comments (scraped_time);
 ALTER TABLE scraped_comments
 ADD COLUMN IF NOT EXISTS score_checked BOOLEAN DEFAULT FALSE NOT NULL;
 
--- ALTER TABLE scraped_comments 
--- RENAME COLUMN IF EXISTS score_checked TO phase2_checked;
-
--- Apparently "RENAME COLUMN IF EXISTS" is not supported
-
 -- Rename column score_checked to phase2_checked if it has not already been renamed
 DO $$
 BEGIN
@@ -30,12 +25,6 @@ BEGIN
     ALTER TABLE "scraped_comments" RENAME COLUMN "score_checked" TO "phase2_checked";
   END IF;
 END $$;
-
-
-DROP VIEW IF EXISTS scraped_comments_expanded;
-CREATE OR REPLACE VIEW scraped_comments_expanded AS
-    SELECT sc.*, (CURRENT_TIMESTAMP - sc.scraped_time) as time_interval_since_scraped
-    FROM scraped_comments AS sc;
 
 DROP VIEW IF EXISTS scraped_comments_expanded;
 DROP VIEW IF EXISTS v_scraped_comments;

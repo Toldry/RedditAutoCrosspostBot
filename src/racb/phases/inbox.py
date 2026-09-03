@@ -1,4 +1,4 @@
-"""Responds to comments fom the inbox"""
+"""Responds to comments and feedback from the Reddit inbox."""
 
 import logging
 import re
@@ -6,8 +6,8 @@ import re
 import praw
 import prawcore
 
-import reddit_instantiator
-import my_i18n as i18n
+from racb.core.reddit import get_reddit_instance
+from racb import i18n
 
 NEGATIVE_PHRASES = [
     'bad bot',
@@ -28,13 +28,7 @@ def respond_to_comment(comment):
 
 
 def handle_comment_reply(comment):
-    # author = None
-    # if comment.distinguished == 'moderator':
-    #     author = 'moderator'
-    # else:
-    #     author = f'/u/{comment.author.name}'
-    # logging.info(f'Received inbox comment by {author}: {comment.body}')
-    reddit = reddit_instantiator.get_reddit_instance()
+    reddit = get_reddit_instance()
     if not isinstance(comment, praw.models.Comment):
         return
     sentiment = check_sentiment(comment.body)
@@ -71,6 +65,5 @@ def respond_to_positive_sentiment(comment):
 def respond_to_negative_sentiment(comment):
     # source_subreddit = comment.subreddit.display_name
     # text = i18n.get_translated_string('RESPOND_TO_NEGATIVE_SENTIMENT', subreddit=source_subreddit)
-
     # return comment.reply(text)
     pass
