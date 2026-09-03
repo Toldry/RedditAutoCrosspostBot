@@ -17,7 +17,7 @@ def get_matches(subreddit_name):
         search_results = reddit.subreddits.search(subreddit_name, limit=10)
         for sub in search_results:
             name = sub.display_name
-            if name.lower() != subreddit_name.lower() and name not in results:
+            if name.lower() != subreddit_name.lower() and name.lower() not in [r.lower() for r in results]:
                 results.append(name)
             if len(results) >= RESULTS_LIMIT:
                 break

@@ -5,6 +5,10 @@
 SUB_BLACKLIST = [
     'all',  # Added to prevent interaction with r/all
 
+    # Test subreddits ignored in production
+    'racb_test_1',
+    'racb_test_2',
+
     'suddenlysexoffender',
     'cringetopia',
     'ReviewsByRetards',

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-03
+
+### Added
+- **Comprehensive Unit Test Suite:** 46 automated unit tests under `tests/unit/` testing constants, i18n, reddit core, duplicate detector, sub search, db operations, phases (1, 2, 3), cleanup, inbox, and main loop.
+- **Live Reddit API Integration Tests:** 7 end-to-end integration tests under `tests/integration/` verifying bot authentication, permissions, auxiliary bot triggers (`same_subreddit_bot`, `sub_doesnt_exist_bot`, `same_post_bot`), graceful private crosspost handling, and cleanup query.
+- **Test Discovery & Configuration:** Added `pytest.ini` with test markers (`unit`, `integration`) and updated `requirements-dev.txt` with `pytest` and `pytest-mock`.
+
+### Changed
+- **Test Subreddits in Blacklist:** Added `racb_test_1` and `racb_test_2` to `SUB_BLACKLIST` in `constants.py` to ensure the production bot ignores testing activities on `r/all`.
+- **Lazy Database Initialization:** Refactored `racb.core.db` to connect on demand rather than at module import time, facilitating clean unit testing without a live database.
+- **Phase 3 Exception Handling:** Added `PRIVATE_SUBREDDIT_CROSSPOST` to `familiar_error_types` in `phase3.py` for graceful crosspost rejection.
+- **Phase 1 Reply Returns:** Updated Phase 1 reply helper functions to return created comment reply objects.
+- **Case-Insensitive Sub Search Deduplication:** Enhanced `sub_search.get_matches` to deduplicate community search results case-insensitively.
+
 ## [2.1.2] - 2026-09-03
 
 ### Changed

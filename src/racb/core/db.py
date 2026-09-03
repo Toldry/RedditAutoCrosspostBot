@@ -94,10 +94,20 @@ def get_db_connection():
             time.sleep(2)
 
 
-conn = get_db_connection()
+_conn = None
+
+
+def get_connection():
+    """Returns a cached PostgreSQL database connection, establishing it if necessary."""
+    global _conn
+    if _conn is None or getattr(_conn, 'closed', False):
+        _conn = get_db_connection()
+        instantiate_database(_conn)
+    return _conn
 
 
 def add_comment(comment):
+    conn = get_connection()
     try:
         with conn.cursor() as cur:
             permalink = comment.permalink
@@ -112,6 +122,7 @@ def add_comment(comment):
 
 
 def get_comments_older_than(num_seconds):
+    conn = get_connection()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         interval = f'{num_seconds} seconds'
         cur.callproc('get_comments_older_than', (interval,))
@@ -120,6 +131,7 @@ def get_comments_older_than(num_seconds):
 
 
 def get_unchecked_comments_older_than(num_seconds):
+    conn = get_connection()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         interval = f'{num_seconds} seconds'
         cur.callproc('get_unchecked_comments_older_than', (interval,))
@@ -128,22 +140,23 @@ def get_unchecked_comments_older_than(num_seconds):
 
 
 def delete_comment(comment_entry):
+    conn = get_connection()
     with conn.cursor() as cur:
         cur.callproc('delete_scraped_comment', (comment_entry['id'],))
         conn.commit()
 
 
 def set_comment_checked(comment_entry):
+    conn = get_connection()
     with conn.cursor() as cur:
         cur.callproc('set_comment_checked', (comment_entry['id'],))
         conn.commit()
 
 
-def instantiate_database():
-    with conn.cursor() as cur, open(SQL_FILE_PATH, 'r', encoding='utf-8') as f:
+def instantiate_database(connection=None):
+    c = connection or get_connection()
+    with c.cursor() as cur, open(SQL_FILE_PATH, 'r', encoding='utf-8') as f:
         sql = f.read()
         cur.execute(sql)
-        conn.commit()
+        c.commit()
 
-
-instantiate_database()

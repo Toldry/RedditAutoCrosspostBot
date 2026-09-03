@@ -130,6 +130,7 @@ def handle_crosspost_exception(e, comment, target_subreddit):
         'NO_SELFS',
         'NO_VIDEOS',
         'OVER18_SUBREDDIT_CROSSPOST',
+        'PRIVATE_SUBREDDIT_CROSSPOST',
         'THREAD_LOCKED',
         'IMAGES_NOTALLOWED',
         'SUBMIT_VALIDATION_BODY_BLACKLISTED_STRING',

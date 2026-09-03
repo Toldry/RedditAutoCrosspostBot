@@ -33,33 +33,34 @@ def handle_incoming_comment(comment, metrics=None):
 
     if target_subreddit.lower() == source_subreddit:
         logger.info(f'Found "same subreddit" comment ({comment.permalink}). Replying via same_subreddit_bot.')
-        reply_to_source_equals_target_comment(comment)
+        reply = reply_to_source_equals_target_comment(comment)
         if metrics:
             metrics.record_aux()
-        return
+        return reply
 
     result_obj = get_posts_with_same_content(comment, target_subreddit)
     if result_obj.posts_found:
         logger.info(f'Found post with duplicate content in r/{target_subreddit} ({comment.permalink}). Replying via same_post_bot.')
         post_with_same_content = result_obj.posts[0]
-        reply_to_same_content_post_comment(comment, target_subreddit, post_with_same_content)
+        reply = reply_to_same_content_post_comment(comment, target_subreddit, post_with_same_content)
         if metrics:
             metrics.record_aux()
-        return
+        return reply
     elif result_obj.unable_to_search and result_obj.unable_to_search_reason == 'SUBREDDIT_DOES_NOT_EXIST':
         logger.info(f'Found reference to non-existent subreddit r/{target_subreddit} ({comment.permalink}). Replying via sub_doesnt_exist_bot.')
-        reply_to_nonexistent_target_subreddit_comment(comment, target_subreddit)
+        reply = reply_to_nonexistent_target_subreddit_comment(comment, target_subreddit)
         if metrics:
             metrics.record_aux()
-        return
+        return reply
 
     if not is_top_level_comment(comment):
-        return
+        return None
 
-    logger.info(f'Qualified recommendation match found: {comment.permalink} -> r/{target_subreddit}')
+    logger.info(f'Qualified recommendation match found: https://reddit.com/{comment.permalink} -> r/{target_subreddit}')
     db.add_comment(comment)
     if metrics:
         metrics.record_match()
+    return True
 
 
 def is_mod_post(comment):
@@ -154,7 +155,7 @@ def reply_to_source_equals_target_comment(source_comment):
         bot_name=reddit.SAME_SUBREDDIT_BOT_NAME,
     )
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit.SAME_SUBREDDIT_BOT_NAME)
-    comment2.reply(text)
+    return comment2.reply(text)
 
 
 def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
@@ -202,7 +203,7 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
         bot_name=reddit.SUB_DOESNT_EXIST_BOT_NAME,
     )
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit.SUB_DOESNT_EXIST_BOT_NAME)
-    comment2.reply(text)
+    return comment2.reply(text)
 
 
 def is_subreddit_name_length_valid(subreddit_name):
@@ -245,7 +246,7 @@ def reply_to_same_content_post_comment(source_comment, target_subreddit, post_wi
         target_subreddit=target_subreddit,
     )
     comment2 = get_comment_with_different_praw_instance(source_comment, reddit.SAME_POST_BOT_NAME)
-    comment2.reply(text)
+    return comment2.reply(text)
 
 
 def get_comment_with_different_praw_instance(comment, username):
