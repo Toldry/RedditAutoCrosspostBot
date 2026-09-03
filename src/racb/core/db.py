@@ -18,8 +18,28 @@ def env_bool(key, default=False):
     return str(val).strip().lower() in ('true', '1', 'yes', 'y', 't')
 
 
+def _mask_db_url(url_str):
+    """Returns database URL with password masked for safe logging."""
+    if not url_str:
+        return '<empty>'
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url_str)
+        if parsed.password:
+            masked_netloc = parsed.netloc.replace(f':{parsed.password}@', ':***@')
+            return parsed._replace(netloc=masked_netloc).geturl()
+        return url_str
+    except Exception:
+        return '<unparseable db_url>'
+
+
 def get_db_connection():
-    db_url = os.environ.get('DATABASE_URL', '')
+    db_url = os.environ.get('DATABASE_URL', '').strip()
+    if not db_url:
+        err_msg = 'DATABASE_URL environment variable is not set or empty.'
+        logging.error(err_msg)
+        raise ValueError(err_msg)
+
     debug = env_bool('DEBUG', False)
     sslmode = os.environ.get('DB_SSLMODE')
     if not sslmode:
@@ -28,16 +48,39 @@ def get_db_connection():
         else:
             sslmode = 'prefer'
 
+    masked_url = _mask_db_url(db_url)
+    logging.info(f'Connecting to database: {masked_url} (sslmode={sslmode})')
+
+    # Errors that cannot be resolved by retrying (fail fast immediately)
+    fatal_error_keywords = (
+        'password authentication failed',
+        'does not exist',
+        'no password supplied',
+        'invalid connection option',
+        'invalid dsn',
+    )
+
     max_retries = 10
     for attempt in range(1, max_retries + 1):
         try:
             connection = psycopg2.connect(dsn=db_url, sslmode=sslmode)
+            logging.info('Database connection established successfully.')
             return connection
         except psycopg2.OperationalError as e:
-            if attempt == max_retries:
-                logging.error(f'Failed to connect to database after {max_retries} attempts: {e}')
+            err_str = str(e).strip()
+
+            # Check if this is a fatal auth or config error
+            if any(kw in err_str.lower() for kw in fatal_error_keywords):
+                logging.error(
+                    f'Fatal database authentication or configuration error for {masked_url}:\n{err_str}\n'
+                    f'Check your POSTGRES_USER, POSTGRES_PASSWORD, and DATABASE_URL in .env.'
+                )
                 raise
-            logging.warning(f'Database not ready yet (attempt {attempt}/{max_retries}). Retrying in 2s...')
+
+            if attempt == max_retries:
+                logging.error(f'Failed to connect to database after {max_retries} attempts ({masked_url}): {err_str}')
+                raise
+            logging.warning(f'Database not ready yet (attempt {attempt}/{max_retries}): {err_str}. Retrying in 2s...')
             time.sleep(2)
 
 

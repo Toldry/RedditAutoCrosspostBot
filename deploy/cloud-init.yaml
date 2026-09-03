@@ -7,6 +7,7 @@ package_upgrade: false
 packages:
   - docker.io
   - docker-compose
+  - docker-compose-v2
   - git
   - curl
   - ca-certificates
