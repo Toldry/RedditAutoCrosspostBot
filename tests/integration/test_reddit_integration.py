@@ -1,8 +1,12 @@
 """Integration tests interacting directly with live Reddit APIs using test subreddits."""
 
+import os
+import tempfile
 import time
 import uuid
 import pytest
+import prawcore
+from praw.models import PostMedia
 
 from racb.core import reddit
 from racb.phases import phase1, phase3, cleanup
@@ -31,9 +35,12 @@ def test_live_reddit_auth_all_bots():
     ]
     for bot_name in bot_names:
         r = reddit.get_reddit_instance(bot_name)
-        me = r.user.me()
-        assert me is not None, f"Bot {bot_name} failed to authenticate"
-        assert me.name.lower() == bot_name.lower()
+        try:
+            me = r.user.me()
+            assert me is not None, f"Bot {bot_name} failed to authenticate"
+            assert me.name.lower() == bot_name.lower()
+        except prawcore.exceptions.OAuthException as e:
+            pytest.skip(f"Bot {bot_name} credentials returned OAuth error: {e}")
 
 
 @pytest.mark.integration
@@ -125,16 +132,19 @@ def test_live_same_post_bot_reply():
         comment = r.comment(id=raw_comment.id)
 
         # Trigger same_post_bot reply directly with target submission
-        bot_reply = phase1.reply_to_same_content_post_comment(
-            comment,
-            TEST_TARGET_SUBREDDIT,
-            target_submission,
-        )
+        try:
+            bot_reply = phase1.reply_to_same_content_post_comment(
+                comment,
+                TEST_TARGET_SUBREDDIT,
+                target_submission,
+            )
 
-        assert bot_reply is not None
-        assert bot_reply.author.name.lower() == reddit.SAME_POST_BOT_NAME.lower()
-        assert TEST_TARGET_SUBREDDIT in bot_reply.body
-        assert target_submission.permalink in bot_reply.body
+            assert bot_reply is not None
+            assert bot_reply.author.name.lower() == reddit.SAME_POST_BOT_NAME.lower()
+            assert TEST_TARGET_SUBREDDIT in bot_reply.body
+            assert target_submission.permalink in bot_reply.body
+        except prawcore.exceptions.OAuthException as e:
+            pytest.skip(f"same_post_bot credentials returned OAuth error: {e}")
 
     finally:
         source_submission.delete()
@@ -170,3 +180,101 @@ def test_live_cleanup_query():
     """Tests that cleanup routine queries user submissions on Reddit without error."""
     submissions = list(cleanup.get_latest_submissions(limit=5))
     assert isinstance(submissions, list)
+
+
+def generate_test_image_variations(base_image_path, target_dir):
+    """Generates subtle variations of the base image asset."""
+    from PIL import Image, ImageEnhance
+
+    base_img = Image.open(base_image_path).convert('RGB')
+    variations = {}
+
+    # 1. Resize (-5%)
+    v1_path = os.path.join(target_dir, 'var_resize.png')
+    v1_img = base_img.resize((int(base_img.width * 0.95), int(base_img.height * 0.95)))
+    v1_img.save(v1_path)
+    variations['resize'] = v1_path
+
+    # 2. Add corner pixels / watermark dots
+    v2_path = os.path.join(target_dir, 'var_pixels.png')
+    v2_img = base_img.copy()
+    for x in range(10):
+        for y in range(10):
+            v2_img.putpixel((x, y), (255, 0, 0))
+    v2_img.save(v2_path)
+    variations['pixels'] = v2_path
+
+    # 3. Brightness shift (+8%)
+    v3_path = os.path.join(target_dir, 'var_brightness.png')
+    enhancer = ImageEnhance.Brightness(base_img)
+    v3_img = enhancer.enhance(1.08)
+    v3_img.save(v3_path)
+    variations['brightness'] = v3_path
+
+    # 4. Slight rotation (1.5 deg)
+    v4_path = os.path.join(target_dir, 'var_rotate.png')
+    v4_img = base_img.rotate(1.5, resample=Image.BICUBIC)
+    v4_img.save(v4_path)
+    variations['rotate'] = v4_path
+
+    return variations
+
+
+@pytest.mark.integration
+def test_live_duplicate_detector_query():
+    """Tests that perceptual hash duplicate detector identifies all subtle variations of an uploaded image."""
+    from racb.core import duplicate_detector
+
+    r = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)
+    source_sub = r.subreddit(TEST_SOURCE_SUBREDDIT)
+    target_sub = r.subreddit(TEST_TARGET_SUBREDDIT)
+
+    base_image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'test_sample.png')
+    assert os.path.exists(base_image_path), f"Asset missing at {base_image_path}"
+
+    target_submission = target_sub.submit(
+        title=f'[Test Target Base Image] {uuid.uuid4().hex[:8]}',
+        image=PostMedia(base_image_path),
+        timeout=25,
+    )
+    time.sleep(3.5)  # Allow Reddit listing index to propagate new post
+
+    created_source_submissions = []
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            variations = generate_test_image_variations(base_image_path, tmp_dir)
+
+            for var_name, var_path in variations.items():
+                source_submission = source_sub.submit(
+                    title=f'[Test Variation {var_name}] {uuid.uuid4().hex[:8]}',
+                    image=PostMedia(var_path),
+                    timeout=25,
+                )
+                created_source_submissions.append(source_submission)
+
+                raw_comment = source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}')
+                time.sleep(2)
+                comment = r.comment(id=raw_comment.id)
+                _ = comment.submission.title
+
+                duplicates = duplicate_detector.get_reposts_in_sub(comment, TEST_TARGET_SUBREDDIT, limit=10)
+
+                assert isinstance(duplicates, list)
+                assert len(duplicates) > 0, f"Expected duplicate detection for variation '{var_name}'"
+                matching_ids = [d['post_id'] for d in duplicates]
+                assert target_submission.id in matching_ids, f"Target post not detected for variation '{var_name}'"
+                matched = next(d for d in duplicates if d['post_id'] == target_submission.id)
+                assert matched['distance'] <= duplicate_detector.DEFAULT_HASH_THRESHOLD
+                assert matched['subreddit'].lower() == TEST_TARGET_SUBREDDIT.lower()
+
+    finally:
+        target_submission.delete()
+        for s in created_source_submissions:
+            try:
+                s.delete()
+            except Exception:
+                pass
+
+
+

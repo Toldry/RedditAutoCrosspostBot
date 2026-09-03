@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-09-03
+
+### Added
+- **Self-Hosted Perceptual Image Hashing:** Replaced deprecated RepostSleuth API with self-hosted perceptual image hashing (`imagehash` / `dhash`) in `duplicate_detector.py` to identify duplicate image submissions across target subreddits.
+- **Image Variation Testing:** Added repository test asset `tests/assets/test_sample.png` and an automated variation generator testing 4 distinct visual modifications (resize, watermark pixels, brightness adjustment, rotation) matching within `DEFAULT_HASH_THRESHOLD = 5`.
+- **3-Tier Candidate Retrieval:** Added fallback chain in `duplicate_detector.py` (`target_sub.new()`, `target_sub.hot()`, and user submission query for private test subreddits).
+- **Dependencies:** Added `imagehash>=4.3.0` and `Pillow>=10.0.0` to `requirements.txt`.
+
+
 ## [2.2.0] - 2026-09-03
 
 ### Added

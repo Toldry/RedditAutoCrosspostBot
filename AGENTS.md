@@ -21,8 +21,8 @@ All 4 bots share credentials configured in [`src/racb/core/reddit.py`](./src/rac
    - Trigger: Comment links to the exact same subreddit where it was posted.
    - Behavior: Replies humorously (*"Yes, that's where we are."*).
 3. **`same_post_bot`** (`u/same_post_bot`):
-   - Trigger: Comment links to a target subreddit that already contains a post with the exact same URL/content.
-   - Behavior: Detects existing posts via Reddit search and [RepostSleuth API](https://api.repostsleuth.com), replying with a link to the prior post.
+   - Trigger: Comment links to a target subreddit that already contains a post with the exact same URL/content or visually matching image.
+   - Behavior: Detects existing posts via Reddit search and self-hosted perceptual image hashing (`imagehash`), replying with a link to the prior post.
 
 ---
 
@@ -88,7 +88,7 @@ flowchart TD
 | [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. |
 | [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
 | [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Live Reddit community search using `reddit.subreddits.search()` for typo suggestions. |
-| [`src/racb/core/duplicate_detector.py`](./src/racb/core/duplicate_detector.py) | RepostSleuth API wrapper (`https://api.repostsleuth.com/image`) for reverse image & duplicate search. |
+| [`src/racb/core/duplicate_detector.py`](./src/racb/core/duplicate_detector.py) | Self-hosted perceptual image hashing (`imagehash` / `dhash`) for visual duplicate detection in target subreddits. |
 | [`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py) | Phase 1 comment matching, blacklisting, auxiliary bot dispatching, DB insertion. |
 | [`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py) | Phase 2 batch comment filtering via `reddit.info()` and DB cleanup. |
 | [`src/racb/phases/phase3.py`](./src/racb/phases/phase3.py) | Phase 3 final validation, crosspost execution, comment reply, modern API exception handling. |
