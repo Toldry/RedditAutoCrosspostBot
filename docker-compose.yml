@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: racb_bot
+    container_name: racb
     restart: unless-stopped
     depends_on:
       db:
@@ -33,7 +33,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-racb_user}:${POSTGRES_PASSWORD:-racb_secure_password}@db:5432/${POSTGRES_DB:-racb}}
       DB_SSLMODE: disable
     volumes:
-      - bot_logs:/app/logs
+      - logs:/app/logs
     networks:
       - racb_net
 
@@ -44,5 +44,5 @@ networks:
 volumes:
   postgres_data:
     name: racb_postgres_data
-  bot_logs:
-    name: racb_bot_logs
+  logs:
+    name: racb_logs
