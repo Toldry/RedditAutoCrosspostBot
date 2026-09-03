@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: racb_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-racb}
+      POSTGRES_USER: ${POSTGRES_USER:-racb_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-racb_secure_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-racb_user} -d ${POSTGRES_DB:-racb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - racb_net
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: racb_bot
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Defaults to the internal docker postgres service if not explicitly overridden in .env
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-racb_user}:${POSTGRES_PASSWORD:-racb_secure_password}@db:5432/${POSTGRES_DB:-racb}}
+      DB_SSLMODE: disable
+    volumes:
+      - bot_logs:/app/logs
+    networks:
+      - racb_net
+
+networks:
+  racb_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: racb_postgres_data
+  bot_logs:
+    name: racb_bot_logs

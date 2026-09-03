@@ -4,6 +4,7 @@ import logging
 import re
 import json
 
+import prawcore
 import consts
 import racb_db
 import reddit_instantiator
@@ -35,7 +36,7 @@ def handle_incoming_comment(comment):
     result_obj = get_posts_with_same_content(comment, target_subreddit)
     if result_obj.posts_found:
         logging.info('Found post with same content. Replying to source comment.')
-        post_with_same_content=result_obj.posts[0] 
+        post_with_same_content = result_obj.posts[0] 
         reply_to_same_content_post_comment(comment, target_subreddit, post_with_same_content)
         return
     elif result_obj.unable_to_search and result_obj.unable_to_search_reason == 'SUBREDDIT_DOES_NOT_EXIST':
@@ -79,7 +80,7 @@ def check_pattern(comment):
 
 def get_posts_with_same_content(comment, subreddit):
     class Result:
-        posts_found =False
+        posts_found = False
         posts = []
         unable_to_search = False
         unable_to_search_reason = None
@@ -91,31 +92,27 @@ def get_posts_with_same_content(comment, subreddit):
         # The format of the query string is explained here: https://github.com/praw-dev/praw/issues/880
         query = f'url:\"{comment.submission.url}\"'
         submissions = reddit.subreddit(subreddit).search(query=query, sort='new', time_filter='all')
-        # iterate over submissions to fetch them
         submissions = [s for s in submissions]
-    except Exception as e: #TODO change exception type to be specific
-        error_message = e.args[0]
-        # when reddit tries redirecting a search query of a link to the submission page, that means 0 results were found for the search query
-        if error_message == 'Redirect to /submit':
+    except prawcore.exceptions.NotFound:
+        result.unable_to_search = True
+        result.unable_to_search_reason = 'SUBREDDIT_DOES_NOT_EXIST'
+        return result
+    except prawcore.exceptions.Forbidden:
+        result.unable_to_search = True
+        result.unable_to_search_reason = 'SUBREDDIT_IS_PRIVATE'
+        return result
+    except prawcore.exceptions.Redirect:
+        # Redirect occurs when 0 results match
+        return result
+    except Exception as e:
+        error_message = str(e)
+        if 'Redirect to /submit' in error_message:
             return result
-        # when reddit redirects to /subreddits/search that means the subreddit doesn't exist
-        elif error_message in ['Redirect to /subreddits/search', 'received 404 HTTP response']:
-            if e.response.text:
-                try:
-                    response_obj = json.loads(e.response.text)
-                    if response_obj['reason'] == 'banned':
-                        result.unable_to_search = True
-                        result.unable_to_search_reason = 'SUBREDDIT_IS_BANNED'
-                        return result
-                except json.JSONDecodeError:
-                    pass
-
+        elif 'Redirect to /subreddits/search' in error_message or '404' in error_message:
             result.unable_to_search = True
             result.unable_to_search_reason = 'SUBREDDIT_DOES_NOT_EXIST'
             return result
-        # this error is recieved when the subreddit is private
-        # "You must be invited to visit this community"
-        elif error_message == 'received 403 HTTP response':
+        elif '403' in error_message:
             result.unable_to_search = True
             result.unable_to_search_reason = 'SUBREDDIT_IS_PRIVATE'
             return result
@@ -202,20 +199,20 @@ def is_subreddit_available(subreddit_name):
     reddit = reddit_instantiator.get_reddit_instance()
     try:
         sub_obj = reddit.subreddit(subreddit_name)
-        subscribers = sub_obj.subscribers
+        _ = sub_obj.subscribers
         return True
-    except:
+    except (prawcore.exceptions.NotFound, prawcore.exceptions.Forbidden, prawcore.exceptions.PrawcoreException, Exception):
         return False 
 
 def get_subreddit_suggestion_list_line(subreddit_name):
-    ret_val = f'* r/{subreddit_name} ('
+    ret_val = f'* r/{subreddit_name}'
     reddit = reddit_instantiator.get_reddit_instance()
-    sub_obj = reddit.subreddit(subreddit_name)
-    if sub_obj.over18:
-        ret_val += '**NSFW**, '
-
-    ret_val += f'subscribers: {sub_obj.subscribers:,})'
-
+    try:
+        sub_obj = reddit.subreddit(subreddit_name)
+        nsfw_str = '**NSFW**, ' if sub_obj.over18 else ''
+        ret_val += f' ({nsfw_str}subscribers: {sub_obj.subscribers:,})'
+    except Exception:
+        pass
     return ret_val
 
 # TODO: make up a better name for this function

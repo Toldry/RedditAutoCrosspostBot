@@ -1,118 +1,102 @@
-This project contains the code for these reddit bots:
-- https://www.reddit.com/user/AutoCrosspostBot
-- https://www.reddit.com/user/sub_doesnt_exist_bot
-- https://www.reddit.com/user/same_subreddit_bot
-- https://www.reddit.com/user/same_post_bot
-
-
 # RedditAutoCrosspostBot
 
+This repository hosts a suite of 4 automated Reddit bots:
+- [u/AutoCrosspostBot](https://www.reddit.com/user/AutoCrosspostBot)
+- [u/sub_doesnt_exist_bot](https://www.reddit.com/user/sub_doesnt_exist_bot)
+- [u/same_subreddit_bot](https://www.reddit.com/user/same_subreddit_bot)
+- [u/same_post_bot](https://www.reddit.com/user/same_post_bot)
+
+---
+
+## What Does AutoCrosspostBot Do?
+
 The primary bot is `AutoCrosspostBot`.\
-It scans reddit comments and looks for ones that match the pattern 
+It monitors Reddit comments across `r/all` and looks for comments that suggest a community matching the pattern:
 
-`/r/SomeOtherSubreddit`
+`/r/SomeOtherSubreddit` or `r/SomeOtherSubreddit`
 
-[Here](https://www.reddit.com/r/wholesomememes/comments/mf5t0p/support_others/gslt8bq/) is an example comment that matches that pattern.\
-It was posted to the subreddit r/wholesomememes, and the entirety of its content is just a link to a another subreddit called r/gatesopencomeonin.
+When a user suggests another subreddit (e.g. `r/gatesopencomeonin` in a `r/wholesomememes` thread):
+1. **Phase 1:** The bot saves the suggestion to a PostgreSQL database.
+2. **Phase 2 (Aged Filter Check):** After a waiting period (e.g. 2 hours), the bot batch-verifies via `reddit.info()` that the comment is still available and meets the score threshold.
+3. **Phase 3 (Final Crosspost):** After a maturation period (e.g. 3 months), the bot crossposts the original submission to the target subreddit with an explanatory localized reply.
 
-The assumption I make when I see such a comment, is that the user is implying something along the lines of: "this post would also fit nicely in r/gatesopencomeonin".
+![AutoCrosspostBot Example](https://user-images.githubusercontent.com/7353619/202482938-dcf929f4-df8f-4394-8fc4-c07a3f17e943.png)
 
-When my bot finds such a comment, it saves the link to that comment for later processing.\
-After waiting 3 months, the bot checks the same comment, and if it has accrued enough upvotes (and passed a few other filters), the bot will crosspost the submission that the comment replied to, to the target subreddit.\
-(in our example, it crossposts from r/wholesomememes to r/gatesopencomeonin. [Here](https://www.reddit.com/r/gatesopencomeonin/comments/o8gm9a/support_others/h34sbsr/) is the crosspost that the bot made)
+---
 
+## Auxiliary Bots (Phase 1 Immediate Triggers)
 
+* **`u/sub_doesnt_exist_bot`**: Replies to comments that link to non-existent subreddits, searching Reddit's live community index for close matches or suggesting community creation.
+* **`u/same_subreddit_bot`**: Replies to comments that link to the exact same subreddit where the comment was posted (*"Yes, that's where we are."*).
+* **`u/same_post_bot`**: Replies to comments linking to a target subreddit that already has an existing post with the exact same content.
 
+---
 
-<!--
-[<img src="https://user-images.githubusercontent.com/7353619/127110170-d20f6993-ad4c-4724-bc91-f5312cb39083.png">](https://www.reddit.com/r/gatesopencomeonin/comments/o8gm9a/support_others/h34sbsr/)
--->
+## Quickstart & Deployment with Docker Compose (Recommended)
 
+The easiest way to run the bot and PostgreSQL 24/7 (e.g. on a free Google Cloud `e2-micro` or Oracle Cloud VM) is using **Docker Compose**:
 
-![image](https://user-images.githubusercontent.com/7353619/202482938-dcf929f4-df8f-4394-8fc4-c07a3f17e943.png)
-
-
-
-## sub_doesnt_exist_bot
-https://www.reddit.com/user/sub_doesnt_exist_bot
-
-Replies to the same type of comments and informs that the sub they linked does not exist.
-
-
-## same_subreddit_bot
-https://www.reddit.com/user/same_subreddit_bot
-
-Replies to comments that link to the same subreddit that comment was posted on.
-
-## same_post_bot
-https://www.reddit.com/user/same_post_bot
-
-Replies to comments that link to a subreddit that already has a post with the same content as the source submission.
-
-# Known problem: Reposts
-AutoCrosspostBot has two methods for preventing reposts. It first checks whether the source submission link was already posted to the target subreddit, and then it uses [repostsleuth.com](https://www.repostsleuth.com) to check whether anything similar to that link was already posted to the target subreddit.
-
-As far as I know, RepostSleuth doesn't support videos or any other non-image file format, so this method will fail to detect video reposts.
-
-I am looking for a way to solve this problem. Suggestions are welcome.
-
-# Requirements
-Python 3.X
-PostgreSQL
-Heroku (for production)
-
-# How to install 
-`pip install -r requirements.txt`
-
-# How to run
-`python reddit_auto_crosspost_bot.py`
-
-
-# Heroku
-I use Heroku to host and run the bots and the Postgres database. I also use Papertrail as the logging platform.
-
-```
+### 1. Clone & Configure
+```bash
 git clone https://github.com/Toldry/RedditAutoCrosspostBot.git
-cd reddit_auto_crosspost_bot
-heroku login
-heroku ps:scale worker=1
+cd RedditAutoCrosspostBot
+
+cp .env.example .env
+# Edit .env with your Reddit account credentials and API secrets
 ```
 
-# PostgreSQL
-The data utilized by the AutoCrosspostBot is stored in a PostgreSQL database.
-See `instantiate_db.sql` for the table and stored function definitions.
-
-# Environment variables
-On dev, the environment variables are stored in the .env file, and on production, they're stored on the Heroku app's config vars.
-```
-APP_CLIENT_SECRET - generated by reddit, u/AutoCrosspostBot's app client secret.
-APP_CLIENT_SECRET__SUB_DOESNT_EXIST - generated by reddit, u/sub_doesnt_exist_bot's app client secret.
-APP_CLIENT_SECRET__SAME_SUBREDDIT - generated by reddit, u/same_subreddit_bot's app client secret.
-APP_CLIENT_SECRET__SAME_POST - generated by reddit, u/same_post_bot's app client secret.
-COMMENT_SCORE_THRESHOLD - the minimum score needed for a suggestion source comment to trigger a crosspost.
-DATABASE_URL - the postgres database url, begins with `postgres://`.
-DEBUG - boolean flag, `True` for debug mode.
-LISTEN_ONLY - boolean flag, `True` when setting AutoCrosspostBot to only listen to comments without crossposting.
-PASSWORD - u/AutoCrosspostBot's password.
-PASSWORD__SUB_DOESNT_EXIST - u/sub_doesnt_exist_bot's password.
-PASSWORD__SAME_SUBREDDIT - u/same_subreddit_bot's password.
-PASSWORD__SAME_POST - u/same_post_bot's password.
-PHASE2_WAITING_PERIOD - time interval between a suggestion source comment being saved and it passing through phase 2.
-PHASE3_WAITING_PERIOD - time interval between a suggestion source comment being saved and it passing through phase 3.
-PAPERTRAIL_API_TOKEN - self explanatory.
+### 2. Start the Stack (Background Daemon)
+```bash
+docker compose up -d --build
 ```
 
-# Phase 1, 2, 3
-AutoCrosspostBot acts in three phases:
-## Phase 1
-Listen to the r/all comment stream and save comments that fit the pattern of a source suggestion comment.
-It is during this phase that the other three bots (u/sub_doesnt_exist_bot, u/same_subreddit_bot, u/same_post_bot) also act.
-## Phase 2
-Purge saved comments whose score does not pass the threshold, and other filters. The purpose of this phase is to significantly reduce the amount of rows of saved comments that are present in the database at any point. Heroku's free tier limits this number to 10,000 by default.
-## Phase 3
-Re-check all the filters, then finally crosspost.
+### 3. View Live Logs
+```bash
+docker compose logs -f bot
+```
 
-# Donate
-If you like the bot, you're welcome to donate to help me maintain and improve it ❤
+### 4. Stop Services
+```bash
+docker compose down
+```
+
+---
+
+## Local Development (Without Docker)
+
+### Requirements
+* Python 3.10+
+* PostgreSQL 14+
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt # Optional: for release management (bump-my-version)
+
+# 2. Configure .env with your local DATABASE_URL
+cp .env.example .env
+
+# 3. Run the bot
+python reddit_auto_crosspost_bot.py
+```
+
+### Versioning & Releases
+Releases adhere to [Semantic Versioning](https://semver.org/) and are managed with `bump-my-version`:
+```bash
+bump-my-version bump patch   # or minor / major
+```
+
+---
+
+## Cloud Hosting Setup (Google Cloud Always Free)
+
+You can run this bot 100% free on Google Cloud's Always Free `e2-micro` tier:
+* Use [`cloud-init.yaml`](./cloud-init.yaml) or [`startup-script.sh`](./startup-script.sh) to automatically provision the instance with 2GB swap space, Docker, and Docker Compose.
+* See [`AGENTS.md`](./AGENTS.md) for architecture details.
+
+---
+
+## License & Support
+If you like the bot, you're welcome to donate to help maintain and improve it:
 
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=FBQP2PLKZJ988)

@@ -1,15 +1,11 @@
 """Retrieves aged comment entries from the DB and crossposts them"""
 
 import logging
-import textwrap
 import os
-import datetime
-from distutils import util
 
 import praw
 import pytimeparse
 
-import consts
 import phase2_handler
 import racb_db
 import reddit_instantiator
@@ -18,13 +14,17 @@ import my_i18n as i18n
 
 def process_comment_entries():
     logging.info('Beginning phase 3 processing')
-    PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD')
+    PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD', '3 months')
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE3_WAITING_PERIOD)
+    if waiting_period_seconds is None:
+        waiting_period_seconds = 90 * 86400
+
     comment_entries = racb_db.get_comments_older_than(waiting_period_seconds)
     for comment_entry in comment_entries:
         handle_comment(comment_entry)
         racb_db.delete_comment(comment_entry)
     logging.info('Finished phase 3 processing')
+
 
 def handle_comment(comment_entry):
     logging.info(f'Begin processing comment entry : {comment_entry["permalink"]}')
@@ -36,7 +36,8 @@ def handle_comment(comment_entry):
     target_subreddit = result.target_subreddit
     exec_crosspost(source_comment, target_subreddit)
 
-def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag = True):
+
+def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=True):
     class Result:
         success = False
         crosspost = None
@@ -47,8 +48,12 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag = T
     crosspost_title = get_crosspost_title_for_crosspost(source_comment.submission, target_subreddit)
 
     try:
-        cross_post = source_comment.submission.crosspost(subreddit=target_subreddit, title=crosspost_title, send_replies=False)
-        logging.info(f'Crosspost succesful. link to post: www.reddit.com{cross_post.permalink}')
+        cross_post = source_comment.submission.crosspost(
+            subreddit=target_subreddit,
+            title=crosspost_title,
+            send_replies=False,
+        )
+        logging.info(f'Crosspost successful. link to post: www.reddit.com{cross_post.permalink}')
         result.success = True
         result.crosspost = cross_post
         if reply_to_crosspost_flag:
@@ -57,22 +62,22 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag = T
         hce_res = handle_crosspost_exception(e, source_comment, target_subreddit)
         if hce_res.handled_with_grace:
             result.failure_reason = hce_res.error_type
-        else: 
-            logging.error(f'Crosspost failed due to a problem: {str(e)}' + '\n\n'
-                          + f'This occured while attempting to crosspost based on this comment: {source_comment.permalink}')
+        else:
+            logging.error(f'Crosspost failed due to a problem: {str(e)}\n\n'
+                          f'This occurred while attempting to crosspost based on this comment: {source_comment.permalink}')
             logging.exception(e)
-            debug = bool(util.strtobool(os.environ.get('DEBUG')))
+            debug = os.environ.get('DEBUG', '').lower() in ('true', '1')
             if debug:
                 raise
-    
+
     return result
+
 
 def get_crosspost_title_for_crosspost(submission, target_subreddit):
     if target_subreddit.lower() == 'totallynotrobots':
         return submission.title.upper()
     else:
         # Will use this submission’s title if None (default: None).
-        # https://praw.readthedocs.io/en/latest/code_overview/models/submission.html#praw.models.Submission.crosspost
         return None 
 
 
@@ -82,23 +87,24 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
         'REPLY_TO_CROSSPOST',
         target_subreddit,
         bot_name=reddit_instantiator.AUTO_CROSSPOST_BOT_NAME,
-        )
-    PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD')
+    )
+    PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD', '3 months')
     timedelta_string = PHASE3_WAITING_PERIOD
     if source_comment.author:
         source_comment_author_name = f'/u/{source_comment.author.name}'
     else:
         source_comment_author_name = i18n.get_translated_string('THE_USER_WHO_COMMENTED', target_subreddit, add_suffix=False)
     
-    text = text.format(source_subreddit=source_subreddit,
-                       target_subreddit=target_subreddit,
-                       source_comment_permalink=f'https://reddit.com{source_comment.permalink}',
-                       source_comment_score=source_comment.score,
-                       source_submission_id=source_comment.submission.id,
-                       timedelta_string=timedelta_string,
-                       source_comment_author_name=source_comment_author_name,)
+    text = text.format(
+        source_subreddit=source_subreddit,
+        target_subreddit=target_subreddit,
+        source_comment_permalink=f'https://reddit.com{source_comment.permalink}',
+        source_comment_score=getattr(source_comment, 'score', 0),
+        source_submission_id=source_comment.submission.id,
+        timedelta_string=timedelta_string,
+        source_comment_author_name=source_comment_author_name,
+    )
     return cross_post.reply(text)
-
 
 
 def handle_crosspost_exception(e, comment, target_subreddit):
@@ -110,33 +116,42 @@ def handle_crosspost_exception(e, comment, target_subreddit):
     if not isinstance(e, praw.exceptions.RedditAPIException):
         return result
 
-    familiar_error_types = ['NO_CROSSPOSTS',
-                            'INVALID_CROSSPOST_THING',
-                            'SUBREDDIT_NOTALLOWED',
-                            'NO_IMAGES',
-                            'NO_LINKS',
-                            'NO_SELFS',
-                            'NO_VIDEOS',
-                            'OVER18_SUBREDDIT_CROSSPOST',
-                            'THREAD_LOCKED', 
-                            'IMAGES_NOTALLOWED', 
-                            'SUBMIT_VALIDATION_BODY_BLACKLISTED_STRING',
-                            'SUBMIT_VALIDATION_TITLE_BLACKLISTED_STRING',
-                            'SUBMIT_VALIDATION_MIN_LENGTH',
-                            'SUBMIT_VALIDATION_MAX_LENGTH',
-                            'SUBMIT_VALIDATION_BODY_REQUIRED',
-                            'SUBMIT_VALIDATION_BODY_NOT_ALLOWED',
-                            'SUBMIT_VALIDATION_LINK_WHITELIST',
-                            'SUBMIT_VALIDATION_LINK_BLACKLIST',
-                            'SUBMIT_VALIDATION_REPOST',
-                            'SUBMIT_VALIDATION_FLAIR_REQUIRED',
-                            'SUBMIT_VALIDATION_TITLE_REGEX_REQUIREMENT',
-                            'SUBMIT_VALIDATION_TITLE_REQUIREMENT',
-                            'BANNED_FROM_SUBREDDIT',
-                           ]
-    if e.error_type in familiar_error_types:
-        result.handled_with_grace = True
-        result.error_type = e.error_type
+    familiar_error_types = [
+        'NO_CROSSPOSTS',
+        'INVALID_CROSSPOST_THING',
+        'SUBREDDIT_NOTALLOWED',
+        'NO_IMAGES',
+        'NO_LINKS',
+        'NO_SELFS',
+        'NO_VIDEOS',
+        'OVER18_SUBREDDIT_CROSSPOST',
+        'THREAD_LOCKED', 
+        'IMAGES_NOTALLOWED', 
+        'SUBMIT_VALIDATION_BODY_BLACKLISTED_STRING',
+        'SUBMIT_VALIDATION_TITLE_BLACKLISTED_STRING',
+        'SUBMIT_VALIDATION_MIN_LENGTH',
+        'SUBMIT_VALIDATION_MAX_LENGTH',
+        'SUBMIT_VALIDATION_BODY_REQUIRED',
+        'SUBMIT_VALIDATION_BODY_NOT_ALLOWED',
+        'SUBMIT_VALIDATION_LINK_WHITELIST',
+        'SUBMIT_VALIDATION_LINK_BLACKLIST',
+        'SUBMIT_VALIDATION_REPOST',
+        'SUBMIT_VALIDATION_FLAIR_REQUIRED',
+        'SUBMIT_VALIDATION_TITLE_REGEX_REQUIREMENT',
+        'SUBMIT_VALIDATION_TITLE_REQUIREMENT',
+        'BANNED_FROM_SUBREDDIT',
+    ]
+
+    error_types = []
+    if hasattr(e, 'items') and e.items:
+        error_types = [item.error_type for item in e.items]
+    elif hasattr(e, 'error_type'):
+        error_types = [e.error_type]
+
+    for err_type in error_types:
+        if err_type in familiar_error_types:
+            result.handled_with_grace = True
+            result.error_type = err_type
+            break
         
     return result
-

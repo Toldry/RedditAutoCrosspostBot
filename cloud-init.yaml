@@ -1,0 +1,35 @@
+#cloud-config
+
+# Update packages and install prerequisites
+package_update: true
+package_upgrade: false
+
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - curl
+  - ca-certificates
+  - htop
+  - python3
+  - python3-pip
+  - python3-venv
+
+# Configure 2GB swap space for 1GB RAM VM
+swap:
+  filename: /swapfile
+  size: 2147483648 # 2 GB in bytes
+  maxsize: 2147483648
+
+# Run commands on first boot
+runcmd:
+  # Ensure Docker service is running and enabled on boot
+  - systemctl enable --now docker
+  
+  # Add default cloud users to docker group so sudo is not needed
+  - usermod -aG docker debian || true
+  - usermod -aG docker ubuntu || true
+
+  # Create deployment directory
+  - mkdir -p /opt/reddit-bot
+  - chown -R debian:debian /opt/reddit-bot || chown -R ubuntu:ubuntu /opt/reddit-bot || true
