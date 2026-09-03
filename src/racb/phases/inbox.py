@@ -9,6 +9,8 @@ import prawcore
 from racb.core.reddit import get_reddit_instance
 from racb import i18n
 
+logger = logging.getLogger(__name__)
+
 NEGATIVE_PHRASES = [
     'bad bot',
     'delete this',
@@ -42,7 +44,7 @@ def handle_comment_reply(comment):
             reddit.inbox.mark_read([comment])
     except prawcore.exceptions.Forbidden as e:
         if e.response.reason == 'Forbidden':
-            logging.info(f'Got 403 Forbidden error, probably because the bot is banned in {comment.subreddit_name_prefixed}')
+            logger.info(f'Got 403 Forbidden error, probably because the bot is banned in {comment.subreddit_name_prefixed}')
             reddit.inbox.mark_read([comment])
         else:
             raise

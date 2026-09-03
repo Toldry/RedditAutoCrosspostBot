@@ -16,6 +16,8 @@ import dotenv
 
 from racb.version import __version__
 
+logger = logging.getLogger(__name__)
+
 praw_instances = None
 
 AUTO_CROSSPOST_BOT_NAME = 'AutoCrosspostBot'
@@ -56,7 +58,7 @@ def _instantiate_praw(username, app_client_id, password, app_client_secret, vers
     developername = 'orqa'
     useragent = f'linux:{clientname}:v{version} (by /u/{developername})'
 
-    logging.info(f'Connecting to reddit via praw to instantiate connection instance. username={username}')
+    logger.info(f'Instantiating PRAW client for /u/{username} (User-Agent: {useragent})')
     reddit = praw.Reddit(
         client_id=app_client_id,
         client_secret=app_client_secret,

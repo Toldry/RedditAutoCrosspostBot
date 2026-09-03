@@ -5,6 +5,8 @@ from http import HTTPStatus
 
 import requests
 
+logger = logging.getLogger(__name__)
+
 
 def get_reposts_in_sub(source_comment, target_subreddit):
     url = source_comment.submission.url
@@ -25,7 +27,7 @@ def search_reposts(url):
     try:
         response = requests.get('https://api.repostsleuth.com/image', params=parameters, timeout=10)
     except Exception as e:
-        logging.warning(f'Encountered error while accessing api.repostsleuth.com: {e}')
+        logger.warning(f'Encountered error while accessing api.repostsleuth.com: {e}')
         return []
 
     log_error = False
@@ -49,5 +51,5 @@ def search_reposts(url):
         log_error = True
 
     if log_error:
-        logging.info(f'Encountered a problem with repostsleuth: status={response.status_code}, reason={response.reason}')
+        logger.info(f'Encountered a problem with repostsleuth: status={response.status_code}, reason={response.reason}')
     return []

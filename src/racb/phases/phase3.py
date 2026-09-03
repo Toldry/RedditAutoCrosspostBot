@@ -10,25 +10,30 @@ from racb.core import db, reddit
 from racb.phases import phase2
 from racb import i18n
 
+logger = logging.getLogger(__name__)
+
 
 def process_comment_entries():
-    logging.info('Beginning phase 3 processing')
+    logger.info('Beginning phase 3 processing...')
     PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD', '3 months')
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE3_WAITING_PERIOD)
     if waiting_period_seconds is None:
         waiting_period_seconds = 90 * 86400
 
     comment_entries = db.get_comments_older_than(waiting_period_seconds)
+    logger.info(f'Found {len(comment_entries)} mature comment(s) older than {PHASE3_WAITING_PERIOD} for Phase 3')
+
     for comment_entry in comment_entries:
         handle_comment(comment_entry)
         db.delete_comment(comment_entry)
-    logging.info('Finished phase 3 processing')
+    logger.info('Finished phase 3 processing')
 
 
 def handle_comment(comment_entry):
-    logging.info(f'Begin processing comment entry : {comment_entry["permalink"]}')
+    logger.info(f'Begin processing comment entry: {comment_entry["permalink"]}')
     result = phase2.run_filters(comment_entry)
     if not result.passes_filter:
+        logger.info(f'Comment {comment_entry["permalink"]} did not pass final filter: {result.reason}')
         return
 
     source_comment = result.comment
@@ -43,7 +48,6 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
         failure_reason = None
 
     result = Result()
-
     crosspost_title = get_crosspost_title_for_crosspost(source_comment.submission, target_subreddit)
 
     try:
@@ -52,7 +56,7 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
             title=crosspost_title,
             send_replies=False,
         )
-        logging.info(f'Crosspost successful. link to post: www.reddit.com{cross_post.permalink}')
+        logger.info(f'Crosspost successful: https://www.reddit.com{cross_post.permalink}')
         result.success = True
         result.crosspost = cross_post
         if reply_to_crosspost_flag:
@@ -61,10 +65,12 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
         hce_res = handle_crosspost_exception(e, source_comment, target_subreddit)
         if hce_res.handled_with_grace:
             result.failure_reason = hce_res.error_type
+            logger.info(f'Crosspost was rejected gracefully ({hce_res.error_type}) for comment {source_comment.permalink}')
         else:
-            logging.error(f'Crosspost failed due to a problem: {str(e)}\n\n'
-                          f'This occurred while attempting to crosspost based on this comment: {source_comment.permalink}')
-            logging.exception(e)
+            logger.error(
+                f'Crosspost failed unexpectedly: {e} | Source comment: {source_comment.permalink}',
+                exc_info=True,
+            )
             debug = os.environ.get('DEBUG', '').lower() in ('true', '1')
             if debug:
                 raise
@@ -77,7 +83,7 @@ def get_crosspost_title_for_crosspost(submission, target_subreddit):
         return submission.title.upper()
     else:
         # Will use this submission’s title if None (default: None).
-        return None 
+        return None
 
 
 def reply_to_crosspost(source_comment, cross_post, target_subreddit):
@@ -93,7 +99,7 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
         source_comment_author_name = f'/u/{source_comment.author.name}'
     else:
         source_comment_author_name = i18n.get_translated_string('THE_USER_WHO_COMMENTED', target_subreddit, add_suffix=False)
-    
+
     text = text.format(
         source_subreddit=source_subreddit,
         target_subreddit=target_subreddit,
@@ -124,8 +130,8 @@ def handle_crosspost_exception(e, comment, target_subreddit):
         'NO_SELFS',
         'NO_VIDEOS',
         'OVER18_SUBREDDIT_CROSSPOST',
-        'THREAD_LOCKED', 
-        'IMAGES_NOTALLOWED', 
+        'THREAD_LOCKED',
+        'IMAGES_NOTALLOWED',
         'SUBMIT_VALIDATION_BODY_BLACKLISTED_STRING',
         'SUBMIT_VALIDATION_TITLE_BLACKLISTED_STRING',
         'SUBMIT_VALIDATION_MIN_LENGTH',
@@ -152,5 +158,5 @@ def handle_crosspost_exception(e, comment, target_subreddit):
             result.handled_with_grace = True
             result.error_type = err_type
             break
-        
+
     return result

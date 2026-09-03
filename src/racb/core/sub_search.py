@@ -4,6 +4,8 @@ import logging
 import prawcore
 from racb.core.reddit import get_reddit_instance
 
+logger = logging.getLogger(__name__)
+
 RESULTS_LIMIT = 4
 
 
@@ -20,5 +22,5 @@ def get_matches(subreddit_name):
             if len(results) >= RESULTS_LIMIT:
                 break
     except (prawcore.exceptions.PrawcoreException, Exception) as e:
-        logging.warning(f"Error searching subreddits for '{subreddit_name}': {e}")
+        logger.warning(f"Error searching subreddits for '{subreddit_name}': {e}")
     return results

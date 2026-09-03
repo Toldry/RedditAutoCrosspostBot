@@ -8,6 +8,8 @@ from pathlib import Path
 import psycopg2
 import psycopg2.extras
 
+logger = logging.getLogger(__name__)
+
 SQL_FILE_PATH = Path(__file__).resolve().parent.parent / 'sql' / 'instantiate_db.sql'
 
 
@@ -45,7 +47,7 @@ def get_db_connection():
             db_url = f'postgresql://{user}:{password}@{host}:{port}/{dbname}'
         else:
             err_msg = 'Neither DATABASE_URL nor POSTGRES_PASSWORD is set in environment.'
-            logging.error(err_msg)
+            logger.error(err_msg)
             raise ValueError(err_msg)
 
     debug = env_bool('DEBUG', False)
@@ -57,7 +59,7 @@ def get_db_connection():
             sslmode = 'prefer'
 
     masked_url = _mask_db_url(db_url)
-    logging.info(f'Connecting to database: {masked_url} (sslmode={sslmode})')
+    logger.info(f'Connecting to database: {masked_url} (sslmode={sslmode})')
 
     # Errors that cannot be resolved by retrying (fail fast immediately)
     fatal_error_keywords = (
@@ -72,23 +74,23 @@ def get_db_connection():
     for attempt in range(1, max_retries + 1):
         try:
             connection = psycopg2.connect(dsn=db_url, sslmode=sslmode)
-            logging.info('Database connection established successfully.')
+            logger.info('Database connection established successfully.')
             return connection
         except psycopg2.OperationalError as e:
             err_str = str(e).strip()
 
             # Check if this is a fatal auth or config error
             if any(kw in err_str.lower() for kw in fatal_error_keywords):
-                logging.error(
+                logger.error(
                     f'Fatal database authentication or configuration error for {masked_url}:\n{err_str}\n'
                     f'Check your POSTGRES_USER, POSTGRES_PASSWORD, and DATABASE_URL in .env.'
                 )
                 raise
 
             if attempt == max_retries:
-                logging.error(f'Failed to connect to database after {max_retries} attempts ({masked_url}): {err_str}')
+                logger.error(f'Failed to connect to database after {max_retries} attempts ({masked_url}): {err_str}')
                 raise
-            logging.warning(f'Database not ready yet (attempt {attempt}/{max_retries}): {err_str}. Retrying in 2s...')
+            logger.warning(f'Database not ready yet (attempt {attempt}/{max_retries}): {err_str}. Retrying in 2s...')
             time.sleep(2)
 
 
@@ -102,7 +104,7 @@ def add_comment(comment):
             cur.callproc('insert_scraped_comment', (permalink,))
             conn.commit()
     except (psycopg2.errors.InsufficientPrivilege, psycopg2.errors.InFailedSqlTransaction):
-        logging.error('Cannot insert row, database transaction failed or permission denied.')
+        logger.error('Cannot insert row, database transaction failed or permission denied.')
         conn.rollback()
         debug = env_bool('DEBUG', False)
         if debug:

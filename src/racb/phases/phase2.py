@@ -9,18 +9,20 @@ import pytimeparse
 from racb.core import db, reddit
 from racb.phases import phase1
 
+logger = logging.getLogger(__name__)
+
 BATCH_SIZE = 100
 
 
 def filter_comments_from_db(verbose=False):
-    logging.info('Running phase 2 comment filter')
+    logger.info('Running phase 2 comment filter pass...')
     PHASE2_WAITING_PERIOD = os.environ.get('PHASE2_WAITING_PERIOD', '2 hours')
     waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE2_WAITING_PERIOD) or 7200
     comment_entries = db.get_unchecked_comments_older_than(waiting_period_seconds)
-    logging.info(f'Found {len(comment_entries)} unchecked comments')
+    logger.info(f'Found {len(comment_entries)} unchecked comment(s) older than {PHASE2_WAITING_PERIOD}')
 
     if not comment_entries:
-        logging.info('Finished running phase 2 comment filter (0 comments)')
+        logger.info('Finished phase 2 comment filter (0 comments to process)')
         return
 
     reddit_instance = reddit.get_reddit_instance()
@@ -39,7 +41,7 @@ def filter_comments_from_db(verbose=False):
             for comment in reddit_instance.info(fullnames=fullnames):
                 fetched_comments[comment.id] = comment
         except (prawcore.exceptions.PrawcoreException, Exception) as e:
-            logging.error(f'Error fetching batch comment info: {e}')
+            logger.error(f'Error fetching batch comment info: {e}')
 
         for cid, ce in id_to_entry.items():
             comment = fetched_comments.get(cid)
@@ -47,14 +49,14 @@ def filter_comments_from_db(verbose=False):
 
             if verbose:
                 score = result.comment.score if result.comment else 'NA'
-                logging.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={ce["permalink"]}')
+                logger.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={ce["permalink"]}')
 
             if result.passes_filter:
                 db.set_comment_checked(ce)
             else:
                 db.delete_comment(ce)
 
-    logging.info('Finished running phase 2 comment filter')
+    logger.info('Finished running phase 2 comment filter pass')
 
 
 def chunk_list(lst, chunk_size):
@@ -115,7 +117,7 @@ def run_filters(comment_entry, comment=None):
         unable_to_search_reason = gpwsc_result.unable_to_search_reason
         result.reason = f'UNABLE_TO_SEARCH_TARGET_SUBREDDIT_BECAUSE__{unable_to_search_reason}'
         return result
-    
+
     result.passes_filter = True
     return result
 
@@ -130,7 +132,7 @@ def check_comment_availability(comment):
         _ = comment.score
         return True
     except (praw.exceptions.ClientException, prawcore.exceptions.PrawcoreException, Exception) as e:
-        logging.info(f'Comment unavailable ({permalink_safe(comment)}): {e}')
+        logger.info(f'Comment unavailable ({permalink_safe(comment)}): {e}')
         return False
 
 
