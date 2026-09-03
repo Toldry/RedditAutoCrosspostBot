@@ -98,8 +98,8 @@ flowchart TD
 | [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore (`SUB_BLACKLIST`). |
 | [`src/racb/i18n.py`](./src/racb/i18n.py) | Custom localization mapping (`en`, `es`, `de`, `fr`, `he`, `totallynotrobots`) mapped by subreddit names. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
-| [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Cloud-init configuration for provisioning cloud VMs with swap and Docker. |
-| [`deploy/startup-script.sh`](./deploy/startup-script.sh) | GCP startup script for automated VM bootstrapping. |
+| [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. |
+| [`deploy/instance-flags.yaml`](./deploy/instance-flags.yaml) | Declarative Google Cloud CLI flags file for provisioning the Always Free e2-micro instance. |
 | [`Dockerfile`](./Dockerfile) | Lightweight Python 3.11 container image definition. |
 | [`docker-compose.yml`](./docker-compose.yml) | Multi-container stack definition (PostgreSQL 15 + Python bot worker). |
 | [`.bumpversion.toml`](./.bumpversion.toml) | Configuration for `bump-my-version` automation. |
@@ -136,8 +136,11 @@ Store these in `.env` for local development or production:
 ## 5. Development & Operational Guidelines
 
 ### Setup & Execution via Docker Compose (Recommended)
-1. **Configure Environment:**
+1. **Clone & Configure Environment:**
    ```bash
+   cd /opt
+   git clone https://github.com/Toldry/RedditAutoCrosspostBot.git
+   cd RedditAutoCrosspostBot
    cp .env.example .env
    # Edit .env with your Reddit passwords and API secrets
    ```

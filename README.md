@@ -38,6 +38,7 @@ The easiest way to run the bot and PostgreSQL 24/7 (e.g. on a free Google Cloud 
 
 ### 1. Clone & Configure
 ```bash
+cd /opt
 git clone https://github.com/Toldry/RedditAutoCrosspostBot.git
 cd RedditAutoCrosspostBot
 
@@ -96,8 +97,12 @@ bump-my-version bump patch   # or minor / major
 ## Cloud Hosting Setup (Google Cloud Always Free)
 
 You can run this bot 100% free on Google Cloud's Always Free `e2-micro` tier:
-* Use [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) or [`deploy/startup-script.sh`](./deploy/startup-script.sh) to automatically provision the instance with 2GB swap space, Docker, and Docker Compose.
-* See [`AGENTS.md`](./AGENTS.md) for full architecture details.
+1. **Provision the VM using declarative flags:**
+   ```bash
+   gcloud compute instances create reddit-crosspost-bot --flags-file=deploy/instance-flags.yaml
+   ```
+2. The VM will automatically execute [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) on first boot, provisioning 2GB swap space, Docker, and Docker Compose.
+3. See [`AGENTS.md`](./AGENTS.md) for architecture details.
 
 ---
 

@@ -1,0 +1,11 @@
+# Google Cloud Compute Engine Always Free instance configuration
+# Usage:
+#   gcloud compute instances create reddit-crosspost-bot --flags-file=deploy/instance-flags.yaml
+
+--zone: us-central1-a
+--machine-type: e2-micro
+--image-family: ubuntu-2404-lts-amd64
+--image-project: ubuntu-os-cloud
+--boot-disk-size: 30GB
+--boot-disk-type: pd-standard
+--metadata-from-file: user-data=deploy/cloud-init.yaml

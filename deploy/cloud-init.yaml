@@ -23,13 +23,12 @@ swap:
 
 # Run commands on first boot
 runcmd:
-  # Ensure Docker service is running and enabled on boot
+  # 1. Ensure Docker service is running and enabled on boot
   - systemctl enable --now docker
   
-  # Add default cloud users to docker group so sudo is not needed
-  - usermod -aG docker debian || true
-  - usermod -aG docker ubuntu || true
+  # 2. Allow users in docker group to create project directories in /opt
+  - chown root:docker /opt
+  - chmod 2775 /opt
 
-  # Create deployment directory
-  - mkdir -p /opt/reddit-bot
-  - chown -R debian:debian /opt/reddit-bot || chown -R ubuntu:ubuntu /opt/reddit-bot || true
+  # 3. Add all regular user accounts to docker group automatically
+  - for u in debian ubuntu admin $(ls /home 2>/dev/null); do usermod -aG docker "$u" 2>/dev/null || true; done
