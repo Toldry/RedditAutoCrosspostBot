@@ -12,6 +12,7 @@ import schedule
 import prawcore
 import urllib3
 
+from racb.version import __version__
 from racb.core import reddit
 from racb.phases import phase1, phase2, phase3, inbox, cleanup
 
@@ -30,11 +31,9 @@ def configure_logging():
     stream_handler = logging.StreamHandler()
 
     debug = env_bool('DEBUG', False)
-    level = logging.INFO
-    if debug:
-        level = logging.DEBUG
+    level = logging.DEBUG if debug else logging.INFO
 
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(level)
     stream_handler.setLevel(level)
 
     logging_blacklist = ['prawcore', 'urllib3.connectionpool', 'schedule']
@@ -46,19 +45,24 @@ def configure_logging():
                         handlers=[
                             file_handler,
                             stream_handler
-                        ])
+                        ],
+                        force=True)
+    logging.getLogger().setLevel(level)
 
 
 def init_streams():
+    logging.info('Initializing Reddit comment and inbox streams...')
     reddit_instance = reddit.get_reddit_instance()
     scanned_subreddits = 'all'
     subreddit = reddit_instance.subreddit(scanned_subreddits)
     c_stream = subreddit.stream.comments(skip_existing=True, pause_after=-1)
     i_stream = reddit_instance.inbox.stream(mark_read=False, pause_after=-1)
+    logging.info('Streams initialized successfully. Listening for comments on r/all...')
     return (c_stream, i_stream)
 
 
 def set_schedule():
+    logging.info('Configuring background task schedule...')
     schedule.every(7).minutes.do(cleanup.delete_unwanted_submissions)
     schedule.every(20).minutes.do(phase2.filter_comments_from_db)
     listen_only = env_bool('LISTEN_ONLY', False)
@@ -72,7 +76,7 @@ def set_schedule():
 
 def main():
     configure_logging()
-    logging.info('Running reddit_auto_crosspost_bot')
+    logging.info(f'=== Starting RedditAutoCrosspostBot v{__version__} ===')
 
     parser = argparse.ArgumentParser(description="RedditAutoCrosspostBot runner")
     parser.add_argument('--only-phase2', action='store_true', help="Run Phase 2 filtering only and exit")
