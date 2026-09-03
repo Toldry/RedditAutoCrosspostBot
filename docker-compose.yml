@@ -14,6 +14,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    ports:
+      # Expose PostgreSQL to host localhost (127.0.0.1) for secure SSH tunneling and GUI management (pgAdmin 4, DBeaver)
+      # Never binds to 0.0.0.0 to prevent public internet exposure
+      - "127.0.0.1:5432:5432"
     networks:
       - racb_net
 

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Exposed Database Port to Localhost:** Bound PostgreSQL port 5432 to `127.0.0.1` in `docker-compose.yml` to support secure SSH tunneling for external GUI clients (pgAdmin 4, DBeaver) without public internet exposure.
+
 ## [2.2.1] - 2026-09-03
 
 ### Added
