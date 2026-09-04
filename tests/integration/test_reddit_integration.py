@@ -15,6 +15,26 @@ from racb.phases import phase1, phase3, cleanup
 TEST_SOURCE_SUBREDDIT = 'racb_test_1'
 TEST_TARGET_SUBREDDIT = 'racb_test_2'
 
+# Flag to disable cleanup of created submissions and comments across all integration tests
+DISABLE_CLEANUP = True
+
+
+def cleanup_reddit_objects(*objects):
+    """Deletes Reddit submissions, comments, or collections of them unless cleanup is disabled."""
+    if DISABLE_CLEANUP:
+        return
+    for obj in objects:
+        if obj is None:
+            continue
+        if isinstance(obj, (list, tuple, set)):
+            for item in obj:
+                cleanup_reddit_objects(item)
+            continue
+        try:
+            obj.delete()
+        except Exception:
+            pass
+
 
 @pytest.fixture(autouse=True)
 def configure_integration_test_environment(monkeypatch):
@@ -35,12 +55,9 @@ def test_live_reddit_auth_all_bots():
     ]
     for bot_name in bot_names:
         r = reddit.get_reddit_instance(bot_name)
-        try:
-            me = r.user.me()
-            assert me is not None, f"Bot {bot_name} failed to authenticate"
-            assert me.name.lower() == bot_name.lower()
-        except prawcore.exceptions.OAuthException as e:
-            pytest.skip(f"Bot {bot_name} credentials returned OAuth error: {e}")
+        me = r.user.me()
+        assert me is not None, f"Bot {bot_name} failed to authenticate"
+        assert me.name.lower() == bot_name.lower()
 
 
 @pytest.mark.integration
@@ -64,6 +81,8 @@ def test_live_same_subreddit_bot_trigger():
         title=f'[Test] Same Sub Test {uuid.uuid4().hex[:8]}',
         selftext='Test post body for same_subreddit_bot integration test',
     )
+    raw_comment = None
+    bot_reply = None
 
     try:
         raw_comment = submission.reply(f'r/{TEST_SOURCE_SUBREDDIT}')
@@ -78,7 +97,7 @@ def test_live_same_subreddit_bot_trigger():
         assert "Yes, that's where we are." in bot_reply.body
 
     finally:
-        submission.delete()
+        cleanup_reddit_objects(bot_reply, raw_comment, submission)
 
 
 @pytest.mark.integration
@@ -92,6 +111,8 @@ def test_live_sub_doesnt_exist_bot_trigger():
         title=f'[Test] Nonexistent Sub Test {uuid.uuid4().hex[:8]}',
         selftext='Test post body for sub_doesnt_exist_bot integration test',
     )
+    raw_comment = None
+    bot_reply = None
 
     try:
         raw_comment = submission.reply(f'r/{fake_sub_name}')
@@ -107,7 +128,7 @@ def test_live_sub_doesnt_exist_bot_trigger():
         assert "does not exist" in bot_reply.body
 
     finally:
-        submission.delete()
+        cleanup_reddit_objects(bot_reply, raw_comment, submission)
 
 
 @pytest.mark.integration
@@ -125,6 +146,8 @@ def test_live_same_post_bot_reply():
         title=f'[Test Current Post] {uuid.uuid4().hex[:8]}',
         selftext='Source post content',
     )
+    raw_comment = None
+    bot_reply = None
 
     try:
         raw_comment = source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}')
@@ -132,23 +155,19 @@ def test_live_same_post_bot_reply():
         comment = r.comment(id=raw_comment.id)
 
         # Trigger same_post_bot reply directly with target submission
-        try:
-            bot_reply = phase1.reply_to_same_content_post_comment(
-                comment,
-                TEST_TARGET_SUBREDDIT,
-                target_submission,
-            )
+        bot_reply = phase1.reply_to_same_content_post_comment(
+            comment,
+            TEST_TARGET_SUBREDDIT,
+            target_submission,
+        )
 
-            assert bot_reply is not None
-            assert bot_reply.author.name.lower() == reddit.SAME_POST_BOT_NAME.lower()
-            assert TEST_TARGET_SUBREDDIT in bot_reply.body
-            assert target_submission.permalink in bot_reply.body
-        except prawcore.exceptions.OAuthException as e:
-            pytest.skip(f"same_post_bot credentials returned OAuth error: {e}")
+        assert bot_reply is not None
+        assert bot_reply.author.name.lower() == reddit.SAME_POST_BOT_NAME.lower()
+        assert TEST_TARGET_SUBREDDIT in bot_reply.body
+        assert target_submission.permalink in bot_reply.body
 
     finally:
-        source_submission.delete()
-        target_submission.delete()
+        cleanup_reddit_objects(bot_reply, raw_comment, source_submission, target_submission)
 
 
 @pytest.mark.integration
@@ -161,6 +180,7 @@ def test_live_phase3_graceful_private_crosspost():
         title=f'[Test Private Source] {uuid.uuid4().hex[:8]}',
         selftext='Source content in private sub',
     )
+    raw_comment = None
 
     try:
         raw_comment = source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}')
@@ -172,7 +192,7 @@ def test_live_phase3_graceful_private_crosspost():
         assert res.failure_reason in ('PRIVATE_SUBREDDIT_CROSSPOST', 'SUBREDDIT_NOTALLOWED', 'NO_CROSSPOSTS')
 
     finally:
-        source_submission.delete()
+        cleanup_reddit_objects(raw_comment, source_submission)
 
 
 @pytest.mark.integration
@@ -237,9 +257,10 @@ def test_live_duplicate_detector_query():
         image=PostMedia(base_image_path),
         timeout=25,
     )
-    time.sleep(3.5)  # Allow Reddit listing index to propagate new post
+    time.sleep(4.0)  # Allow Reddit listing index to propagate new post
 
     created_source_submissions = []
+    created_comments = []
 
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -254,11 +275,18 @@ def test_live_duplicate_detector_query():
                 created_source_submissions.append(source_submission)
 
                 raw_comment = source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}')
+                created_comments.append(raw_comment)
                 time.sleep(2)
                 comment = r.comment(id=raw_comment.id)
                 _ = comment.submission.title
 
-                duplicates = duplicate_detector.get_reposts_in_sub(comment, TEST_TARGET_SUBREDDIT, limit=10)
+                # Query duplicates with retry in case Reddit image processing index is slightly delayed
+                duplicates = []
+                for attempt in range(3):
+                    duplicates = duplicate_detector.get_reposts_in_sub(comment, TEST_TARGET_SUBREDDIT, limit=15)
+                    if duplicates and target_submission.id in [d['post_id'] for d in duplicates]:
+                        break
+                    time.sleep(2.0)
 
                 assert isinstance(duplicates, list)
                 assert len(duplicates) > 0, f"Expected duplicate detection for variation '{var_name}'"
@@ -269,12 +297,8 @@ def test_live_duplicate_detector_query():
                 assert matched['subreddit'].lower() == TEST_TARGET_SUBREDDIT.lower()
 
     finally:
-        target_submission.delete()
-        for s in created_source_submissions:
-            try:
-                s.delete()
-            except Exception:
-                pass
+        cleanup_reddit_objects(created_comments, created_source_submissions, target_submission)
+
 
 
 

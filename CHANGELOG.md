@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Test Artifact Cleanup Script:** Added `scripts/cleanup_test_history.py` to query the submission and comment histories of all four bot accounts (`AutoCrosspostBot`, `sub_doesnt_exist_bot`, `same_subreddit_bot`, `same_post_bot`) and safely purge any lingering test posts and comments.
+
+### Changed
+- **Integration Test Comment Cleanup & Bypass Flag:** Updated `tests/integration/test_reddit_integration.py` to track and delete all created comments and bot replies upon test completion alongside submissions, and added `DISABLE_CLEANUP` flag to enable preserving Reddit posts and comments for debugging.
+
+
 ## [2.2.2] - 2026-09-03
 
 ### Changed
