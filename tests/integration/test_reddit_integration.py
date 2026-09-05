@@ -61,6 +61,26 @@ def test_live_reddit_auth_all_bots():
 
 
 @pytest.mark.integration
+def test_live_authenticate_all_bots_function():
+    """Verifies that the startup authenticate_all_bots function executes without errors on live Reddit."""
+    # Should complete without raising any exception if credentials in .env are valid
+    reddit.authenticate_all_bots()
+
+
+@pytest.mark.integration
+def test_live_main_startup_flow(monkeypatch):
+    """Verifies that main() startup authentication check succeeds with live Reddit before dispatching."""
+    from unittest.mock import patch
+    from racb.main import main
+
+    monkeypatch.setattr('sys.argv', ['racb'])
+    with patch('racb.main.start_bot') as mock_start_bot, \
+         patch('racb.main.configure_logging'):
+        main()
+        mock_start_bot.assert_called_once()
+
+
+@pytest.mark.integration
 def test_live_subreddits_access():
     """Verifies that the bot can access the private test subreddits."""
     r = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)

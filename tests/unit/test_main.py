@@ -54,3 +54,31 @@ def test_handle_exception_unexpected_raises():
     with patch('racb.main.env_bool', return_value=False):
         should_raise = handle_exception(exc)
         assert should_raise is True
+
+
+@pytest.mark.unit
+def test_main_startup_auth_success():
+    from racb.main import main
+
+    with patch('racb.main.configure_logging'), \
+         patch('racb.core.reddit.authenticate_all_bots') as mock_auth, \
+         patch('racb.main.start_bot') as mock_start, \
+         patch('sys.argv', ['racb']):
+        main()
+        mock_auth.assert_called_once()
+        mock_start.assert_called_once()
+
+
+@pytest.mark.unit
+def test_main_startup_auth_failure_exits():
+    from racb.main import main
+
+    with patch('racb.main.configure_logging'), \
+         patch('racb.core.reddit.authenticate_all_bots', side_effect=RuntimeError('Bot authentication failed')), \
+         patch('racb.main.start_bot') as mock_start, \
+         patch('sys.argv', ['racb']), \
+         pytest.raises(SystemExit) as excinfo:
+        main()
+
+    assert excinfo.value.code == 1
+    mock_start.assert_not_called()

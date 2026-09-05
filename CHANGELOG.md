@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Bot Startup Authentication Verification:** Added `authenticate_all_bots()` in `racb.core.reddit` and integrated it into `main()` in `racb.main` to verify active Reddit API authentication and account identity for all 4 bot accounts (`AutoCrosspostBot`, `sub_doesnt_exist_bot`, `same_subreddit_bot`, `same_post_bot`) at startup, immediately halting execution with an explicit error message if any credentials fail.
+- **Bot Authentication Unit & Integration Tests:** Added automated unit tests in `test_reddit_core.py` and `test_main.py` covering successful startup authentication, credential errors, missing accounts, and identity mismatches, as well as live API integration tests in `test_reddit_integration.py`.
+
 ## [2.2.3] - 2026-09-04
 
 ### Added

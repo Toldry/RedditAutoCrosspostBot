@@ -4,6 +4,7 @@ import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import sys
 import time
 
 import praw
@@ -132,6 +133,12 @@ def set_schedule():
 def main():
     configure_logging()
     logger.info(f'=== Starting RedditAutoCrosspostBot v{__version__} ===')
+
+    try:
+        reddit.authenticate_all_bots()
+    except Exception as e:
+        logger.critical(f'Startup authentication failed: {e}')
+        sys.exit(1)
 
     parser = argparse.ArgumentParser(description="RedditAutoCrosspostBot runner")
     parser.add_argument('--only-phase2', action='store_true', help="Run Phase 2 filtering only and exit")

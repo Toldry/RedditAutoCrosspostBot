@@ -2,6 +2,7 @@
 
 __all__ = [
     'get_reddit_instance',
+    'authenticate_all_bots',
     'AUTO_CROSSPOST_BOT_NAME',
     'SUB_DOESNT_EXIST_BOT_NAME',
     'SAME_SUBREDDIT_BOT_NAME',
@@ -94,3 +95,39 @@ def get_reddit_instance(username=AUTO_CROSSPOST_BOT_NAME):
             praw_instances[name] = reddit_instance
 
     return praw_instances[username]
+
+
+def authenticate_all_bots():
+    """Verifies that all 4 bot accounts can successfully authenticate against the Reddit API.
+
+    Raises:
+        RuntimeError: If any bot fails authentication or user identity verification.
+    """
+    logger.info('Authenticating all Reddit bot accounts...')
+    bot_names = [
+        AUTO_CROSSPOST_BOT_NAME,
+        SUB_DOESNT_EXIST_BOT_NAME,
+        SAME_SUBREDDIT_BOT_NAME,
+        SAME_POST_BOT_NAME,
+    ]
+    failed_bots = {}
+    for name in bot_names:
+        logger.info(f'Verifying authentication for /u/{name}...')
+        try:
+            reddit_instance = get_reddit_instance(name)
+            me = reddit_instance.user.me()
+            if me is None:
+                raise RuntimeError(f'Bot /u/{name} is not authenticated (user.me() returned None, read-only mode)')
+            if me.name.lower() != name.lower():
+                raise RuntimeError(f'Bot /u/{name} authenticated as unexpected user /u/{me.name}')
+            logger.info(f'Successfully authenticated /u/{me.name}')
+        except Exception as e:
+            err_msg = f'Failed to authenticate bot /u/{name}: {e}'
+            logger.error(err_msg)
+            failed_bots[name] = str(e)
+
+    if failed_bots:
+        failures_summary = '; '.join(f'/u/{name}: {err}' for name, err in failed_bots.items())
+        raise RuntimeError(f'Authentication failed for {len(failed_bots)} bot(s): {failures_summary}')
+
+    logger.info('All bot accounts authenticated successfully.')
