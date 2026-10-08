@@ -4,6 +4,7 @@
 !.env.example
 !.gitignore
 !.bumpversion.toml
+!.github/
 old.py
 app.log*
 db.json
