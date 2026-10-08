@@ -3,8 +3,8 @@
 Welcome to the **RedditAutoCrosspostBot** repository. This document is a comprehensive guide for AI agents and human contributors working on, debugging, extending, or maintaining this codebase.
 
 > [!IMPORTANT]
-> Section 9 lists **known defects** that were verified against the code, as of v2.2.4. Read it before you
-> assume a feature works the way its name or docstring suggests. If you fix one, remove it from that list.
+> Section 9 lists **known limitations and open defects**. Read it before you assume a feature works the
+> way its name suggests. If you fix one, remove it from that list.
 
 ---
 
@@ -13,8 +13,8 @@ Welcome to the **RedditAutoCrosspostBot** repository. This document is a compreh
 This repository hosts a suite of 4 automated Reddit bots powered by [PRAW (Python Reddit API Wrapper)](https://praw.readthedocs.io/), backed by a PostgreSQL database and containerized with Docker / Docker Compose for deployment on free cloud VPS instances (e.g. Google Cloud Always Free or Oracle Cloud Always Free) or local hardware.
 
 All 4 bots run in **one Python process, on a single thread**. A single loop alternates between the
-`r/all` comment stream, the inbox stream and the `schedule` jobs, so any slow call blocks everything else
-(see section 7).
+`r/all` comment stream and the `schedule` jobs (inbox processing is one of them), so any slow call blocks
+everything else (see section 7).
 
 ### Primary Bot: `AutoCrosspostBot`
 - **Goal:** Monitors Reddit comments on `r/all` for community crosspost recommendations matching `r/SomeSubreddit` or `/r/SomeSubreddit`.
@@ -89,7 +89,7 @@ flowchart TD
     DUP -->|SUBREDDIT_DOES_NOT_EXIST| A3["sub_doesnt_exist_bot reply"]
     DUP -->|otherwise| TL{"Top-level comment?"}
     TL -->|No| X5["ignore"]
-    TL -->|Yes| DB[("insert_scraped_comment(permalink)")]
+    TL -->|Yes| DB[("insert_scraped_comment(permalink, target)")]
 ```
 
 Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1. Phase 2 deletes it later.
@@ -98,16 +98,21 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 - **Phase 1 ([`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py)):**
   - Continuous streaming from `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)`.
   - Filters: Discards moderator comments, submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`src/racb/constants.py`](./src/racb/constants.py)). Non-top-level comments (`comment.parent_id != comment.link_id`) are discarded only **after** auxiliary-bot dispatch (see the warning in section 1).
-  - Qualified suggestions are stored via stored procedure `insert_scraped_comment(permalink)`.
-  - Only the **permalink** is stored. The target subreddit is **re-parsed from the live comment body** in Phases 2 and 3.
+  - Qualified suggestions are stored via stored procedure `insert_scraped_comment(permalink, target_subreddit)`.
+  - Phases 2 and 3 re-parse the target from the live comment body and reject the row
+    (`TARGET_SUBREDDIT_CHANGED`) if it no longer equals the stored target, case-insensitively. This blocks
+    bait-and-switch edits. Rows scraped before v2.3 have `target_subreddit = NULL` and skip this check.
   - All of this work, including the duplicate search and image downloads, runs synchronously on the stream loop.
+  - Auxiliary replies go through `phase1.reply_as_bot()`, which only logs when `DRY_RUN` is enabled.
+  - Any error while handling one comment is caught in `main.handle_comment_safely()` and skips only that
+    comment (section 7).
 - **Phase 2 ([`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py)):**
   - Runs periodically via `schedule` (or manually via `python -m racb --only-phase2`).
   - Fetches unchecked rows older than `PHASE2_WAITING_PERIOD` using `get_unchecked_comments_older_than(interval)`.
   - Executes **batch fetching via `reddit.info(fullnames=chunk)`** in chunks of 100 to minimize API requests by 99%:
     - Comment availability (not deleted / removed).
     - Score >= `COMMENT_SCORE_THRESHOLD`.
-    - Regex pattern still holds (user didn't edit comment).
+    - Regex pattern still holds (user didn't edit comment), and still names the stored target subreddit.
     - Target subreddit availability and duplicate check.
   - *Accuracy note:* only the **comment fetch** is batched. The duplicate check
     (`phase1.get_posts_with_same_content`) still costs one search request per row, plus a lazy submission
@@ -124,14 +129,17 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
   - Executes `submission.crosspost()` and posts an explanatory reply using localized text templates from [`src/racb/i18n.py`](./src/racb/i18n.py).
   - Handles Reddit API crosspost exceptions gracefully via modern `e.items` inspection (e.g., `NO_CROSSPOSTS`, `SUBREDDIT_NOTALLOWED`, `NO_IMAGES`, `SUBMIT_VALIDATION_*`).
   - Deletes the record from PostgreSQL. This happens **after** the crosspost, and Phase 3 keeps no
-    "already crossposted" state. A crash between the crosspost and the delete re-crossposts on the next run.
+    "already crossposted" state (see section 9).
+  - With `DRY_RUN`, it logs what it would crosspost and keeps the row.
 - **Maintenance & Feedback:**
   - [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py): Periodically fetches the latest 40 submissions made by `AutoCrosspostBot` and deletes any with score < 0.
-    Only submissions are covered. Comments made by any of the 4 bots are never cleaned up.
-  - [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py): Monitors inbox stream for feedback (`good bot` / `bad bot`).
-    Both `respond_to_positive_sentiment` and `respond_to_negative_sentiment` are currently **no-ops**
-    (bodies commented out). Matching messages are only marked read. Only `AutoCrosspostBot`'s inbox is
-    streamed; the 3 auxiliary bots' inboxes are never read.
+    Only submissions are covered. Comments made by any of the 4 bots are never cleaned up. A failed
+    delete is logged and skipped; `DRY_RUN` only logs.
+  - [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py): Evaluates feedback (`good bot` / `bad bot`).
+    `process_unread_inboxes()` runs every 10 minutes and reads the unread inbox of **all 4** bots
+    (there is no continuous inbox stream any more). Feedback is logged at INFO and marked read.
+    `respond_to_positive_sentiment` and `respond_to_negative_sentiment` are still deliberate **no-ops**
+    (bodies commented out by the author), so the bots never reply to feedback.
 
 ---
 
@@ -142,6 +150,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/main.py`](./src/racb/main.py) | Application entry point, logging setup, stream loop, exception recovery, and `schedule` runner. |
 | [`src/racb/__main__.py`](./src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
 | [`src/racb/__init__.py`](./src/racb/__init__.py) | Package marker; re-exports `__version__`. |
+| [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_listen_only()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
 | [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check) and the bot-name constants. |
 | [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
 | [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Live Reddit community search using `reddit.subreddits.search()` for typo suggestions. |
@@ -151,16 +160,18 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/phases/phase3.py`](./src/racb/phases/phase3.py) | Phase 3 final validation, crosspost execution, comment reply, modern API exception handling. |
 | [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py) | Evaluates feedback sent to the bot's inbox. |
 | [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
-| [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on **every new DB connection**, not only at startup (see section 6). |
+| [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on **every new DB connection**, so every statement must be idempotent (see section 6). |
 | [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore (`SUB_BLACKLIST`). |
 | [`src/racb/i18n.py`](./src/racb/i18n.py) | Custom localization mapping (`en`, `es`, `de`, `fr`, `he`, `totallynotrobots`) mapped by subreddit names. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
 | [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run` and `--limit N` (`0` means all). |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 61 mocked unit tests (`@pytest.mark.unit`), one file per module. |
+| [`tests/unit/`](./tests/unit/) | 94 mocked unit tests (`@pytest.mark.unit`), one file per module. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
-| [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`. |
+| [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
+| [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: runs the unit tests on Python 3.11 for pushes to `master`/`main` and for pull requests. |
+| [`.github/dependabot.yml`](./.github/dependabot.yml) | Monthly Dependabot updates for the pinned pip requirements and GitHub Actions. |
 | [`examples/example_reddit_comment.py`](./examples/example_reddit_comment.py) | Not executable code: a commented-out attribute dump of a PRAW `Comment` and `Submission`, kept for reference. |
 | [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
 | [`deploy/instance-flags.yaml`](./deploy/instance-flags.yaml) | Declarative Google Cloud CLI flags file for provisioning the Always Free e2-micro instance. |
@@ -170,12 +181,11 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`.gitignore`](./.gitignore) | Ignores **all dotfiles** (`.*`) except an explicit allowlist. See section 8. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Release history following Keep a Changelog. |
 | [`.env.example`](./.env.example) | Environment variable template. |
-| [`requirements.txt`](./requirements.txt) | Modernized runtime Python dependencies (`praw>=7.7.1`, `psycopg2-binary`, etc.). |
-| [`requirements-dev.txt`](./requirements-dev.txt) | Development & release dependencies (`bump-my-version`, `pytest`, `pytest-mock`). |
+| [`requirements.txt`](./requirements.txt) | Runtime Python dependencies, **pinned exactly** (`praw==8.0.3`, `prawcore==4.0.0`, ...). |
+| [`requirements-dev.txt`](./requirements-dev.txt) | Development & release dependencies (`bump-my-version`, `pytest`, `pytest-mock`), pinned exactly. |
 
 There is **no** `pyproject.toml` / `setup.py`: the package is not installable and relies on
-`PYTHONPATH=src` (the Dockerfile sets `PYTHONPATH=/app/src`). There is also **no CI**: no `.github/`
-directory exists, and nothing runs the tests automatically.
+`PYTHONPATH=src` (the Dockerfile sets `PYTHONPATH=/app/src`).
 
 ---
 
@@ -191,12 +201,13 @@ Store these in `.env` for local development or production:
 | `POSTGRES_PASSWORD` | String | *(none; required if no `DATABASE_URL`)* | Same as above. Compose falls back to `racb_secure_password`; change it. |
 | `POSTGRES_HOST` | String | `localhost` | Used only when building the URL from parts. |
 | `POSTGRES_PORT` | String | `5432` | Used only when building the URL from parts. |
-| `DB_SSLMODE` | String | auto | libpq `sslmode`. If unset: `disable` when the URL contains `@db:`, `@localhost:`, `@127.0.0.1:` **or `DEBUG` is true**, otherwise `prefer`. Compose sets `disable`. |
+| `DB_SSLMODE` | String | auto | libpq `sslmode`. If unset: `disable` when the URL contains `@db:`, `@localhost:` or `@127.0.0.1:`, otherwise `prefer`. Compose sets `disable`. |
 | `DEBUG` | Boolean (`True`/`False`) | `False` | Debug mode toggle. Sets logging to `DEBUG`, disables catch-all exception swallow. See side effects below. |
 | `LISTEN_ONLY` | Boolean (`True`/`False`) | `False` | When `True`, disables Phase 3 crossposting while retaining stream listening and Phase 2 filtering. |
+| `DRY_RUN` | Boolean (`True`/`False`) | `False` | When `True`, nothing is written to Reddit: auxiliary replies, crossposts and cleanup deletions are only logged with a `[DRY RUN]` prefix. The database is still written to, but Phase 3 keeps the rows it would have crossposted. |
 | `COMMENT_SCORE_THRESHOLD` | Integer | `1` (`.env.example`: `30`) | Minimum upvote score a comment must have to survive Phase 2 and be crossposted in Phase 3. |
 | `PHASE2_WAITING_PERIOD` | Time string | `2 hours` | Time duration before Phase 2 checks a comment (parsed via `pytimeparse`, e.g. `2 hours` or `1 day`). |
-| `PHASE3_WAITING_PERIOD` | Time string | `3 months` | Time duration before Phase 3 executes the crosspost (e.g. `3 months` or `90 days`). The raw string is also inserted verbatim into the public crosspost reply. |
+| `PHASE3_WAITING_PERIOD` | Time string | `90 days` | Time duration before Phase 3 executes the crosspost (e.g. `3 months` or `90 days`). The public crosspost reply shows it as a localized whole number of days. |
 | `LOG_DIR` | Path | `logs` | Directory for `app.log` (relative to the CWD; `/app/logs` in Docker, mounted on volume `racb_logs`). |
 | `PASSWORD` | String | | Account password for `AutoCrosspostBot`. |
 | `APP_CLIENT_SECRET` | String | | App client secret for `AutoCrosspostBot`. |
@@ -207,27 +218,23 @@ Store these in `.env` for local development or production:
 | `PASSWORD__SAME_POST` | String | | Account password for `same_post_bot`. |
 | `APP_CLIENT_SECRET__SAME_POST` | String | | App client secret for `same_post_bot`. |
 
-### Parsing caveats
-- **Booleans** are parsed by three different helpers. `main.env_bool` and `db.env_bool` accept
-  `true/1/yes/y/t` (case-insensitive). `phase3.exec_crosspost` accepts only `true/1`.
-- **Time strings:** `pytimeparse` does **not** understand months. `timeparse('3 months')` returns `None`.
-  Phase 3 then silently falls back to 90 days, so the shipped default works only by accident: `6 months`
-  would also become 90 days. Use days or weeks (`180 days`, `26 weeks`).
-- **`PHASE2_WAITING_PERIOD=0 seconds`** silently becomes 2 hours, because Phase 2 uses
-  `timeparse(...) or 7200` and `0` is falsy. Phase 3 checks `is None` correctly.
-- **`.env` loading order:** `dotenv.load_dotenv()` runs lazily, inside the first `get_reddit_instance()`
-  call. `configure_logging()` runs **before** that, so outside Docker `DEBUG` and `LOG_DIR` from `.env`
-  do not affect logging. Export them in the shell instead. Docker uses `env_file`, so it is unaffected.
+### Parsing rules (`src/racb/config.py`)
+- **Booleans:** `true/1/yes/y/t`, case-insensitive, via `config.env_bool()`. Anything else is false.
+- **Durations:** `config.parse_duration()` accepts everything `pytimeparse` does (`2 hours`, `90 days`,
+  `1w 2d`) plus `N month(s)` (30 days each) and `N year(s)` (365 days each). An unparseable value logs a
+  WARNING and falls back to the default. `0 seconds` is respected as zero.
+- **`.env` loading:** `main()` calls `config.load_environment()` first, before logging is configured, so
+  `DEBUG` and `LOG_DIR` from `.env` apply outside Docker too. Existing environment variables always win
+  over `.env`.
 
 ### `DEBUG=True` side effects (do not enable in production)
-- Calls `schedule.run_all()` at startup, which runs cleanup, Phase 2 **and Phase 3 (real crossposts)** immediately.
-- Any exception in the main loop crashes the process instead of being retried.
+- Runs Phase 2 once at startup. Cleanup and Phase 3, which write to Reddit, keep their normal schedule.
+- Errors in comment handling, scheduled jobs and the stream loop are re-raised, which crashes the process.
 - `add_comment` and `exec_crosspost` re-raise instead of logging.
-- Disables TLS to the database when `DB_SSLMODE` is unset, even for remote hosts.
 
 ### `LISTEN_ONLY=True` is **not** a dry run
 It only skips scheduling Phase 3. The 3 auxiliary bots **still post public replies** from Phase 1, and the
-cleanup job **still deletes** submissions. There is no flag that makes the bot fully read-only.
+cleanup job **still deletes** submissions. Use `DRY_RUN=True` for a fully read-only run.
 
 ---
 
@@ -281,26 +288,22 @@ cleanup job **still deletes** submissions. There is no flag that makes the bot f
    ```bash
    python -m racb --only-phase2
    ```
-   Every invocation, including `--only-phase2` and `--help`, first runs `authenticate_all_bots()`. That
+   Every invocation except `--help`, including `--only-phase2`, first runs `authenticate_all_bots()`. That
    needs network access and valid credentials for **all 4** accounts, and exits with code 1 otherwise.
 
 ### Testing
 ```bash
-# Unit tests only (fast, fully mocked, no network or DB). Use this by default.
-pytest -m unit
+# Unit tests only (fast, fully mocked, no network or DB). pytest.ini makes this the default.
+pytest
 
 # Live integration tests: post REAL content to Reddit as the bot accounts.
 pytest -m integration
 ```
 
-> [!CAUTION]
-> A bare `pytest` collects **all 71 tests**, including the 10 live integration tests, because `pytest.ini`
-> does not deselect them. Always pass `-m unit` unless you intend to post to Reddit.
-
 - The integration tests need valid credentials for all 4 bots. They use the private test subreddits
   `r/racb_test_1` (source) and `r/racb_test_2` (target), both in `SUB_BLACKLIST` so production ignores them.
-- `DISABLE_CLEANUP = True` is currently committed at the top of the integration test file, so test posts
-  and comments are **left on Reddit**. Remove them with:
+- They delete what they create. Set `RACB_KEEP_TEST_ARTIFACTS=true` to keep posts and comments for
+  debugging (this sets `DISABLE_CLEANUP` in the test file). Remove leftovers with:
   ```bash
   python scripts/cleanup_test_history.py --dry-run   # preview
   python scripts/cleanup_test_history.py --limit 0   # delete all matching items
@@ -316,6 +319,8 @@ pytest -m integration
 - Format: `YYYY-MM-DD HH:MM:SS [LEVEL   ] module.name: message`, sent to stderr and to
   `$LOG_DIR/app.log` (rotating, 5 x 5 MB).
 - The `prawcore`, `urllib3.connectionpool` and `schedule` loggers are **disabled entirely**, which also hides prawcore's rate-limit messages.
+- `[DRY RUN]` lines show writes that `DRY_RUN` suppressed. `Skipping comment ... after Reddit error` lines
+  show per-comment failures (e.g. a bot banned from a subreddit) that no longer interrupt the stream.
 - A heartbeat line (`[Heartbeat] Last ~10m: scanned N comments ...`) is logged every 10 minutes by `StreamMetrics`. It is the quickest health and throughput signal.
 
 ### Release & Semantic Versioning Workflow
@@ -340,13 +345,14 @@ We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Change
 When run, `bump-my-version` updates [`src/racb/version.py`](./src/racb/version.py), updates [`CHANGELOG.md`](./CHANGELOG.md), generates a git commit, and tags the release with `vX.Y.Z`. Push commits and tags to GitHub with `git push --follow-tags`.
 
 Mechanics worth knowing:
-- `allow_dirty = false`: **commit your change first** (including the `## [Unreleased]` CHANGELOG entry).
-  Then run the bump, which makes its own `chore(release): bump version X -> Y` commit and an annotated tag.
+- Bump on `master`, after the feature branch is merged (rule 5 in section 10), never on a feature branch.
+- `allow_dirty = false`: the working tree must be clean. The bump makes its own
+  `chore(release): bump version X -> Y` commit and an annotated tag.
 - The CHANGELOG edit is a plain string replacement: `## [Unreleased]` becomes `## [Unreleased]` followed
   by `## [X.Y.Z] - YYYY-MM-DD`. Whatever sat under Unreleased moves into the new version, so the
   `## [Unreleased]` heading must exist exactly once.
-- The version also appears in every PRAW User-Agent (`linux:<bot>:v<version> (by /u/orqa)`). The image
-  downloader in `duplicate_detector.py` hardcodes its own `RACB/2.2` string, which bumps do not update.
+- The version also appears in every PRAW User-Agent (`linux:<bot>:v<version> (by /u/orqa)`) and in the
+  image downloader's User-Agent (`RACB/<version> (+github URL)`).
 
 ### Critical Implementation Details & Gotchas
 - **PRAW Native Rate Limiting:**
@@ -358,9 +364,12 @@ Mechanics worth knowing:
   Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](./src/racb/core/db.py).
 - **Batch Comment Processing in Phase 2:**
   To adhere to Reddit API rate limits (100 QPM), Phase 2 fetches up to 100 comments per request using `reddit.info(fullnames=...)`. Do not revert to individual per-comment HTTP requests.
-- **Dependencies are unpinned** (`>=` only, no lockfile). A fresh install currently resolves **PRAW 8.x
-  and prawcore 4.x**, two major versions newer than the `praw>=7.7.1` floor suggests. Every Docker rebuild
-  can pull a new major version.
+- **Dependencies are pinned exactly** so that a Docker rebuild cannot pull an untested major version.
+  Upgrade them deliberately (Dependabot opens monthly PRs) and run the unit tests.
+- **Image duplicate matching** (`duplicate_detector.fingerprints_match`) needs both a whole-image dhash
+  distance ≤ `DEFAULT_HASH_THRESHOLD` (5) **and** every cell of a 4×4 grid within
+  `DEFAULT_REGION_HASH_THRESHOLD` (10). The grid check stops different memes made from the same template
+  from matching, but it also rejects rotated reposts. Downloads larger than `MAX_IMAGE_BYTES` (20 MB) are skipped.
 
 ---
 
@@ -370,22 +379,29 @@ Defined in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql
 
 | Object | Definition |
 | :--- | :--- |
-| `scraped_comments` | `id SERIAL PK`, `permalink VARCHAR(600) NOT NULL`, `scraped_time TIMESTAMP` (no time zone), `phase2_checked BOOLEAN NOT NULL DEFAULT FALSE`. Index on `scraped_time`. **No unique constraint** on `permalink`, and the target subreddit is not stored. |
-| `v_scraped_comments` | `scraped_comments.*` plus `time_since_scraped = CURRENT_TIMESTAMP - scraped_time`. |
-| `insert_scraped_comment(varchar)` | Inserts with `scraped_time = CURRENT_TIMESTAMP`. |
-| `get_comments_older_than(interval)` | Rows where `time_since_scraped > t`, regardless of `phase2_checked` (Phase 3). |
+| `scraped_comments` | `id SERIAL PK`, `permalink VARCHAR(600) NOT NULL`, `scraped_time TIMESTAMP` (no time zone), `phase2_checked BOOLEAN NOT NULL DEFAULT FALSE`, `target_subreddit VARCHAR(32)` (NULL for pre-v2.3 rows). Index on `scraped_time`. **No unique constraint** on `permalink`. |
+| `v_scraped_comments` | `scraped_comments.*` plus `time_since_scraped = LOCALTIMESTAMP - scraped_time`. For humans; the functions query the table directly. |
+| `insert_scraped_comment(varchar, varchar)` | `(permalink, target_subreddit)`; inserts with `scraped_time = LOCALTIMESTAMP`. |
+| `get_comments_older_than(interval)` | `(id, permalink, scraped_time, target_subreddit)` where `scraped_time < LOCALTIMESTAMP - t`, regardless of `phase2_checked` (Phase 3). |
 | `get_unchecked_comments_older_than(interval)` | The same with `phase2_checked = false` (Phase 2). |
 | `set_comment_checked(int)` / `delete_scraped_comment(int)` | Mark checked / delete by `id`. |
 
 Behavior to be aware of:
 - The script runs on **every new connection** (`db.get_connection()` reconnects whenever the cached
-  connection is closed). Each run re-adds the legacy column `score_checked` and then drops it again,
-  which permanently consumes one PostgreSQL attribute number. See defect D1 in section 9.
-- The age predicate (`CURRENT_TIMESTAMP - scraped_time > t`) cannot use the `scraped_time` index.
-- psycopg2 runs in its default non-autocommit mode, and the read helpers never commit. The single shared
-  connection therefore stays *idle in transaction* after a read until the next write commits. Because
-  `CURRENT_TIMESTAMP` is the **transaction start** time, an insert made inside such a lingering transaction
-  is stamped with the time of the earlier read, not the time of the insert.
+  connection is closed or `db.reset_connection()` was called), so it must stay idempotent. In particular,
+  **never ADD then DROP a column**: PostgreSQL never reuses a dropped column's attribute number, and a table
+  may only ever have 1600. Before v2.3 the script did exactly that on every run; it would have failed for
+  good after about 1595 connections.
+- Existing deployments keep the attribute numbers already used. To check the headroom:
+  ```sql
+  SELECT max(attnum) FROM pg_attribute WHERE attrelid = 'scraped_comments'::regclass;
+  ```
+  If it is ever close to 1600, rebuild the table (`CREATE TABLE ... AS SELECT`, recreate the index, swap names).
+- To change a function's signature or return type, `DROP FUNCTION IF EXISTS` the old signature first.
+  `CREATE OR REPLACE` cannot change either.
+- The age predicates compare the bare `scraped_time` column with a constant, so the index is used.
+- Connections use **autocommit**, so every stored-procedure call is its own transaction. No session sits
+  *idle in transaction*, and `LOCALTIMESTAMP` is the time of the call.
 
 ---
 
@@ -397,59 +413,72 @@ Behavior to be aware of:
 | Heartbeat log | 10 min | `metrics.log_heartbeat` |
 | Phase 2 | 20 min | `phase2.filter_comments_from_db` |
 | Phase 3 (skipped if `LISTEN_ONLY`) | 6 min | `phase3.process_comment_entries` |
+| Inbox feedback (all 4 bots) | 10 min | `inbox.process_unread_inboxes` |
 
-`main_loop()` drains one batch from the comment stream, then one from the inbox stream, then calls
-`schedule.run_pending()`. Both streams use `pause_after=-1`. In PRAW this makes the generator yield `None`
-after **every** request and **never sleep**, so the loop polls continuously. Only prawcore's rate limiter
-throttles it, and the inbox polling consumes part of the same request budget as the `r/all` stream.
+All jobs except the heartbeat are wrapped in `main.run_job_safely()`. It logs a failing job's exception
+instead of propagating it. This matters because `schedule` computes `next_run` only after a job returns
+normally, so a raising job would re-run on every loop iteration. It also calls `db.reset_connection()` on
+DB connection errors.
 
-Every exception from Phase 1, the inbox or a scheduled job propagates out of `main_loop()` into `handle_exception()`:
-- Retried after a 30 s sleep, followed by **re-creating both streams** with `skip_existing=True` (comments
-  posted meanwhile are never seen): `ServerError`, `Forbidden`, `requests.ConnectTimeout`, and prawcore
-  `RequestException` wrapping a urllib3 `MaxRetryError`/`ReadTimeoutError`. Types are matched with
-  `type(e) in (...)`, i.e. **exact type, not subclasses**.
-- Logged and the streams re-created without a sleep: `RedditAPIException` containing `DELETED_COMMENT`, `THREAD_LOCKED`, `SOMETHING_IS_BROKEN` or `RATELIMIT`.
-- Anything else, e.g. `TooManyRequests`, `NotFound` or `psycopg2.OperationalError`, **crashes the process**.
-  Docker's `restart: unless-stopped` then restarts it, which re-authenticates all 4 bots and opens a new DB
-  connection (see section 6).
-- With `schedule`, a job that raises is **not rescheduled**: `Job.run()` sets `next_run` only after the job
-  succeeds. A job that keeps failing is therefore retried on every loop iteration.
+`main_loop()` drains one batch from the comment stream, then calls `schedule.run_pending()`. The stream uses
+`pause_after=-1`. In PRAW this makes the generator yield `None` after **every** request and **never sleep**,
+so the loop polls continuously, throttled only by prawcore's rate limiter.
+
+Errors are handled in three layers:
+
+```mermaid
+flowchart TD
+    C["phase1.handle_incoming_comment(comment)"] -->|raises| S{"handle_comment_safely()"}
+    S -->|"network error\n(ServerError, RequestException,\nTooManyRequests, requests errors)"| H
+    S -->|"DB connection error"| R["reset DB connection,\nskip comment"]
+    S -->|"other Reddit / PRAW error\n(e.g. 403 bot banned)"| K["log INFO, skip comment"]
+    S -->|"anything else"| L["log with traceback, skip comment"]
+    F["stream fetch"] -->|raises| H{"handle_exception()"}
+    H -->|"TooManyRequests"| W60["sleep 60 s"]
+    H -->|"network error or Forbidden"| W30["sleep 30 s"]
+    H -->|"DB connection error"| WDB["reset DB, sleep 30 s"]
+    H -->|"graceful RedditAPIException"| N["no sleep"]
+    W60 & W30 & WDB & N --> RS["re-create stream\n(skip_existing=True)"]
+    H -->|"anything else"| X["crash; Docker restarts"]
+```
+
+- Matching uses `isinstance`, so subclasses are covered.
+- With `DEBUG=True`, every layer re-raises.
+- A stream reset uses `skip_existing=True`, so comments posted during the outage are never seen.
 
 Rule for new code (reinforcing rule 3 in section 10): catch per-item errors **inside** the per-comment or
-per-row handler. Letting them reach `handle_exception()` costs a stream reset, and possibly a 30 s stall or a crash.
+per-row handler. Only network-level failures should reach `handle_exception()`.
 
 ---
 
 ## 8. Repository & Deployment Gotchas
 
-- **`.gitignore` ignores every dotfile** (`.*`) except `.env.example`, `.gitignore` and `.bumpversion.toml`.
-  Any new dotfile is silently ignored until you add a `!` exception: `.github/` (CI, Dependabot),
-  `.dockerignore`, `.pre-commit-config.yaml`, `.claude/`. Check with `git check-ignore -v <path>`.
-- **There is no `.dockerignore`.** `COPY . .` therefore bakes `.env` (all 4 account passwords and
-  secrets), `.git/` and `tests/` into the image. Never push this image to a registry as-is.
+- **`.gitignore` ignores every dotfile** (`.*`) except `.env.example`, `.gitignore`, `.bumpversion.toml`
+  and `.github/`. Any other new dotfile (`.dockerignore`, `.pre-commit-config.yaml`, `.claude/`, ...)
+  is silently ignored until you add a `!` exception. Check with `git check-ignore -v <path>`.
+- **There is no `.dockerignore`.** `COPY . .` bakes `.env`, `.git/` and `tests/` into the image. Baking
+  `.env` in is the owner's choice. At runtime, Compose's `env_file: .env` already supplies the variables,
+  and `load_dotenv()` never overrides existing ones, so the baked copy is only a fallback. Never push
+  this image to a registry, because it contains all 4 account passwords and secrets.
 - The container runs as root and has no `HEALTHCHECK` for the bot service (only `db` has one).
 - `deploy/cloud-init.yaml` adds **every** account under `/home` to the `docker` group (root-equivalent)
-  and makes `/opt` group-writable. It installs Docker only; cloning and starting the bot is manual.
-- Python versions: the Docker image uses 3.11, README says "3.10+", and the unit tests also pass on 3.13.
+  and makes `/opt` group-writable. This is deliberate, for the GCP web-SSH workflow on a single-admin VM;
+  do not reuse it on a shared machine. It installs Docker only; cloning and starting the bot is manual.
+- Python versions: the Docker image and CI use 3.11, README says "3.10+", and the unit tests also pass on 3.13.
 
 ---
 
-## 9. Known Defects (verified against v2.2.4)
+## 9. Known Limitations & Open Questions
 
-| ID | Severity | Defect |
-| :--- | :--- | :--- |
-| D1 | **Critical** | `instantiate_db.sql` adds `score_checked` and then drops it on every new DB connection. Dropped columns keep their attribute number forever. Reproduced on PostgreSQL 16: run 1595 fails with `tables can have at most 1600 columns`. After that the bot cannot reach its DB until the table is rebuilt. `VACUUM FULL` does not reclaim the numbers. |
-| D2 | High | Cleanup deletes submissions with `score < 0`. Reddit floors submission scores at 0, so this most likely never fires. The public crosspost reply still promises *"I'll remove posts with negative scores."* |
-| D3 | High | Bait-and-switch: the target is re-parsed from the **current** comment body in Phases 2 and 3. Someone can earn upvotes with `r/aww`, edit the comment to `r/anything_else`, and the bot crossposts there carrying the old score. |
-| D4 | High | `Forbidden` (typically the bot being banned from the subreddit it replied in) is treated as a network error. It costs a 30 s sleep and a stream reset with comments lost. |
-| D5 | High | The English, Hebrew and totallynotrobots crosspost replies claim *"I checked on repostsleuth.com"*. RepostSleuth integration was removed in 2.2.1. |
-| D6 | Medium | `PHASE3_WAITING_PERIOD=3 months` cannot be parsed and falls back to 90 days. `PHASE2_WAITING_PERIOD=0 seconds` becomes 2 hours (section 4). |
-| D7 | Medium | `phase1.get_posts_with_same_content` catches `prawcore.exceptions.Redirect` and treats it as "exists, no duplicates". The later string check for `'Redirect to /subreddits/search'` is dead code. If Reddit answers a search on a nonexistent subreddit with a redirect rather than a 404, `sub_doesnt_exist_bot` never fires and the row is stored. |
-| D8 | Medium | Phase 3 is not idempotent, and duplicate rows for the same submission and target are possible (no unique key). If the reply fails after a successful crosspost, the result is reported as a failed crosspost. |
-| D9 | Medium | The `sub_doesnt_exist_bot` reply body uses the source subreddit's language, but `get_suffix()` uses the **target** (nonexistent) subreddit's language, producing mixed-language replies in localized subreddits. |
-| D10 | Medium | The inbox stream is polled continuously, but both handlers are no-ops. The footer invites "Good bot/Bad bot" replies that nothing reads. |
-| D11 | Low | Translation bugs: `es` / `de` / `fr` crosspost replies contain `] (` (a space breaks the Markdown link); the `es` footer has an unclosed `^(`; the `he` footnotes are numbered 1, 2, 2; several typos (`אלול`, `לדכתך`, `hoochgewählten`); and the raw English `PHASE3_WAITING_PERIOD` string is inserted into non-English text. |
-| D12 | Low | `DISABLE_CLEANUP = True` is committed in the integration tests, so every integration run leaves posts on Reddit. |
+| Topic | Status |
+| :--- | :--- |
+| Duplicate crossposts | Phase 3 has no "already crossposted" state, and `permalink` has no unique constraint. A crash between `crosspost()` and the row delete, or two rows for the same submission and target, could crosspost twice, **unless Reddit rejects duplicate crossposts server-side**. The owner believes it does; this is unverified. PRAW sends no `resubmit` flag, and an `ALREADY_SUB`-style rejection is not in `familiar_error_types`, so it would be logged as an unexpected failure. A failure of the reply after a successful crosspost is also reported as a failed crosspost. |
+| Negative-score cleanup | Deletes `AutoCrosspostBot` submissions with `score < 0`. The owner reports that submission scores can go negative; this was not independently confirmed. |
+| Single-threaded Phase 1 | The duplicate search, up to 50 image downloads (6 s timeout each) and the subreddit suggestions all run on the stream loop. A slow call delays reading `r/all`. The heartbeat's "scanned" count is the throughput signal. |
+| Rotated reposts | Not detected as duplicates (see the image-matching note in section 5). |
+| Pre-v2.3 rows | Have `target_subreddit = NULL`, so the bait-and-switch check is skipped for them until they age out (at most one Phase 3 waiting period after upgrading). |
+| Already-consumed column slots | Deployments that ran the pre-v2.3 schema script keep the attribute numbers it used up (section 6). |
+| Inbox feedback replies | Intentionally disabled by the author; feedback is only logged. |
 
 ---
 
@@ -459,6 +488,8 @@ per-row handler. Letting them reach `handle_exception()` costs a stream reset, a
 2. **Follow Existing Style:** Use clean, standard Python style matching the codebase (PEP 8 conventions, explicit error handling with `prawcore.exceptions` and `praw.exceptions.RedditAPIException`).
 3. **Graceful Reddit Exception Handling:** Any newly introduced Reddit API calls must handle potential exceptions (`Forbidden`, `ServerError`, `RedditAPIException`, sub bans, locked threads, deleted comments) without crashing the main loop.
 4. **Localization Awareness:** When adding or modifying bot comments, update translations in [`src/racb/i18n.py`](./src/racb/i18n.py) for all supported languages.
-5. **Mandatory Version Bumping & Changelog Updates:** Every code, configuration, or infrastructure change intended for commit/deployment MUST include updating [`CHANGELOG.md`](./CHANGELOG.md) under `## [Unreleased]` and running `bump-my-version bump patch` (or `minor`/`major`). Never push, release, or deploy without completing the version bump and creating the release tag.
-6. **Never run live integration tests casually:** use `pytest -m unit`. Integration tests post publicly as the real bot accounts.
+5. **Mandatory Changelog Updates & Version Bumping:** Every code, configuration, or infrastructure change MUST add an entry to [`CHANGELOG.md`](./CHANGELOG.md) under `## [Unreleased]` in the same branch. The version bump (`bump-my-version bump patch`, or `minor`/`major`) and its `vX.Y.Z` tag are made **on `master` after merging**, never on a feature branch. A tag on an unmerged branch marks a release that may never ship, and parallel branches would claim the same version number. Never release or deploy without completing the version bump and pushing the tag (`git push --follow-tags`).
+6. **Never run live integration tests casually:** plain `pytest` runs only unit tests. `pytest -m integration` posts publicly as the real bot accounts.
 7. **Keep section 9 current:** when you fix a known defect, delete its row; when you find a new one, add it.
+8. **Read configuration through `src/racb/config.py`:** do not add new `os.environ` reads or boolean/duration parsers elsewhere.
+9. **Every new Reddit write must respect `DRY_RUN`** (see `phase1.reply_as_bot` for the pattern).

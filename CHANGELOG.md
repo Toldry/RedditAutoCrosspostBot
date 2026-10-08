@@ -7,7 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Database Schema Time Bomb:** `instantiate_db.sql` re-added and dropped the legacy `score_checked` column on every database connection. PostgreSQL never reuses dropped column slots, so the table would have stopped accepting the script after ~1595 connections and bricked the bot. The migration is now idempotent; verified against PostgreSQL 16 with fresh and legacy databases.
+- **Bait-and-Switch Crossposts:** The target subreddit is now stored at scrape time (new `target_subreddit` column). Phases 2 and 3 reject comments that were edited to point at a different subreddit (`TARGET_SUBREDDIT_CHANGED`). Rows scraped before this release skip the check.
+- **Stream Disruption on Per-Comment Errors:** Errors while handling a single comment (e.g. `403 Forbidden` because an auxiliary bot is banned from a subreddit) now skip only that comment. Previously they caused a 30-second sleep and a stream reset that dropped comments, or crashed the process.
+- **Exception Matching:** Main-loop error handling now uses `isinstance`, and handles `TooManyRequests` (60-second back-off) and database connection errors (reconnect) instead of crashing.
+- **Failing Scheduled Jobs:** Jobs are wrapped so an exception is logged and the job is rescheduled normally. Previously `schedule` left a failing job overdue, so it re-ran on every loop iteration.
+- **Waiting Period Parsing:** `PHASE3_WAITING_PERIOD=3 months` only worked through a silent 90-day fallback, because `pytimeparse` does not support months; `6 months` also became 90 days. Months and years are now supported, unparseable values log a warning, and `PHASE2_WAITING_PERIOD=0 seconds` is no longer turned into 2 hours.
+- **`.env` Load Order:** `.env` is now loaded before logging is configured, so `DEBUG` and `LOG_DIR` from `.env` apply outside Docker.
+- **Nonexistent Subreddit Detection:** A search redirect to `/subreddits/search` is now recognized as a nonexistent subreddit. It was previously treated as "exists, no duplicates", and the code meant to handle it was unreachable.
+- **Same-Template Meme False Positives:** Duplicate image matching now also requires every cell of a 4×4 region-hash grid to match, so different memes made from the same template no longer count as duplicates. Rotated reposts are no longer matched either.
+- **Crosspost Reply Text:** Removed the false claim that RepostSleuth was checked (that integration was removed in 2.2.1). The waiting period is now shown as a localized number of days instead of the raw English config value.
+- **Translations:** Fixed Markdown links broken by `] (` (es/de/fr), an unclosed superscript in the Spanish footer, Hebrew footnote numbering and typos, and German machine-translation calques (*Pfosten*, *gekreuzt*, *Das Unter*). Added the missing "waited N days" sentence to es/de/fr.
+- **Mixed-Language Replies:** `sub_doesnt_exist_bot` built its footer in the (nonexistent) target subreddit's language instead of the source subreddit's.
+- **Stale Transaction Timestamps:** Database connections now use autocommit, so read calls no longer leave the session idle in a transaction and inserts are stamped with the actual insert time.
+- **Index Use:** Age queries compare `scraped_time` against a constant, so the `scraped_time` index is used.
+
+### Added
+- **`DRY_RUN` Mode:** Logs auxiliary replies, crossposts and cleanup deletions instead of performing them. Phase 3 keeps the rows it would have crossposted.
+- **Inbox Feedback for All Bots:** A scheduled job reads the unread inboxes of all 4 bots every 10 minutes and logs good/bad bot feedback. It replaces the continuous `AutoCrosspostBot`-only inbox stream, which polled without pause and shared the request budget with the `r/all` stream.
+- **`racb.config` Module:** Single place for environment parsing (booleans, durations, flags); it replaces three inconsistent boolean parsers.
+- **CI & Dependabot:** GitHub Actions workflow running the unit tests on Python 3.11, and monthly Dependabot updates. `.github/` is now allowed by `.gitignore`.
+- **Unit Tests:** 33 new tests covering the fixes above (94 unit tests in total).
+
 ### Changed
+- **Pinned Dependencies:** `requirements*.txt` now pin exact, tested versions (a fresh install had already resolved PRAW 8 / prawcore 4).
+- **Default Test Selection:** A bare `pytest` no longer runs the live Reddit integration tests; use `pytest -m integration`.
+- **Integration Test Cleanup:** Integration tests delete what they create again by default; set `RACB_KEEP_TEST_ARTIFACTS=true` to keep it. The live image test no longer expects rotated images to match.
+- **`DEBUG` Mode:** At startup it now runs only Phase 2 immediately, instead of every job including real Phase 3 crossposts and cleanup deletions. It no longer disables TLS for remote databases.
+- **`--help`:** No longer requires authenticating all 4 Reddit accounts.
+- **Image Downloads:** Capped at 20 MB, and sent with an honest `RACB/<version>` User-Agent instead of a spoofed browser string.
+- **Release Rule:** Version bumps and tags now happen on `master` after merge, not on feature branches.
 - **AGENTS.md Audit:** Corrected inaccurate descriptions (Phase 1 decision order, Phase 2 batching savings, inbox/cleanup behavior, rate-limit semantics) and documented previously missing topics: all environment variables with code defaults and parsing caveats, `DEBUG`/`LISTEN_ONLY` side effects, database schema, scheduler and exception-handling semantics, test suite usage (unit vs. live integration), cleanup script, logging, release mechanics, repository/deployment gotchas, and a verified known-defects list.
 
 ## [2.2.4] - 2026-09-05
