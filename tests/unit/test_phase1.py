@@ -1,6 +1,7 @@
 """Unit tests for racb.phases.phase1 module."""
 
 from unittest.mock import patch, MagicMock
+import prawcore
 import pytest
 from racb.phases import phase1
 
@@ -99,4 +100,55 @@ def test_handle_incoming_comment_adds_qualified_recommendation(make_mock_comment
     with patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_res):
         with patch('racb.core.db.add_comment') as mock_db_add:
             phase1.handle_incoming_comment(comment)
-            mock_db_add.assert_called_once_with(comment)
+            mock_db_add.assert_called_once_with(comment, 'target_sub')
+
+
+def make_redirect(path):
+    response = MagicMock()
+    response.headers = {'location': f'https://www.reddit.com{path}'}
+    return prawcore.exceptions.Redirect(response)
+
+
+@pytest.mark.unit
+def test_search_redirect_to_community_search_means_subreddit_does_not_exist(make_mock_comment):
+    comment = make_mock_comment(body='r/doesnotexist')
+    mock_reddit = MagicMock()
+    mock_reddit.subreddit.return_value.search.side_effect = make_redirect('/subreddits/search.json')
+
+    with patch('racb.core.reddit.get_reddit_instance', return_value=mock_reddit):
+        result = phase1.get_posts_with_same_content(comment, 'doesnotexist')
+
+    assert result.unable_to_search is True
+    assert result.unable_to_search_reason == 'SUBREDDIT_DOES_NOT_EXIST'
+
+
+@pytest.mark.unit
+def test_other_search_redirects_are_not_treated_as_nonexistent(make_mock_comment):
+    comment = make_mock_comment(body='r/somesub')
+    mock_reddit = MagicMock()
+    mock_reddit.subreddit.return_value.search.side_effect = make_redirect('/r/somesub/submit')
+
+    with patch('racb.core.reddit.get_reddit_instance', return_value=mock_reddit):
+        result = phase1.get_posts_with_same_content(comment, 'somesub')
+
+    assert result.unable_to_search is False
+
+
+@pytest.mark.unit
+def test_reply_as_bot_dry_run_does_not_reply(make_mock_comment):
+    comment = make_mock_comment()
+    with patch.dict('os.environ', {'DRY_RUN': 'true'}):
+        with patch('racb.phases.phase1.get_comment_with_different_praw_instance') as mock_get_comment:
+            assert phase1.reply_as_bot(comment, 'text', 'same_post_bot') is None
+            mock_get_comment.assert_not_called()
+
+
+@pytest.mark.unit
+def test_nonexistent_subreddit_reply_suffix_uses_source_language(make_mock_comment):
+    comment = make_mock_comment(body='r/nonexistent_sub_xyz', subreddit='ich_iel')
+    with patch('racb.phases.phase1.sub_search.get_matches', return_value=[]):
+        with patch('racb.phases.phase1.reply_as_bot') as mock_reply:
+            phase1.reply_to_nonexistent_target_subreddit_comment(comment, 'nonexistent_sub_xyz')
+    reply_text = mock_reply.call_args.args[1]
+    assert 'Dieser Kommentar wurde von einem Bot geschrieben' in reply_text
+    assert 'THIS COMMENT WAS WRITTEN BY A BOT' not in reply_text

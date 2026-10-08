@@ -1,30 +1,28 @@
 """Phase 3: Final validation and execution of crossposts with localized replies."""
 
 import logging
-import os
 
 import praw
-import pytimeparse
 
 from racb.core import db, reddit
 from racb.phases import phase2
-from racb import i18n
+from racb import config, i18n
 
 logger = logging.getLogger(__name__)
 
 
 def process_comment_entries():
     logger.info('Beginning phase 3 processing...')
-    PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD', '3 months')
-    waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE3_WAITING_PERIOD)
-    if waiting_period_seconds is None:
-        waiting_period_seconds = 90 * 86400
+    waiting_period_seconds = config.phase3_waiting_period_seconds()
 
     comment_entries = db.get_comments_older_than(waiting_period_seconds)
-    logger.info(f'Found {len(comment_entries)} mature comment(s) older than {PHASE3_WAITING_PERIOD} for Phase 3')
+    logger.info(f'Found {len(comment_entries)} mature comment(s) older than {waiting_period_seconds}s for Phase 3')
 
     for comment_entry in comment_entries:
         handle_comment(comment_entry)
+        if config.is_dry_run():
+            # Keep the row so it is still crossposted once DRY_RUN is turned off
+            continue
         db.delete_comment(comment_entry)
     logger.info('Finished phase 3 processing')
 
@@ -50,6 +48,11 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
     result = Result()
     crosspost_title = get_crosspost_title_for_crosspost(source_comment.submission, target_subreddit)
 
+    if config.is_dry_run():
+        logger.info(f'[DRY RUN] Would crosspost {source_comment.submission.permalink} to r/{target_subreddit}')
+        result.failure_reason = 'DRY_RUN'
+        return result
+
     try:
         cross_post = source_comment.submission.crosspost(
             subreddit=target_subreddit,
@@ -71,8 +74,7 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
                 f'Crosspost failed unexpectedly: {e} | Source comment: {source_comment.permalink}',
                 exc_info=True,
             )
-            debug = os.environ.get('DEBUG', '').lower() in ('true', '1')
-            if debug:
+            if config.is_debug():
                 raise
 
     return result
@@ -93,8 +95,7 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
         target_subreddit,
         bot_name=reddit.AUTO_CROSSPOST_BOT_NAME,
     )
-    PHASE3_WAITING_PERIOD = os.environ.get('PHASE3_WAITING_PERIOD', '3 months')
-    timedelta_string = PHASE3_WAITING_PERIOD
+    timedelta_string = i18n.format_duration_in_days(config.phase3_waiting_period_seconds(), target_subreddit)
     if source_comment.author:
         source_comment_author_name = f'/u/{source_comment.author.name}'
     else:

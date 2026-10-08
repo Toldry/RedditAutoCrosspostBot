@@ -10,6 +10,23 @@ import requests
 from racb.core import duplicate_detector
 
 
+@pytest.fixture(autouse=True)
+def clear_fingerprint_cache():
+    """Fingerprints are cached per URL; tests reuse URLs with different image content."""
+    duplicate_detector.compute_image_fingerprint.cache_clear()
+    yield
+    duplicate_detector.compute_image_fingerprint.cache_clear()
+
+
+def make_http_response(content, status_code=200, headers=None):
+    """Builds a real streamed `requests.Response` serving `content`."""
+    response = requests.Response()
+    response.status_code = status_code
+    response.raw = io.BytesIO(content)
+    response.headers.update(headers or {})
+    return response
+
+
 def create_test_image_bytes(color='red', size=(100, 100)):
     """Generates an in-memory PNG image."""
     img = Image.new('RGB', size, color=color)
@@ -32,11 +49,7 @@ def test_is_image_url():
 @pytest.mark.unit
 def test_compute_image_hash_success():
     img_bytes = create_test_image_bytes(color='blue')
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.content = img_bytes
-
-    with patch('requests.get', return_value=mock_resp):
+    with patch('requests.get', return_value=make_http_response(img_bytes)):
         h = duplicate_detector.compute_image_hash('https://i.redd.it/blue.png')
         assert h is not None
         assert isinstance(h, imagehash.ImageHash)
@@ -74,13 +87,7 @@ def test_get_reposts_in_sub_matches_identical_image(make_mock_comment):
     mock_reddit.subreddit.return_value = mock_target_sub
 
     def mock_requests_get(url, **kwargs):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        if 'source' in url:
-            mock_resp.content = img_bytes_1
-        else:
-            mock_resp.content = img_bytes_2
-        return mock_resp
+        return make_http_response(img_bytes_1 if 'source' in url else img_bytes_2)
 
     with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit):
         with patch('requests.get', side_effect=mock_requests_get):
@@ -122,13 +129,7 @@ def test_get_reposts_in_sub_ignores_different_images(make_mock_comment):
     mock_reddit.subreddit.return_value = mock_target_sub
 
     def mock_requests_get(url, **kwargs):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        if 'source' in url:
-            mock_resp.content = buf_source.getvalue()
-        else:
-            mock_resp.content = buf_candidate.getvalue()
-        return mock_resp
+        return make_http_response(buf_source.getvalue() if 'source' in url else buf_candidate.getvalue())
 
     with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit):
         with patch('requests.get', side_effect=mock_requests_get):
@@ -167,4 +168,66 @@ def test_image_variations_hash_distance_within_threshold():
     # Variation 4: Slight rotation (1.5 deg)
     v4 = base_img.rotate(1.5, resample=Image.BICUBIC)
     assert (base_hash - imagehash.dhash(v4)) <= duplicate_detector.DEFAULT_HASH_THRESHOLD
+
+
+def load_sample_image():
+    import os
+    asset_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'test_sample.png')
+    return Image.open(asset_path).convert('RGB')
+
+
+def fingerprint_of(img):
+    return duplicate_detector.ImageFingerprint(imagehash.dhash(img), duplicate_detector.compute_region_hashes(img))
+
+
+def add_meme_captions(img, top_text, bottom_text):
+    from PIL import ImageDraw, ImageFont
+    captioned = img.copy()
+    draw = ImageDraw.Draw(captioned)
+    width, height = captioned.size
+    try:
+        font = ImageFont.truetype('DejaVuSans-Bold.ttf', height // 10)
+    except OSError:
+        font = ImageFont.load_default(size=height // 10)
+    for text, y in ((top_text, height * 0.03), (bottom_text, height * 0.85)):
+        draw.text((width * 0.05, y), text, fill='white', font=font, stroke_width=3, stroke_fill='black')
+    return captioned
+
+
+@pytest.mark.unit
+def test_fingerprints_match_reposted_variations():
+    from PIL import ImageEnhance
+    base_img = load_sample_image()
+    width, height = base_img.size
+    variations = {
+        'resize': base_img.resize((int(width * 0.95), int(height * 0.95))),
+        'brightness': ImageEnhance.Brightness(base_img).enhance(1.08),
+        'low_resolution': base_img.resize((width // 3, height // 3)).resize((width, height)),
+    }
+    for name, variation in variations.items():
+        is_match, _ = duplicate_detector.fingerprints_match(fingerprint_of(base_img), fingerprint_of(variation))
+        assert is_match, f'Expected variation {name!r} to match'
+
+
+@pytest.mark.unit
+def test_fingerprints_reject_same_meme_template_with_different_captions():
+    base_img = load_sample_image()
+    meme_a = add_meme_captions(base_img, 'NOBODY:', 'ABSOLUTELY NOBODY:')
+    meme_b = add_meme_captions(base_img, 'ME AT 3AM', 'FIXING PROD')
+
+    # With DejaVu Sans these two are only ~4 bits apart on the whole-image dhash (a false positive
+    # under the old check); the per-region check must tell them apart regardless of font
+    is_match, _ = duplicate_detector.fingerprints_match(fingerprint_of(meme_a), fingerprint_of(meme_b))
+    assert not is_match
+
+
+@pytest.mark.unit
+def test_download_image_bytes_rejects_oversized_images():
+    oversized = b'x' * (duplicate_detector.MAX_IMAGE_BYTES + 1)
+    with patch('requests.get', return_value=make_http_response(oversized)):
+        assert duplicate_detector.download_image_bytes('https://i.redd.it/huge.png') is None
+
+    declared_oversized = make_http_response(b'x', headers={'Content-Length': str(10 ** 10)})
+    with patch('requests.get', return_value=declared_oversized):
+        assert duplicate_detector.download_image_bytes('https://i.redd.it/huge.png') is None
 

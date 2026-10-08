@@ -17,7 +17,7 @@ translations = {
 --- 
 ^(🤖 este comentario fue escrito por un bot. bip boop 🤖)
 
-^(siéntase bienvenido a responder 'Mal bot' / 'Buen bot', es una retroalimentación útil
+^(no dude en responder 'Mal bot' / 'Buen bot', son comentarios útiles)
 ^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})''',
         'de': '''
 
@@ -64,71 +64,65 @@ I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seein
     
 I waited {timedelta_string}^1 before crossposting in case a human might've wanted to crosspost this themselves.
 
-I also checked on [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^2 before crossposting, to make sure this wasn't already posted before in r/{target_subreddit}.
-
 
 If you think this was a mistake, please downvote the OP; I'll remove posts with negative scores.
 
 ---
 ^(1 - This value was chosen arbitrarily)
 
-^(2 - Might not work for some types of submissions, such as videos)
-
 ''',
         'es': '''
-Publiqué esto de r/{source_subreddit} a r/{target_subreddit} después de ver [este comentario **hecho por humanos** con una votación decente] ({source_comment_permalink}) (score={source_comment_score}), que parece Sugiero que esta publicación también encajaría bien aquí.
-  
-Si cree que esto fue un error, siga adelante y vote en contra; Eliminaré las publicaciones con puntuaciones negativas.
+Compartí esto de r/{source_subreddit} en r/{target_subreddit} después de ver [este comentario **hecho por humanos** con una votación decente]({source_comment_permalink}) (score={source_comment_score}), que parece sugerir que esta publicación también encajaría bien aquí.
+
+Esperé {timedelta_string} antes de compartirlo, por si una persona quería hacerlo por su cuenta.
+
+Si cree que esto fue un error, vote negativo; eliminaré las publicaciones con puntuación negativa.
 ''',
         'de': '''
-Ich habe diesen Pfosten von r/{source_subreddit} nach r/{target_subreddit} gekreuzt, nachdem ich [diesen anständig hoochgewählten und von Menschen gemachten Kommentar] ({source_comment_permalink}) (score={source_comment_score}) gesehen habe und mir dachte, dass dieser Beitrag auch hier gut passen würde.
+Ich habe diesen Beitrag von r/{source_subreddit} nach r/{target_subreddit} gecrosspostet, nachdem ich [diesen ordentlich hochgevoteten, von einem Menschen geschriebenen Kommentar]({source_comment_permalink}) (Score={source_comment_score}) gesehen habe, der nahelegt, dass dieser Beitrag auch hier gut passen würde.
 
-Wenn du der Meinung bist, dass es hier nicht passt, downvote den Post. Ich werde Beiträge mit negativen Ergebnissen entfernen.
+Ich habe {timedelta_string} gewartet, falls ein Mensch das lieber selbst crossposten wollte.
+
+Wenn du der Meinung bist, dass es hier nicht passt, downvote den Post. Ich werde Beiträge mit negativem Score entfernen.
 ''',
         'fr': '''
-J'ai croisé ceci de r/{source_subreddit} à r/{target_subreddit} après avoir vu [ce commentaire  fait par l'homme  décemment voté] ({source_comment_permalink}) (score={source_comment_score}), cela semble suggèrent que cet article conviendrait également ici.
-  
-Si vous pensez que c'était une erreur, allez-y et votez contre; Je supprimerai les messages avec des scores négatifs.
+J'ai crossposté ceci de r/{source_subreddit} vers r/{target_subreddit} après avoir vu [ce commentaire **écrit par un humain** et plutôt bien noté]({source_comment_permalink}) (score={source_comment_score}), qui semble suggérer que cette publication aurait aussi sa place ici.
+
+J'ai attendu {timedelta_string} avant de crossposter, au cas où un humain aurait voulu le faire lui-même.
+
+Si vous pensez que c'était une erreur, votez contre ; je supprimerai les publications ayant un score négatif.
 ''',
         'he': '''
 עשיתי קרוספוסט מ־ r/{source_subreddit} ל־ r/{target_subreddit} אחרי שראיתי את [הקומענט הזה **שנכתב על ידי בן אדם**^1]({source_comment_permalink}) (ניקוד={source_comment_score}), שמרמז כי הפוסט הזה מתאים גם לכאן.
     
-בדקתי ב־ [repostsleuth.com](https://repostsleuth.com/search?postId={source_submission_id})^2 לפני שקריספסטתי, על מנת לוודא שלא כבר קריספסטו את זה ל־ r/{target_subreddit}.
+חיכיתי {timedelta_string}^2 לפני שעשיתי קרוספוסט, למקרה שבן אדם היה רוצה לעשות את זה בעצמו.
 
-בנוסף, חיכיתי {timedelta_string}^2 לפני שקריספסטתי, במקרה ובן אדם היה רוצה לקרספסט את זה בעצמו.
-
-אם לדכתך זו טעות, את.ה מוזמן להצביע־מטה; אסיר פוסטים עם ניקוד שלילי.
+אם לדעתכם זו טעות, אתם מוזמנים להצביע־מטה; אסיר פוסטים עם ניקוד שלילי.
 
 ---
-^(1 - בהנחה ש {source_comment_author_name} בן־אנוש)
+^(1 - בהנחה ש־{source_comment_author_name} בן־אנוש)
 
-^(2 - אלול לא לעבוד בסוגי פוסטים מסוימים, כגון סרטונים.)
-
-^(3 - ערך זה נבחר באקראי)
+^(2 - ערך זה נבחר באקראי)
 
 ''',
         'totallynotrobots': '''
 I CROSSPOSTED THIS FROM r/{source_subreddit} TO r/{target_subreddit} AFTER SEEING [THIS DECENTLY UPVOTED **HUMAN-MADE**^1 COMMENT]({source_comment_permalink}) (SCORE={source_comment_score}), THAT SEEMS TO SUGGEST THAT THIS POST WOULD BE A GOOD FIT HERE TOO.
     
-I CHECKED ON [REPOSTSLEUTH.COM](https://repostsleuth.com/search?postId={source_submission_id})^2 BEFORE CROSSPOSTING, TO MAKE SURE THIS WASN'T ALREADY POSTED BEFORE IN r/{target_subreddit}.
-
-I ALSO WAITED {timedelta_string}^3 BEFORE CROSSPOSTING, TO GIVE OTHER HUMANS A CHANCE TO CROSSPOST THIS THEMSELVES.
+I WAITED {timedelta_string}^2 BEFORE CROSSPOSTING, TO GIVE OTHER HUMANS A CHANCE TO CROSSPOST THIS THEMSELVES.
 
 IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH NEGATIVE SCORES.
 
 ---
 ^(1 - ASSUMING {source_comment_author_name} IS HUMAN)
 
-^(2 - MIGHT NOT WORK FOR SOME TYPES OF SUBMISSIONS, SUCH AS VIDEOS)
-
-^(3 - THIS VALUE WAS CHOSEN ARBITRARILY)
+^(2 - THIS VALUE WAS CHOSEN ARBITRARILY)
 
 ''',
     },
     'THE_USER_WHO_COMMENTED': {
         'en': '''the user who commented''',
         'es': None,
-        'de': '''der Nutzer, der geantwortet hat''',
+        'de': '''der Nutzer, der kommentiert hat''',
         'fr': None,
         'he': '''המשתמש שהגיב''',
         'totallynotrobots': '''THE USER WHO COMMENTED''',
@@ -136,15 +130,15 @@ IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH N
     'THATS_WHERE_WE_ARE': {
         'en': '''Yes, that's where we are.''',
         'es': None,
-        'de': '''Ja, hier sind wir''',
+        'de': '''Ja, da sind wir.''',
         'fr': None,
-        'he': '''כן, זה איפו שאנחנו.''',
+        'he': '''כן, זה איפה שאנחנו.''',
         'totallynotrobots': '''YES, THAT'S WHERE WE ARE.''',
     },
     'NONEXISTENT_SUBREDDIT': {
         'en': '''The subreddit r/{target_subreddit} does not exist.''',
         'es': None,
-        'de': '''Das Unter r/{target_subreddit} existiert nicht''',
+        'de': '''Den Subreddit r/{target_subreddit} gibt es nicht.''',
         'fr': None,
         'he': '''הסאברעדיט r/{target_subreddit} לא קיים.''',
         'totallynotrobots': '''THE SUBREDDIT r/{target_subreddit} DOES NOT EXIST.''',
@@ -176,10 +170,18 @@ IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH N
     'FOUND_POST_WITH_SAME_CONTENT': {
         'en': '''I found [this post]({same_content_post_url}) in r/{target_subreddit} with the same content as the current post.''',
         'es': None,
-        'de': '''Ich habe [diesen Post]({same_content_post_url}) in r/{target_subreddit} gefunden, der den selben Link enthält.''',
+        'de': '''Ich habe [diesen Post]({same_content_post_url}) in r/{target_subreddit} gefunden, der denselben Link enthält.''',
         'fr': None,
-        'he': '''מצאתי את  [הפוסט הזה]({same_content_post_url}) ב־ r/{target_subreddit} עם אותו התוכן כמו הפוסט הנוכחי.''',
+        'he': '''מצאתי את [הפוסט הזה]({same_content_post_url}) ב־ r/{target_subreddit} עם אותו התוכן כמו הפוסט הנוכחי.''',
         'totallynotrobots': '''I FOUND [THIS POST]({same_content_post_url}) IN r/{target_subreddit} WITH THE SAME CONTENT AS THE CURRENT POST.''',
+    },
+    'DURATION_IN_DAYS': {
+        'en': '''{days} days''',
+        'es': '''{days} días''',
+        'de': '''{days} Tage''',
+        'fr': '''{days} jours''',
+        'he': '''{days} ימים''',
+        'totallynotrobots': '''{days} DAYS''',
     },
 }
 
@@ -291,3 +293,10 @@ def get_suffix(subreddit, bot_name):
         suffix_text = suffix_text.format(bot_name=bot_name)
     
     return suffix_text
+
+
+def format_duration_in_days(seconds, subreddit):
+    """Formats a duration as a whole number of days in the subreddit's language."""
+    days = round(seconds / 86400)
+    text = get_translated_string('DURATION_IN_DAYS', subreddit, add_suffix=False)
+    return text.format(days=days)

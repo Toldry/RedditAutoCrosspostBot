@@ -82,3 +82,71 @@ def test_main_startup_auth_failure_exits():
 
     assert excinfo.value.code == 1
     mock_start.assert_not_called()
+
+
+@pytest.mark.unit
+def test_handle_exception_matches_subclasses_and_rate_limits():
+    too_many_requests = prawcore.exceptions.TooManyRequests(MagicMock())
+    with patch('time.sleep') as mock_sleep, patch('racb.main.env_bool', return_value=False):
+        assert handle_exception(too_many_requests) is False
+        mock_sleep.assert_called_once()
+
+
+@pytest.mark.unit
+def test_handle_exception_resets_database_on_connection_error():
+    import psycopg2
+    with patch('time.sleep'), patch('racb.main.env_bool', return_value=False), \
+         patch('racb.main.db.reset_connection') as mock_reset:
+        assert handle_exception(psycopg2.OperationalError('server closed the connection')) is False
+        mock_reset.assert_called_once()
+
+
+@pytest.mark.unit
+def test_handle_comment_safely_skips_comment_on_reddit_error(make_mock_comment):
+    from racb.main import handle_comment_safely
+    forbidden = prawcore.exceptions.Forbidden(MagicMock())
+    with patch('racb.main.phase1.handle_incoming_comment', side_effect=forbidden), \
+         patch('racb.main.env_bool', return_value=False):
+        handle_comment_safely(make_mock_comment())  # must not raise
+
+
+@pytest.mark.unit
+def test_handle_comment_safely_propagates_network_errors(make_mock_comment):
+    from racb.main import handle_comment_safely
+    server_error = prawcore.exceptions.ServerError(MagicMock())
+    with patch('racb.main.phase1.handle_incoming_comment', side_effect=server_error), \
+         patch('racb.main.env_bool', return_value=False):
+        with pytest.raises(prawcore.exceptions.ServerError):
+            handle_comment_safely(make_mock_comment())
+
+
+@pytest.mark.unit
+def test_run_job_safely_swallows_errors_so_job_is_rescheduled():
+    from racb.main import run_job_safely
+    import schedule
+
+    calls = []
+
+    def failing_job():
+        calls.append(1)
+        raise ValueError('boom')
+
+    scheduler = schedule.Scheduler()
+    scheduler.every(10).minutes.do(run_job_safely, failing_job)
+    job = scheduler.jobs[0]
+    with patch.dict('os.environ', {'DEBUG': 'false'}):
+        job.run()
+    assert calls == [1]
+    assert job.should_run is False  # next_run moved 10 minutes ahead instead of staying overdue
+
+
+@pytest.mark.unit
+def test_help_does_not_require_reddit_authentication():
+    from racb.main import main
+    with patch('racb.main.configure_logging'), \
+         patch('racb.core.reddit.authenticate_all_bots') as mock_auth, \
+         patch('sys.argv', ['racb', '--help']), \
+         pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 0
+    mock_auth.assert_not_called()

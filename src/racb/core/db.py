@@ -8,16 +8,11 @@ from pathlib import Path
 import psycopg2
 import psycopg2.extras
 
+from racb.config import env_bool
+
 logger = logging.getLogger(__name__)
 
 SQL_FILE_PATH = Path(__file__).resolve().parent.parent / 'sql' / 'instantiate_db.sql'
-
-
-def env_bool(key, default=False):
-    val = os.environ.get(key)
-    if val is None:
-        return default
-    return str(val).strip().lower() in ('true', '1', 'yes', 'y', 't')
 
 
 def _mask_db_url(url_str):
@@ -50,10 +45,9 @@ def get_db_connection():
             logger.error(err_msg)
             raise ValueError(err_msg)
 
-    debug = env_bool('DEBUG', False)
     sslmode = os.environ.get('DB_SSLMODE')
     if not sslmode:
-        if '@db:' in db_url or '@localhost:' in db_url or '@127.0.0.1:' in db_url or debug:
+        if '@db:' in db_url or '@localhost:' in db_url or '@127.0.0.1:' in db_url:
             sslmode = 'disable'
         else:
             sslmode = 'prefer'
@@ -74,6 +68,10 @@ def get_db_connection():
     for attempt in range(1, max_retries + 1):
         try:
             connection = psycopg2.connect(dsn=db_url, sslmode=sslmode)
+            # Every stored procedure call is its own transaction. Without autocommit, read-only calls
+            # leave the connection idle in a transaction, and CURRENT_TIMESTAMP/LOCALTIMESTAMP inside a
+            # later write would then be the (stale) start time of that lingering transaction.
+            connection.autocommit = True
             logger.info('Database connection established successfully.')
             return connection
         except psycopg2.OperationalError as e:
@@ -106,12 +104,23 @@ def get_connection():
     return _conn
 
 
-def add_comment(comment):
+def reset_connection():
+    """Discards the cached connection so the next call reconnects (used after connection-level errors)."""
+    global _conn
+    if _conn is not None:
+        try:
+            _conn.close()
+        except Exception:
+            pass
+    _conn = None
+
+
+def add_comment(comment, target_subreddit):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             permalink = comment.permalink
-            cur.callproc('insert_scraped_comment', (permalink,))
+            cur.callproc('insert_scraped_comment', (permalink, target_subreddit))
             conn.commit()
     except (psycopg2.errors.InsufficientPrivilege, psycopg2.errors.InFailedSqlTransaction):
         logger.error('Cannot insert row, database transaction failed or permission denied.')

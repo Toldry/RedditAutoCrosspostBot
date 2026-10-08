@@ -44,3 +44,23 @@ def test_integration_cleanup_reddit_objects(monkeypatch):
     cleanup_reddit_objects(mock_sub2)
     mock_sub2.delete.assert_not_called()
 
+
+
+@pytest.mark.unit
+def test_delete_unwanted_submissions_dry_run():
+    sub_negative = MagicMock(score=-2, permalink='/r/test/comments/1/')
+    with patch.dict('os.environ', {'DRY_RUN': 'true'}):
+        with patch('racb.phases.cleanup.get_latest_submissions', return_value=[sub_negative]):
+            cleanup.delete_unwanted_submissions()
+    sub_negative.delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_delete_unwanted_submissions_continues_after_delete_error():
+    import prawcore
+    failing = MagicMock(score=-1, permalink='/r/test/comments/1/')
+    failing.delete.side_effect = prawcore.exceptions.Forbidden(MagicMock())
+    other = MagicMock(score=-1, permalink='/r/test/comments/2/')
+    with patch('racb.phases.cleanup.get_latest_submissions', return_value=[failing, other]):
+        cleanup.delete_unwanted_submissions()
+    other.delete.assert_called_once()

@@ -7,7 +7,7 @@ import prawcore
 
 from racb.constants import SUB_BLACKLIST
 from racb.core import db, reddit, duplicate_detector, sub_search
-from racb import i18n
+from racb import config, i18n
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def handle_incoming_comment(comment, metrics=None):
         return None
 
     logger.info(f'Qualified recommendation match found: https://reddit.com/{comment.permalink} -> r/{target_subreddit}')
-    db.add_comment(comment)
+    db.add_comment(comment, target_subreddit)
     if metrics:
         metrics.record_match()
     return True
@@ -117,7 +117,11 @@ def get_posts_with_same_content(comment, subreddit):
         result.unable_to_search = True
         result.unable_to_search_reason = 'SUBREDDIT_IS_PRIVATE'
         return result
-    except prawcore.exceptions.Redirect:
+    except prawcore.exceptions.Redirect as e:
+        # Reddit answers a search inside a nonexistent subreddit by redirecting to its community search
+        if getattr(e, 'path', '').startswith('/subreddits/search'):
+            result.unable_to_search = True
+            result.unable_to_search_reason = 'SUBREDDIT_DOES_NOT_EXIST'
         return result
     except Exception as e:
         error_message = str(e)
@@ -154,8 +158,7 @@ def reply_to_source_equals_target_comment(source_comment):
         source_subreddit,
         bot_name=reddit.SAME_SUBREDDIT_BOT_NAME,
     )
-    comment2 = get_comment_with_different_praw_instance(source_comment, reddit.SAME_SUBREDDIT_BOT_NAME)
-    return comment2.reply(text)
+    return reply_as_bot(source_comment, text, reddit.SAME_SUBREDDIT_BOT_NAME)
 
 
 def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
@@ -168,9 +171,10 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     text = text.format(target_subreddit=target_subreddit)
 
     matches = sub_search.get_matches(target_subreddit)
-    filtered_matches = [sub for sub in matches if is_subreddit_available(sub)]
+    suggestion_lines = [get_subreddit_suggestion_list_line(sub) for sub in matches]
+    formatted_matches = [line for line in suggestion_lines if line is not None]
 
-    if len(filtered_matches) == 0:
+    if len(formatted_matches) == 0:
         text2 = i18n.get_translated_string(
             'MAYBE_TYPO',
             source_subreddit,
@@ -183,7 +187,6 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
             source_subreddit,
             add_suffix=False,
         )
-        formatted_matches = [get_subreddit_suggestion_list_line(sub) for sub in filtered_matches]
         alternate_subreddits_string = '\n'.join(formatted_matches)
         text2 = text2.format(alternate_subreddits_string=alternate_subreddits_string)
         text = f'{text}\n\n{text2}'
@@ -198,12 +201,12 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
         text3 = text3.format(target_subreddit=target_subreddit)
         text = f'{text}\n\n{text3}'
 
+    # The body above is in the source subreddit's language, so the suffix must be too
     text += i18n.get_suffix(
-        subreddit=target_subreddit,
+        subreddit=source_subreddit,
         bot_name=reddit.SUB_DOESNT_EXIST_BOT_NAME,
     )
-    comment2 = get_comment_with_different_praw_instance(source_comment, reddit.SUB_DOESNT_EXIST_BOT_NAME)
-    return comment2.reply(text)
+    return reply_as_bot(source_comment, text, reddit.SUB_DOESNT_EXIST_BOT_NAME)
 
 
 def is_subreddit_name_length_valid(subreddit_name):
@@ -212,25 +215,20 @@ def is_subreddit_name_length_valid(subreddit_name):
     return NEW_SUBREDDIT_NAME_MINIMUM_LENGTH <= len(subreddit_name) <= NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH
 
 
-def is_subreddit_available(subreddit_name):
-    reddit_instance = reddit.get_reddit_instance()
-    try:
-        sub_obj = reddit_instance.subreddit(subreddit_name)
-        _ = sub_obj.subscribers
-        return True
-    except (prawcore.exceptions.NotFound, prawcore.exceptions.Forbidden, prawcore.exceptions.PrawcoreException, Exception):
-        return False
-
-
 def get_subreddit_suggestion_list_line(subreddit_name):
+    """Formats a suggestion bullet, or returns None if the subreddit is unavailable.
+
+    Fetches the subreddit once and uses it for both the availability check and the details.
+    """
     ret_val = f'* r/{subreddit_name}'
     reddit_instance = reddit.get_reddit_instance()
     try:
         sub_obj = reddit_instance.subreddit(subreddit_name)
+        subscribers = sub_obj.subscribers
         nsfw_str = '**NSFW**, ' if sub_obj.over18 else ''
-        ret_val += f' ({nsfw_str}subscribers: {sub_obj.subscribers:,})'
     except Exception:
-        pass
+        return None
+    ret_val += f' ({nsfw_str}subscribers: {subscribers:,})'
     return ret_val
 
 
@@ -245,7 +243,15 @@ def reply_to_same_content_post_comment(source_comment, target_subreddit, post_wi
         same_content_post_url=post_with_same_content.permalink,
         target_subreddit=target_subreddit,
     )
-    comment2 = get_comment_with_different_praw_instance(source_comment, reddit.SAME_POST_BOT_NAME)
+    return reply_as_bot(source_comment, text, reddit.SAME_POST_BOT_NAME)
+
+
+def reply_as_bot(source_comment, text, bot_name):
+    """Replies to `source_comment` as `bot_name`, or only logs the reply when DRY_RUN is enabled."""
+    if config.is_dry_run():
+        logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {source_comment.permalink}:\n{text}')
+        return None
+    comment2 = get_comment_with_different_praw_instance(source_comment, bot_name)
     return comment2.reply(text)
 
 
