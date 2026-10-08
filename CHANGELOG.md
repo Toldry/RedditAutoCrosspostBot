@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **AGENTS.md Audit:** Corrected inaccurate descriptions (Phase 1 decision order, Phase 2 batching savings, inbox/cleanup behavior, rate-limit semantics) and documented previously missing topics: all environment variables with code defaults and parsing caveats, `DEBUG`/`LISTEN_ONLY` side effects, database schema, scheduler and exception-handling semantics, test suite usage (unit vs. live integration), cleanup script, logging, release mechanics, repository/deployment gotchas, and a verified known-defects list.
+
 ## [2.2.4] - 2026-09-05
 
 ### Added
