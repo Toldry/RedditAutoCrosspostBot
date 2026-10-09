@@ -1,0 +1,28 @@
+# systemd unit: fetches the bot's secrets from Google Secret Manager into memory (/run is a tmpfs),
+# then starts the Docker Compose stack. Install with the steps in deploy/SECRET_MANAGER.md.
+#
+#   sudo systemctl restart racb     # re-fetch secrets, rebuild and restart the stack
+#   sudo systemctl stop racb        # docker compose down
+#   journalctl -u racb              # this unit's output (bot logs: docker compose logs -f bot)
+
+[Unit]
+Description=RedditAutoCrosspostBot (secrets from Secret Manager + Docker Compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/RedditAutoCrosspostBot
+ExecStartPre=/bin/sh /opt/RedditAutoCrosspostBot/deploy/racb-fetch-secrets.sh /run/racb/env
+ExecStart=/usr/bin/docker compose up -d --build --remove-orphans
+ExecStop=/usr/bin/docker compose down
+# Building the image on an e2-micro can take several minutes
+TimeoutStartSec=900
+# Right after boot the metadata server or network may not be ready yet
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

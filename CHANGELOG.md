@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Index Use:** Age queries compare `scraped_time` against a constant, so the `scraped_time` index is used.
 
 ### Added
+- **Secret Manager Deployment:** Added `deploy/SECRET_MANAGER.md`, a step-by-step gcloud guide for storing `.env` in Google Secret Manager. It comes with `deploy/racb-fetch-secrets.sh`, which fetches the secret into memory-only `/run/racb/env`, and `deploy/racb.service`, a systemd unit that fetches secrets and then starts Docker Compose. The guide also covers optional access for Claude Code cloud sessions to run integration tests.
 - **`DRY_RUN` Mode:** Logs auxiliary replies, crossposts and cleanup deletions instead of performing them. Phase 3 keeps the rows it would have crossposted.
 - **Inbox Feedback for All Bots:** A scheduled job reads the unread inboxes of all 4 bots every 10 minutes and logs good/bad bot feedback. It replaces the continuous `AutoCrosspostBot`-only inbox stream, which polled without pause and shared the request budget with the `r/all` stream.
 - **`racb.config` Module:** Single place for environment parsing (booleans, durations, flags); it replaces three inconsistent boolean parsers.
