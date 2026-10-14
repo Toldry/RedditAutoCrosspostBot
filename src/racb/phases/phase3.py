@@ -27,6 +27,28 @@ def process_comment_entries():
     logger.info('Finished phase 3 processing')
 
 
+def process_oldest_entry():
+    """Runs Phase 3 on the oldest DB row only, for testing the bot in production one entry at a time.
+
+    The row is processed even if it is younger than PHASE3_WAITING_PERIOD.
+    As in the scheduled run, the row is deleted afterwards (kept with DRY_RUN).
+    Returns False if the table is empty.
+    """
+    comment_entry = db.get_oldest_comment()
+    if comment_entry is None:
+        logger.info('The scraped_comments table is empty; nothing to process')
+        return False
+    logger.info(f'Processing the oldest entry (id={comment_entry["id"]}, scraped at {comment_entry["scraped_time"]})')
+
+    handle_comment(comment_entry)
+    if config.is_dry_run():
+        logger.info(f'[DRY RUN] Keeping entry id={comment_entry["id"]} in the database')
+    else:
+        db.delete_comment(comment_entry)
+        logger.info(f'Deleted entry id={comment_entry["id"]} from the database')
+    return True
+
+
 def handle_comment(comment_entry):
     logger.info(f'Begin processing comment entry: {comment_entry["permalink"]}')
     result = phase2.run_filters(comment_entry)

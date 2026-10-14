@@ -159,6 +159,14 @@ def set_schedule():
 def parse_args():
     parser = argparse.ArgumentParser(description="RedditAutoCrosspostBot runner")
     parser.add_argument('--only-phase2', action='store_true', help="Run Phase 2 filtering only and exit")
+    parser.add_argument(
+        '--process-one',
+        action='store_true',
+        help=(
+            "Run Phase 3 (final checks, crosspost, reply, row delete) on the oldest DB entry only and exit, "
+            "even if it is not due yet. Combine with DRY_RUN=True to only log."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -180,6 +188,10 @@ def main():
     if args.only_phase2:
         phase2.filter_comments_from_db(verbose=True)
         return
+
+    if args.process_one:
+        found = phase3.process_oldest_entry()
+        sys.exit(0 if found else 1)
 
     start_bot()
 

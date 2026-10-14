@@ -131,6 +131,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
   - Deletes the record from PostgreSQL. This happens **after** the crosspost, and Phase 3 keeps no
     "already crossposted" state (see section 9).
   - With `DRY_RUN`, it logs what it would crosspost and keeps the row.
+  - `python -m racb --process-one` runs this on the oldest row only and exits (section 5).
 - **Maintenance & Feedback:**
   - [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py): Periodically fetches the latest 40 submissions made by `AutoCrosspostBot` and deletes any with score < 0.
     Only submissions are covered. Comments made by any of the 4 bots are never cleaned up. A failed
@@ -289,7 +290,19 @@ cleanup job **still deletes** submissions. Use `DRY_RUN=True` for a fully read-o
    ```bash
    python -m racb --only-phase2
    ```
-   Every invocation except `--help`, including `--only-phase2`, first runs `authenticate_all_bots()`. That
+5. **Process a Single Entry (Production Testing):**
+   ```bash
+   uv run python -m racb --process-one                    # the oldest row in scraped_comments
+   DRY_RUN=True uv run python -m racb --process-one       # same checks, but only logs the crosspost
+   ```
+   Runs Phase 3 (`phase3.process_oldest_entry`) on the row with the earliest `scraped_time` and exits,
+   without the stream or the schedule. The row is processed **even if it is younger than
+   `PHASE3_WAITING_PERIOD`**, but it still has to pass every Phase 2 filter (score threshold included). As in
+   the scheduled run, the row is deleted afterwards whether or not it was crossposted, unless `DRY_RUN` is on,
+   so repeated runs walk through the table oldest first. Exit code 1 means the table is empty.
+   Under Docker Compose, inside the running bot container: `docker compose exec bot python -m racb --process-one`
+   (add `-e DRY_RUN=True` after `exec` for a dry run).
+   Every invocation except `--help`, including `--only-phase2` and `--process-one`, first runs `authenticate_all_bots()`. That
    needs network access and valid credentials for **all 4** accounts, and exits with code 1 otherwise.
 
 ### Testing
@@ -363,7 +376,7 @@ Mechanics worth knowing:
   only controls how long PRAW will **sleep** on a `RATELIMIT` API error ("you are doing that too much")
   before retrying. Up to 300 s of that sleep happens on the single main thread, so the stream stalls meanwhile.
 - **PostgreSQL Stored Procedures:**
-  Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](./src/racb/core/db.py).
+  Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `get_oldest_scraped_comment`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](./src/racb/core/db.py).
 - **Batch Comment Processing in Phase 2:**
   To adhere to Reddit API rate limits (100 QPM), Phase 2 fetches up to 100 comments per request using `reddit.info(fullnames=...)`. Do not revert to individual per-comment HTTP requests.
 - **Dependencies are locked** in `uv.lock`, including transitive ones, so a Docker rebuild cannot pull an
@@ -391,6 +404,7 @@ Defined in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql
 | `insert_scraped_comment(varchar, varchar)` | `(permalink, target_subreddit)`; inserts with `scraped_time = LOCALTIMESTAMP`. |
 | `get_comments_older_than(interval)` | `(id, permalink, scraped_time, target_subreddit)` where `scraped_time < LOCALTIMESTAMP - t`, regardless of `phase2_checked` (Phase 3). |
 | `get_unchecked_comments_older_than(interval)` | The same with `phase2_checked = false` (Phase 2). |
+| `get_oldest_scraped_comment()` | The same columns for the row with the earliest `scraped_time`, regardless of age (`--process-one`). |
 | `set_comment_checked(int)` / `delete_scraped_comment(int)` | Mark checked / delete by `id`. |
 
 Behavior to be aware of:

@@ -150,3 +150,20 @@ def test_help_does_not_require_reddit_authentication():
         main()
     assert excinfo.value.code == 0
     mock_auth.assert_not_called()
+
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('found, expected_exit_code', [(True, 0), (False, 1)])
+def test_process_one_runs_oldest_entry_and_exits(found, expected_exit_code):
+    from racb.main import main
+    with patch('racb.main.configure_logging'), \
+         patch('racb.core.reddit.authenticate_all_bots'), \
+         patch('racb.main.phase3.process_oldest_entry', return_value=found) as mock_oldest, \
+         patch('racb.main.start_bot') as mock_start, \
+         patch('sys.argv', ['racb', '--process-one']), \
+         pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == expected_exit_code
+    mock_oldest.assert_called_once_with()
+    mock_start.assert_not_called()

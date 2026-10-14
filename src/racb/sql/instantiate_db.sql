@@ -73,6 +73,21 @@ END;
 $$
 LANGUAGE plpgsql;
 
+DROP FUNCTION IF EXISTS get_oldest_scraped_comment();
+CREATE OR REPLACE FUNCTION get_oldest_scraped_comment()
+RETURNS
+    TABLE(id INTEGER, permalink VARCHAR, scraped_time TIMESTAMP, target_subreddit VARCHAR)
+AS
+$$
+BEGIN RETURN QUERY
+    SELECT sc.id, sc.permalink, sc.scraped_time, sc.target_subreddit
+    FROM scraped_comments as sc
+    ORDER BY sc.scraped_time, sc.id
+    LIMIT 1;
+END;
+$$
+LANGUAGE plpgsql;
+
 DROP FUNCTION IF EXISTS insert_scraped_comment(VARCHAR);
 DROP FUNCTION IF EXISTS insert_scraped_comment(VARCHAR, VARCHAR);
 CREATE OR REPLACE FUNCTION insert_scraped_comment(new_permalink VARCHAR, new_target_subreddit VARCHAR)
