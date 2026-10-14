@@ -98,7 +98,7 @@ uv lock --upgrade-package praw        # upgrade one package within the bounds in
 uv lock --upgrade                     # upgrade everything
 uv sync                               # apply the lock to .venv
 ```
-Dependabot opens monthly pull requests that do the same.
+There are no automatic dependency-update pull requests; upgrade deliberately with the commands above.
 
 ### Running the Tests
 The unit tests are fully mocked: they need no Reddit credentials, network access or database.

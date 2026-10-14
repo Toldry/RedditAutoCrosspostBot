@@ -171,7 +171,6 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
 | [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. |
-| [`.github/dependabot.yml`](./.github/dependabot.yml) | Monthly Dependabot updates for `pyproject.toml` / `uv.lock` (`uv` ecosystem) and GitHub Actions. |
 | [`examples/example_reddit_comment.py`](./examples/example_reddit_comment.py) | Not executable code: a commented-out attribute dump of a PRAW `Comment` and `Submission`, kept for reference. |
 | [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
 | [`deploy/instance-flags.yaml`](./deploy/instance-flags.yaml) | Declarative Google Cloud CLI flags file for provisioning the Always Free e2-micro instance. |
@@ -367,7 +366,8 @@ Mechanics worth knowing:
 - **Dependencies are locked** in `uv.lock`, including transitive ones, so a Docker rebuild cannot pull an
   untested version. The Dockerfile and CI use `uv sync --locked`, which fails instead of silently
   re-resolving. Change dependencies only with `uv add` / `uv remove` / `uv lock --upgrade-package <name>`,
-  commit `pyproject.toml` and `uv.lock` together, and run the unit tests. Dependabot opens monthly PRs.
+  commit `pyproject.toml` and `uv.lock` together, and run the unit tests. Dependabot is deliberately
+  **disabled** (no `.github/dependabot.yml`); upgrades are manual.
 - **Do not reintroduce `requirements.txt`.** If a tool needs one, generate it with
   `uv export --no-dev --no-hashes -o requirements.txt` rather than maintaining it by hand.
 - **Image duplicate matching** (`duplicate_detector.fingerprints_match`) needs both a whole-image dhash
