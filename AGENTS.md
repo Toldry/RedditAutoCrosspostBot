@@ -57,7 +57,7 @@ flowchart TD
     B -->|Valid Recommendation| F[("PostgreSQL DB\nscraped_comments")]
     
     F --> G["Phase 2: Batch Filter Check\n(src/racb/phases/phase2.py, every 20m)"]
-    G -->|Batch Fetch via reddit.info()| H["Validate Availability & Score"]
+    G -->|"Batch Fetch via reddit.info()"| H["Validate Availability & Score"]
     H -->|Score < Threshold or Invalid| I["DELETE from DB"]
     H -->|Passes Filters| J["Set phase2_checked = true"]
     

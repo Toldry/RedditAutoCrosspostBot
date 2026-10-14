@@ -86,6 +86,38 @@ $env:PYTHONPATH="src"          # Windows PowerShell
 python -m racb
 ```
 
+### Running the Tests
+The unit tests are fully mocked: they need no Reddit credentials, network access or database.
+
+```bash
+# 1. Create and activate a virtual environment (once)
+python -m venv .venv
+source .venv/bin/activate      # Linux/macOS
+.venv\Scripts\Activate.ps1     # Windows PowerShell
+
+# 2. Install runtime and test dependencies
+pip install -r requirements.txt -r requirements-dev.txt
+
+# 3. Run the unit tests (pytest.ini sets PYTHONPATH and skips the live tests)
+pytest
+```
+
+Useful variations:
+```bash
+pytest tests/unit/test_phase1.py   # one file
+pytest -k duplicate                # tests whose name matches "duplicate"
+pytest -x -vv                      # stop at the first failure, verbose output
+```
+
+> [!WARNING]
+> `pytest -m integration` runs the **live** integration tests. They log in as all 4 real bot accounts
+> (credentials from `.env`) and post real submissions and comments in the private test subreddits
+> `r/racb_test_1` and `r/racb_test_2`. They delete what they create; leftovers can be removed with
+> `python scripts/cleanup_test_history.py --dry-run` (preview) and then `--limit 0`.
+
+CI runs the unit tests on Python 3.11 for every pull request and every push to `master`
+(see [`.github/workflows/tests.yml`](./.github/workflows/tests.yml)).
+
 ### Versioning & Releases
 Releases adhere to [Semantic Versioning](https://semver.org/) and are managed with `bump-my-version`:
 ```bash

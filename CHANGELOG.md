@@ -22,12 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mixed-Language Replies:** `sub_doesnt_exist_bot` built its footer in the (nonexistent) target subreddit's language instead of the source subreddit's.
 - **Stale Transaction Timestamps:** Database connections now use autocommit, so read calls no longer leave the session idle in a transaction and inserts are stamped with the actual insert time.
 - **Index Use:** Age queries compare `scraped_time` against a constant, so the `scraped_time` index is used.
+- **AGENTS.md Diagram:** The lifecycle Mermaid diagram failed to render on GitHub, because an unquoted edge label contained parentheses (`reddit.info()`).
 
 ### Added
 - **`DRY_RUN` Mode:** Logs auxiliary replies, crossposts and cleanup deletions instead of performing them. Phase 3 keeps the rows it would have crossposted.
 - **Inbox Feedback for All Bots:** A scheduled job reads the unread inboxes of all 4 bots every 10 minutes and logs good/bad bot feedback. It replaces the continuous `AutoCrosspostBot`-only inbox stream, which polled without pause and shared the request budget with the `r/all` stream.
 - **`racb.config` Module:** Single place for environment parsing (booleans, durations, flags); it replaces three inconsistent boolean parsers.
 - **CI & Dependabot:** GitHub Actions workflow running the unit tests on Python 3.11, and monthly Dependabot updates. `.github/` is now allowed by `.gitignore`.
+- **README Test Instructions:** How to set up a virtual environment, run the unit tests, and what the live integration tests do.
 - **Unit Tests:** 33 new tests covering the fixes above (94 unit tests in total).
 
 ### Changed
