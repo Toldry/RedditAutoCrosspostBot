@@ -148,6 +148,14 @@ def get_unchecked_comments_older_than(num_seconds):
         return comment_entries
 
 
+def get_comment_by_id(comment_id):
+    """Returns the row with this id (regardless of its age), or None if there is none."""
+    conn = get_connection()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.callproc('get_scraped_comment_by_id', (comment_id,))
+        return cur.fetchone()
+
+
 def delete_comment(comment_entry):
     conn = get_connection()
     with conn.cursor() as cur:

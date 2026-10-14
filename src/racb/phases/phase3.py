@@ -27,6 +27,38 @@ def process_comment_entries():
     logger.info('Finished phase 3 processing')
 
 
+def process_single_entry(entry_id=None):
+    """Runs Phase 3 on one DB row, for testing the bot in production one entry at a time.
+
+    With `entry_id`, that row is processed even if it is younger than PHASE3_WAITING_PERIOD.
+    Without it, the oldest row that is already due for Phase 3 is processed.
+    As in the scheduled run, the row is deleted afterwards (kept with DRY_RUN).
+    Returns False if there was no such row.
+    """
+    if entry_id is None:
+        waiting_period_seconds = config.phase3_waiting_period_seconds()
+        comment_entries = db.get_comments_older_than(waiting_period_seconds)
+        if not comment_entries:
+            logger.info(f'No comment entry is older than {waiting_period_seconds}s; nothing to process')
+            return False
+        comment_entry = min(comment_entries, key=lambda ce: ce['scraped_time'])
+        logger.info(f'Processing the oldest due entry (id={comment_entry["id"]}, {len(comment_entries)} due)')
+    else:
+        comment_entry = db.get_comment_by_id(entry_id)
+        if comment_entry is None:
+            logger.error(f'No comment entry with id={entry_id}')
+            return False
+        logger.info(f'Processing entry id={entry_id} (scraped at {comment_entry["scraped_time"]})')
+
+    handle_comment(comment_entry)
+    if config.is_dry_run():
+        logger.info(f'[DRY RUN] Keeping entry id={comment_entry["id"]} in the database')
+    else:
+        db.delete_comment(comment_entry)
+        logger.info(f'Deleted entry id={comment_entry["id"]} from the database')
+    return True
+
+
 def handle_comment(comment_entry):
     logger.info(f'Begin processing comment entry: {comment_entry["permalink"]}')
     result = phase2.run_filters(comment_entry)

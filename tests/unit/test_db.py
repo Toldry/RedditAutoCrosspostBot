@@ -60,3 +60,8 @@ def test_db_operations(make_mock_comment):
         # 5. set_comment_checked
         db.set_comment_checked({'id': 42})
         mock_cursor.callproc.assert_called_with('set_comment_checked', (42,))
+
+        # 6. get_comment_by_id
+        mock_cursor.fetchone.return_value = {'id': 42, 'permalink': '/r/test/'}
+        assert db.get_comment_by_id(42)['id'] == 42
+        mock_cursor.callproc.assert_called_with('get_scraped_comment_by_id', (42,))

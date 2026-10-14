@@ -73,6 +73,20 @@ END;
 $$
 LANGUAGE plpgsql;
 
+DROP FUNCTION IF EXISTS get_scraped_comment_by_id(INTEGER);
+CREATE OR REPLACE FUNCTION get_scraped_comment_by_id(p_id INTEGER)
+RETURNS
+    TABLE(id INTEGER, permalink VARCHAR, scraped_time TIMESTAMP, target_subreddit VARCHAR)
+AS
+$$
+BEGIN RETURN QUERY
+    SELECT sc.id, sc.permalink, sc.scraped_time, sc.target_subreddit
+    FROM scraped_comments as sc
+    WHERE sc.id = p_id;
+END;
+$$
+LANGUAGE plpgsql;
+
 DROP FUNCTION IF EXISTS insert_scraped_comment(VARCHAR);
 DROP FUNCTION IF EXISTS insert_scraped_comment(VARCHAR, VARCHAR);
 CREATE OR REPLACE FUNCTION insert_scraped_comment(new_permalink VARCHAR, new_target_subreddit VARCHAR)

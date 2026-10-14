@@ -84,3 +84,54 @@ def test_reply_to_crosspost_localizes_waiting_period(make_mock_comment):
     assert '90 Tage' in reply_text
     assert '3 months' not in reply_text
     assert 'repostsleuth' not in reply_text.lower()
+
+
+@pytest.mark.unit
+def test_process_single_entry_by_id_ignores_waiting_period_and_deletes_row():
+    entry = {'id': 7, 'permalink': '/r/a/comments/1/t/c/', 'scraped_time': None, 'target_subreddit': 'b'}
+    with patch.dict('os.environ', {'DRY_RUN': 'false'}), \
+         patch('racb.phases.phase3.db.get_comment_by_id', return_value=entry) as mock_get, \
+         patch('racb.phases.phase3.db.get_comments_older_than') as mock_due, \
+         patch('racb.phases.phase3.handle_comment') as mock_handle, \
+         patch('racb.phases.phase3.db.delete_comment') as mock_delete:
+        assert phase3.process_single_entry(7) is True
+    mock_get.assert_called_once_with(7)
+    mock_due.assert_not_called()
+    mock_handle.assert_called_once_with(entry)
+    mock_delete.assert_called_once_with(entry)
+
+
+@pytest.mark.unit
+def test_process_single_entry_without_id_picks_oldest_due_entry():
+    from datetime import datetime
+    newer = {'id': 1, 'permalink': '/x/', 'scraped_time': datetime(2026, 5, 2), 'target_subreddit': 'b'}
+    older = {'id': 2, 'permalink': '/y/', 'scraped_time': datetime(2026, 5, 1), 'target_subreddit': 'b'}
+    with patch.dict('os.environ', {'DRY_RUN': 'false'}), \
+         patch('racb.phases.phase3.db.get_comments_older_than', return_value=[newer, older]), \
+         patch('racb.phases.phase3.handle_comment') as mock_handle, \
+         patch('racb.phases.phase3.db.delete_comment') as mock_delete:
+        assert phase3.process_single_entry() is True
+    mock_handle.assert_called_once_with(older)
+    mock_delete.assert_called_once_with(older)
+
+
+@pytest.mark.unit
+def test_process_single_entry_keeps_row_in_dry_run():
+    entry = {'id': 7, 'permalink': '/r/a/comments/1/t/c/', 'scraped_time': None, 'target_subreddit': 'b'}
+    with patch.dict('os.environ', {'DRY_RUN': 'true'}), \
+         patch('racb.phases.phase3.db.get_comment_by_id', return_value=entry), \
+         patch('racb.phases.phase3.handle_comment') as mock_handle, \
+         patch('racb.phases.phase3.db.delete_comment') as mock_delete:
+        assert phase3.process_single_entry(7) is True
+    mock_handle.assert_called_once_with(entry)
+    mock_delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_process_single_entry_reports_missing_entry():
+    with patch('racb.phases.phase3.db.get_comment_by_id', return_value=None), \
+         patch('racb.phases.phase3.db.get_comments_older_than', return_value=[]), \
+         patch('racb.phases.phase3.handle_comment') as mock_handle:
+        assert phase3.process_single_entry(99) is False
+        assert phase3.process_single_entry() is False
+    mock_handle.assert_not_called()
