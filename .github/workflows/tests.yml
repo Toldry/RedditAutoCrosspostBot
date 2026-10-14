@@ -34,6 +34,8 @@ jobs:
     concurrency:
       group: release
       cancel-in-progress: false
+    outputs:
+      deploy-sha: ${{ steps.head.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,3 +58,62 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           uv run bump-my-version bump ${{ steps.level.outputs.level }}
           git push --follow-tags origin HEAD:master
+      # The release commit if one was made, otherwise the master that was checked out above
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  # Rebuilds and restarts the bot on the VM at the commit the release job ended on, so only tested code
+  # ships. Setup and security model: docs/auto-deploy.md. Off until the AUTO_DEPLOY variable is 'true'.
+  deploy:
+    needs: release
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/master'
+      && vars.AUTO_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # Lets google-github-actions/auth get a GitHub OIDC token, which replaces a stored GCP key
+      id-token: write
+    # One deploy at a time; a newer push waits for the running deploy instead of cancelling it mid-build
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      # SSH reaches the VM through an IAP tunnel, so port 22 never has to be open to the internet.
+      # The key may only run scripts/redeploy.sh (forced command), and the host key is pinned.
+      - name: Configure SSH
+        env:
+          VM_DEPLOY_SSH_KEY: ${{ secrets.VM_DEPLOY_SSH_KEY }}
+          VM_SSH_HOST_KEY: ${{ vars.VM_SSH_HOST_KEY }}
+          VM_NAME: ${{ vars.VM_NAME }}
+          VM_USER: ${{ vars.VM_USER }}
+          GCP_ZONE: ${{ vars.GCP_ZONE }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          install -d -m 700 ~/.ssh
+          (umask 077 && printf '%s\n' "$VM_DEPLOY_SSH_KEY" > ~/.ssh/deploy_key)
+          printf 'racb-vm %s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host racb-vm
+            HostName $VM_NAME
+            User $VM_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            HostKeyAlias racb-vm
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+            ProxyCommand gcloud compute start-iap-tunnel %h 22 --listen-on-stdin --zone=$GCP_ZONE --project=$GCP_PROJECT_ID --verbosity=warning
+          EOF
+      # The forced command receives the SHA as SSH_ORIGINAL_COMMAND
+      - name: Deploy
+        env:
+          DEPLOY_SHA: ${{ needs.release.outputs.deploy-sha }}
+        run: |
+          # shellcheck disable=SC2029 # expanding the SHA on this side is the point
+          ssh racb-vm "$DEPLOY_SHA"

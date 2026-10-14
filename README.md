@@ -147,6 +147,8 @@ You can run this bot 100% free on Google Cloud's Always Free `e2-micro` tier:
    ```
 2. The VM will automatically execute [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) on first boot, provisioning 2GB swap space, Docker, and Docker Compose.
 3. See [`AGENTS.md`](./AGENTS.md) for architecture details.
+4. Optionally, have every push to `master` that passes the tests redeploy the VM automatically: see
+   [`docs/auto-deploy.md`](./docs/auto-deploy.md) for the one-time setup.
 
 ---
 
