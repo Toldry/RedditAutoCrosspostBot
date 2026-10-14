@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-10-14
+
 ### Changed
 - **Shorter Crosspost Reply:** The reply on each crosspost no longer says how long the bot waited before crossposting, no longer asks readers to downvote the post if it was a mistake, and drops the "This value was chosen arbitrarily" footnote, in every language. Negative-score crossposts are still removed.
 
