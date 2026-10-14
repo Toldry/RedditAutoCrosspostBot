@@ -20,3 +20,39 @@ jobs:
       - run: uv sync --locked
       # pytest.ini deselects the live integration tests by default
       - run: uv run pytest
+
+  # Releases every push to master that passed the tests: picks the bump from the Conventional
+  # Commit types since the last tag (scripts/release_level.py), then bump-my-version moves
+  # CHANGELOG.md's [Unreleased] entries into a dated section, commits and tags. Nobody bumps by hand.
+  release:
+    needs: unit-tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Queue releases instead of running two at once; a queued run sees the previous run's tag
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The latest master, not the pushed SHA: an earlier queued run may have added a release commit
+          ref: master
+          # Full history and tags, to find the commits since the last release
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          # Keep in sync with the Dockerfile
+          version: '0.11.32'
+          enable-cache: true
+      - run: uv sync --locked
+      - id: level
+        run: echo "level=$(uv run python scripts/release_level.py)" >> "$GITHUB_OUTPUT"
+      # Pushes made with GITHUB_TOKEN do not trigger workflows, so this cannot loop
+      - if: steps.level.outputs.level != 'none'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          uv run bump-my-version bump ${{ steps.level.outputs.level }}
+          git push --follow-tags origin HEAD:master

@@ -167,20 +167,21 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/locales/`](./src/racb/locales/) | gettext catalogs: `<locale>/LC_MESSAGES/messages.po` (edited) and `messages.mo` (compiled, committed). Locales: `en` (source text), `es`, `de`, `fr`, `he`, and `en@totallynotrobots`, an English variant using the gettext `@modifier` syntax. |
 | [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
+| [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether CHANGELOG `[Unreleased]` has entries. |
 | [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run` and `--limit N` (`0` means all). |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 108 mocked unit tests (`@pytest.mark.unit`), one file per module. |
+| [`tests/unit/`](./tests/unit/) | 124 mocked unit tests (`@pytest.mark.unit`), one file per module. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
-| [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. |
+| [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. On `master`, a `release` job then bumps the version and tags it (section 5). |
 | [`.github/dependabot.yml`](./.github/dependabot.yml) | Dependabot config for `pyproject.toml` / `uv.lock` (`uv` ecosystem) and GitHub Actions. Version updates are **paused** with `open-pull-requests-limit: 0`; delete those lines to resume monthly PRs. |
 | [`examples/example_reddit_comment.py`](./examples/example_reddit_comment.py) | Not executable code: a commented-out attribute dump of a PRAW `Comment` and `Submission`, kept for reference. |
 | [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
 | [`deploy/instance-flags.yaml`](./deploy/instance-flags.yaml) | Declarative Google Cloud CLI flags file for provisioning the Always Free e2-micro instance. |
 | [`Dockerfile`](./Dockerfile) | Lightweight Python 3.11 container image definition. |
 | [`docker-compose.yml`](./docker-compose.yml) | Multi-container stack definition (PostgreSQL 15 + Python bot worker). |
-| [`.bumpversion.toml`](./.bumpversion.toml) | Configuration for `bump-my-version` automation. |
+| [`.bumpversion.toml`](./.bumpversion.toml) | Configuration for `bump-my-version`, which the CI `release` job runs. |
 | [`.gitignore`](./.gitignore) | Ignores **all dotfiles** (`.*`) except an explicit allowlist. See section 8. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Release history following Keep a Changelog. |
 | [`.env.example`](./.env.example) | Environment variable template. |
@@ -339,30 +340,31 @@ uv run pytest -m integration
 - A heartbeat line (`[Heartbeat] Last ~10m: scanned N comments ...`) is logged every 10 minutes by `StreamMetrics`. It is the quickest health and throughput signal.
 
 ### Release & Semantic Versioning Workflow
-We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). Version bumps are automated via [`bump-my-version`](https://github.com/callowayproject/bump-my-version).
+We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). **Releases are fully automatic; nobody bumps the version by hand.**
 
-- **Bump Patch (`v2.0.0` -> `v2.0.1`):**
-  ```bash
-  uv run bump-my-version bump patch
-  ```
-- **Bump Minor (`v2.0.0` -> `v2.1.0`):**
-  ```bash
-  uv run bump-my-version bump minor
-  ```
-- **Bump Major (`v2.0.0` -> `v3.0.0`):**
-  ```bash
-  uv run bump-my-version bump major
-  ```
-- **Dry-run verification before releasing:**
-  ```bash
-  uv run bump-my-version bump patch --dry-run --verbose
-  ```
-When run, `bump-my-version` updates [`src/racb/version.py`](./src/racb/version.py), updates [`CHANGELOG.md`](./CHANGELOG.md), generates a git commit, and tags the release with `vX.Y.Z`. Push commits and tags to GitHub with `git push --follow-tags`.
+After every push to `master`, once the unit tests pass, the `release` job in
+[`.github/workflows/tests.yml`](./.github/workflows/tests.yml):
+1. runs [`scripts/release_level.py`](./scripts/release_level.py), which prints `none` if CHANGELOG
+   `## [Unreleased]` is empty, otherwise the bump implied by the commits since the last `v*` tag
+   (merge commits and earlier release commits are ignored):
+   - `major`: a breaking Conventional Commit, `type!: ...` / `type(scope)!: ...` or a `BREAKING CHANGE:` footer
+   - `minor`: a `feat` commit
+   - `patch`: anything else, including commits that are not Conventional Commits
+2. runs `uv run bump-my-version bump <level>`, which updates [`src/racb/version.py`](./src/racb/version.py)
+   and [`CHANGELOG.md`](./CHANGELOG.md), makes a `chore(release): bump version X -> Y` commit as
+   `github-actions[bot]`, and an annotated `vX.Y.Z` tag;
+3. pushes both to `master` (`git push --follow-tags`).
 
 Mechanics worth knowing:
-- Bump on `master`, after the feature branch is merged (rule 5 in section 10), never on a feature branch.
-- `allow_dirty = false`: the working tree must be clean. The bump makes its own
-  `chore(release): bump version X -> Y` commit and an annotated tag.
+- Write Conventional Commit subjects (`feat:`, `fix:`, `docs:`, ...) on feature branches; they decide
+  the bump. With squash merges, the PR title becomes the commit, so it must follow the convention too.
+- The job checks out the latest `master` and runs in a `release` concurrency group, so releases queue.
+  If someone merges while a release is running, its push is rejected and the job fails; the run for that
+  later merge then releases everything. Pushes made with `GITHUB_TOKEN` do not trigger workflows, so the
+  release commit cannot start another release (and its tests do not re-run).
+- It needs `master` to accept pushes from GitHub Actions. If branch protection is ever enabled, allow
+  `github-actions[bot]` to bypass it, or the job fails.
+- To preview locally: `uv run bump-my-version bump patch --dry-run --verbose` (clean working tree required).
 - The CHANGELOG edit is a plain string replacement: `## [Unreleased]` becomes `## [Unreleased]` followed
   by `## [X.Y.Z] - YYYY-MM-DD`. Whatever sat under Unreleased moves into the new version, so the
   `## [Unreleased]` heading must exist exactly once.
@@ -512,7 +514,7 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 2. **Follow Existing Style:** Use clean, standard Python style matching the codebase (PEP 8 conventions, explicit error handling with `prawcore.exceptions` and `praw.exceptions.RedditAPIException`).
 3. **Graceful Reddit Exception Handling:** Any newly introduced Reddit API calls must handle potential exceptions (`Forbidden`, `ServerError`, `RedditAPIException`, sub bans, locked threads, deleted comments) without crashing the main loop.
 4. **Localization Awareness:** When adding or modifying bot comments, update the `.po` catalog of every locale under [`src/racb/locales/`](./src/racb/locales/) (message ids are symbolic keys; `en` holds the source text, and an empty `msgstr` falls back to English). Then run `uv run pybabel compile -d src/racb/locales` and commit the regenerated `.mo` files; a unit test fails if they are stale. Counts use plural forms (`ngettext`, plural id `<KEY>_PLURAL`). To add a locale, create its `.po` (e.g. `uv run pybabel init -i src/racb/locales/en/LC_MESSAGES/messages.po -d src/racb/locales -l <locale>`) and list its subreddits in [`subreddits.toml`](./src/racb/locales/subreddits.toml).
-5. **Mandatory Changelog Updates & Version Bumping:** Every code, configuration, or infrastructure change MUST add an entry to [`CHANGELOG.md`](./CHANGELOG.md) under `## [Unreleased]` in the same branch. The version bump (`bump-my-version bump patch`, or `minor`/`major`) and its `vX.Y.Z` tag are made **on `master` after merging**, never on a feature branch. A tag on an unmerged branch marks a release that may never ship, and parallel branches would claim the same version number. Never release or deploy without completing the version bump and pushing the tag (`git push --follow-tags`).
+5. **Mandatory Changelog Updates, No Manual Version Bumps:** Every code, configuration, or infrastructure change MUST add an entry to [`CHANGELOG.md`](./CHANGELOG.md) under `## [Unreleased]` in the same branch. **Never bump the version or create a tag yourself**, on a feature branch or on `master`: the CI `release` job does it after merge (section 5). Parallel branches would otherwise claim the same version number. Use Conventional Commit subjects, since they choose the bump (`feat` minor, `!` major, anything else patch).
 6. **Never run live integration tests casually:** plain `pytest` runs only unit tests. `pytest -m integration` posts publicly as the real bot accounts.
 7. **Keep section 9 current:** when you fix a known defect, delete its row; when you find a new one, add it.
 8. **Read configuration through `src/racb/config.py`:** do not add new `os.environ` reads or boolean/duration parsers elsewhere.
