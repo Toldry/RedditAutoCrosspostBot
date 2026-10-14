@@ -1,11 +1,16 @@
 version: 2
+# Version updates are PAUSED: open-pull-requests-limit 0 stops Dependabot from opening
+# version-update PRs. Delete those lines (default limit is 5) to turn them back on.
+# Dependabot security updates are controlled separately in the repository settings.
 updates:
   # Updates pyproject.toml lower bounds and uv.lock
   - package-ecosystem: uv
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0

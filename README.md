@@ -98,7 +98,7 @@ uv lock --upgrade-package praw        # upgrade one package within the bounds in
 uv lock --upgrade                     # upgrade everything
 uv sync                               # apply the lock to .venv
 ```
-Dependabot opens monthly pull requests that do the same.
+Dependabot version updates are paused (`open-pull-requests-limit: 0` in [`.github/dependabot.yml`](./.github/dependabot.yml)); remove those lines to get monthly update pull requests again.
 
 ### Running the Tests
 The unit tests are fully mocked: they need no Reddit credentials, network access or database.
