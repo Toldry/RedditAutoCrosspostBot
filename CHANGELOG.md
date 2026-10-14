@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **gettext Translations:** Bot replies are now translated with standard gettext catalogs (`src/racb/locales/<locale>/LC_MESSAGES/messages.po`, compiled to committed `.mo` files with Babel) instead of a hardcoded dictionary in `i18n.py`. The r/totallynotrobots style is now the `en@totallynotrobots` locale, an English variant that falls back to English. The subreddit-to-language map moved to `src/racb/locales/subreddits.toml`. All existing replies are unchanged, apart from the plural fix below.
+
 ### Changed
 - **Dependabot Paused:** `.github/dependabot.yml` now sets `open-pull-requests-limit: 0`, so Dependabot no longer opens version-update pull requests. Dependencies are upgraded manually with `uv lock --upgrade-package`. Remove those lines to resume.
+- **Bot Footer:** Removed the "feel welcome to respond 'Bad bot'/'Good bot'" line in every language, and the Rank link now points to `https://www.botrank.net/bots/<bot name>` instead of botranks.com.
+
+### Fixed
+- **Plural Day Counts:** Durations use plural forms, so a 1-day waiting period reads "1 day" instead of "1 days" (and "יום אחד" / "יומיים" for 1 and 2 days in Hebrew).
+- **Merged Subreddit Names:** Missing commas in the old language map had glued German subreddit names together (`GermanAustriaberlin`, `zurichEasy_German`, `kreiswichsFragReddit`, `borussiadortmundwien`), so none of them matched. r/Austria, r/berlin, r/zurich, r/kreiswichs, r/FragReddit, r/borussiadortmund and r/wien now get German replies. r/German and r/Easy_German stay English, since they are for learners.
 
 ## [2.3.0] - 2026-10-15
 

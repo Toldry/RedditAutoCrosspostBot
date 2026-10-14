@@ -126,7 +126,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     function does **not** filter on `phase2_checked`, so Phase 3 depends on Phase 2 having pruned rows first.
   - Re-runs validation checks (`phase2.run_filters`, which fetches each comment individually).
   - Formats submission title (e.g. uppercase for `r/totallynotrobots`).
-  - Executes `submission.crosspost()` and posts an explanatory reply using localized text templates from [`src/racb/i18n.py`](./src/racb/i18n.py).
+  - Executes `submission.crosspost()` and posts an explanatory reply using localized text templates loaded by [`src/racb/i18n.py`](./src/racb/i18n.py) from the gettext catalogs in [`src/racb/locales/`](./src/racb/locales/).
   - Handles Reddit API crosspost exceptions gracefully via modern `e.items` inspection (e.g., `NO_CROSSPOSTS`, `SUBREDDIT_NOTALLOWED`, `NO_IMAGES`, `SUBMIT_VALIDATION_*`).
   - Deletes the record from PostgreSQL. This happens **after** the crosspost, and Phase 3 keeps no
     "already crossposted" state (see section 9).
@@ -162,11 +162,13 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
 | [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on **every new DB connection**, so every statement must be idempotent (see section 6). |
 | [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore (`SUB_BLACKLIST`). |
-| [`src/racb/i18n.py`](./src/racb/i18n.py) | Custom localization mapping (`en`, `es`, `de`, `fr`, `he`, `totallynotrobots`) mapped by subreddit names. |
+| [`src/racb/i18n.py`](./src/racb/i18n.py) | Loads the gettext catalogs, picks the locale for a subreddit, and falls back to English for untranslated strings (body and footer always share one language). |
+| [`src/racb/locales/`](./src/racb/locales/) | gettext catalogs: `<locale>/LC_MESSAGES/messages.po` (edited) and `messages.mo` (compiled, committed). Locales: `en` (source text), `es`, `de`, `fr`, `he`, and `en@totallynotrobots`, an English variant using the gettext `@modifier` syntax. |
+| [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
 | [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run` and `--limit N` (`0` means all). |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 94 mocked unit tests (`@pytest.mark.unit`), one file per module. |
+| [`tests/unit/`](./tests/unit/) | 108 mocked unit tests (`@pytest.mark.unit`), one file per module. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -495,7 +497,7 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 1. **Preserve Comments & Docstrings:** Do not remove existing comments, docstrings, or developer notes during edits.
 2. **Follow Existing Style:** Use clean, standard Python style matching the codebase (PEP 8 conventions, explicit error handling with `prawcore.exceptions` and `praw.exceptions.RedditAPIException`).
 3. **Graceful Reddit Exception Handling:** Any newly introduced Reddit API calls must handle potential exceptions (`Forbidden`, `ServerError`, `RedditAPIException`, sub bans, locked threads, deleted comments) without crashing the main loop.
-4. **Localization Awareness:** When adding or modifying bot comments, update translations in [`src/racb/i18n.py`](./src/racb/i18n.py) for all supported languages.
+4. **Localization Awareness:** When adding or modifying bot comments, update the `.po` catalog of every locale under [`src/racb/locales/`](./src/racb/locales/) (message ids are symbolic keys; `en` holds the source text, and an empty `msgstr` falls back to English). Then run `uv run pybabel compile -d src/racb/locales` and commit the regenerated `.mo` files; a unit test fails if they are stale. Counts use plural forms (`ngettext`, plural id `<KEY>_PLURAL`). To add a locale, create its `.po` (e.g. `uv run pybabel init -i src/racb/locales/en/LC_MESSAGES/messages.po -d src/racb/locales -l <locale>`) and list its subreddits in [`subreddits.toml`](./src/racb/locales/subreddits.toml).
 5. **Mandatory Changelog Updates & Version Bumping:** Every code, configuration, or infrastructure change MUST add an entry to [`CHANGELOG.md`](./CHANGELOG.md) under `## [Unreleased]` in the same branch. The version bump (`bump-my-version bump patch`, or `minor`/`major`) and its `vX.Y.Z` tag are made **on `master` after merging**, never on a feature branch. A tag on an unmerged branch marks a release that may never ship, and parallel branches would claim the same version number. Never release or deploy without completing the version bump and pushing the tag (`git push --follow-tags`).
 6. **Never run live integration tests casually:** plain `pytest` runs only unit tests. `pytest -m integration` posts publicly as the real bot accounts.
 7. **Keep section 9 current:** when you fix a known defect, delete its row; when you find a new one, add it.
