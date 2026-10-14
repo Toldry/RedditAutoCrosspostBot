@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-10-14
+
 ### Fixed
 - **Test History Cleanup 404s:** When Reddit answers 404 to deleting an item, `scripts/cleanup_test_history.py` now says why instead of only logging the error: it re-fetches the item (an item that turns out to be deleted already now counts as deleted), checks whether the bot can still open the item's subreddit (banned, or private without approved-user access), and checks once per bot whether logged-out readers can see the account (a 404 there means shadowbanned or suspended). The live integration tests now log failed teardown deletes instead of silently ignoring them, which is how test posts piled up unnoticed.
 
