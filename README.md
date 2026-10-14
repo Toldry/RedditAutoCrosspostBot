@@ -102,8 +102,7 @@ You can run this bot 100% free on Google Cloud's Always Free `e2-micro` tier:
    gcloud compute instances create reddit-crosspost-bot --flags-file=deploy/instance-flags.yaml
    ```
 2. The VM will automatically execute [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) on first boot, provisioning 2GB swap space, Docker, and Docker Compose.
-3. Optionally keep the bot's secrets in Google Secret Manager instead of a plaintext `.env` on the VM: see [`deploy/SECRET_MANAGER.md`](./deploy/SECRET_MANAGER.md).
-4. See [`AGENTS.md`](./AGENTS.md) for architecture details.
+3. See [`AGENTS.md`](./AGENTS.md) for architecture details.
 
 ---
 

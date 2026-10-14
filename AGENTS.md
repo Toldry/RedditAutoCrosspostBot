@@ -175,9 +175,6 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`examples/example_reddit_comment.py`](./examples/example_reddit_comment.py) | Not executable code: a commented-out attribute dump of a PRAW `Comment` and `Submission`, kept for reference. |
 | [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
 | [`deploy/instance-flags.yaml`](./deploy/instance-flags.yaml) | Declarative Google Cloud CLI flags file for provisioning the Always Free e2-micro instance. |
-| [`deploy/SECRET_MANAGER.md`](./deploy/SECRET_MANAGER.md) | Step-by-step guide for storing `.env` in Google Secret Manager, plus optional access for Claude Code cloud sessions to run integration tests. |
-| [`deploy/racb-fetch-secrets.sh`](./deploy/racb-fetch-secrets.sh) | Fetches the `racb-env` secret into a file (default `/run/racb/env`) using whatever credentials `gcloud` has. Writes atomically; root:docker `0640`. |
-| [`deploy/racb.service`](./deploy/racb.service) | systemd unit for the VM: fetch secrets, then `docker compose up -d --build`. |
 | [`Dockerfile`](./Dockerfile) | Lightweight Python 3.11 container image definition. |
 | [`docker-compose.yml`](./docker-compose.yml) | Multi-container stack definition (PostgreSQL 15 + Python bot worker). |
 | [`.bumpversion.toml`](./.bumpversion.toml) | Configuration for `bump-my-version` automation. |
@@ -459,14 +456,10 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 - **`.gitignore` ignores every dotfile** (`.*`) except `.env.example`, `.gitignore`, `.bumpversion.toml`
   and `.github/`. Any other new dotfile (`.dockerignore`, `.pre-commit-config.yaml`, `.claude/`, ...)
   is silently ignored until you add a `!` exception. Check with `git check-ignore -v <path>`.
-- **Secrets:** on a VM set up per [`deploy/SECRET_MANAGER.md`](./deploy/SECRET_MANAGER.md), `.env` is a
-  symlink to `/run/racb/env` (memory only), which `racb.service` fills from Secret Manager at boot. Deploy
-  with `git pull && sudo systemctl restart racb`; running `docker compose up` directly after a reboot
-  fails until the unit has fetched the secret.
-- **There is no `.dockerignore`.** `COPY . .` copies `.env`, `.git/` and `tests/` into the image. At runtime,
-  Compose's `env_file: .env` already supplies the variables, and `load_dotenv()` never overrides existing
-  ones, so a copy of `.env` inside the image is only a fallback. Where `.env` is still a plaintext file,
-  never push the image to a registry, because it then contains all 4 account passwords and secrets.
+- **There is no `.dockerignore`.** `COPY . .` bakes `.env`, `.git/` and `tests/` into the image. Baking
+  `.env` in is the owner's choice. At runtime, Compose's `env_file: .env` already supplies the variables,
+  and `load_dotenv()` never overrides existing ones, so the baked copy is only a fallback. Never push
+  this image to a registry, because it contains all 4 account passwords and secrets.
 - The container runs as root and has no `HEALTHCHECK` for the bot service (only `db` has one).
 - `deploy/cloud-init.yaml` adds **every** account under `/home` to the `docker` group (root-equivalent)
   and makes `/opt` group-writable. This is deliberate, for the GCP web-SSH workflow on a single-admin VM;
