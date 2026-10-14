@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-15
+
 ### Fixed
 - **Plural Day Counts:** Durations use plural forms, so a 1-day waiting period reads "1 day" instead of "1 days" (and "יום אחד" / "יומיים" for 1 and 2 days in Hebrew).
 - **Database Schema Time Bomb:** `instantiate_db.sql` re-added and dropped the legacy `score_checked` column on every database connection. PostgreSQL never reuses dropped column slots, so the table would have stopped accepting the script after ~1595 connections and bricked the bot. The migration is now idempotent; verified against PostgreSQL 16 with fresh and legacy databases.
