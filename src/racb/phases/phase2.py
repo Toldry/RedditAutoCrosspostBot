@@ -47,7 +47,7 @@ def filter_comments_from_db(verbose=False):
 
             if verbose:
                 score = result.comment.score if result.comment else 'NA'
-                logger.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={ce["permalink"]}')
+                logger.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={reddit.full_url(ce["permalink"])}')
 
             if result.passes_filter:
                 db.set_comment_checked(ce)
@@ -143,4 +143,4 @@ def check_comment_availability(comment):
 
 
 def permalink_safe(comment):
-    return getattr(comment, 'permalink', 'unknown')
+    return reddit.full_url(getattr(comment, 'permalink', 'unknown'))

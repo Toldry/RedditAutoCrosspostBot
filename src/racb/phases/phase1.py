@@ -16,7 +16,7 @@ def handle_incoming_comment(comment, metrics=None):
     if metrics:
         metrics.record_comment()
 
-    logger.debug(f'Handling a comment: {comment.permalink}')
+    logger.debug(f'Handling a comment: {reddit.full_url(comment.permalink)}')
     target_subreddit = check_pattern(comment)
     if target_subreddit is None:
         return
@@ -32,7 +32,7 @@ def handle_incoming_comment(comment, metrics=None):
         return
 
     if target_subreddit.lower() == source_subreddit:
-        logger.info(f'Found "same subreddit" comment ({comment.permalink}). Replying via same_subreddit_bot.')
+        logger.info(f'Found "same subreddit" comment ({reddit.full_url(comment.permalink)}). Replying via same_subreddit_bot.')
         reply = reply_to_source_equals_target_comment(comment)
         if metrics:
             metrics.record_aux()
@@ -40,14 +40,14 @@ def handle_incoming_comment(comment, metrics=None):
 
     result_obj = get_posts_with_same_content(comment, target_subreddit)
     if result_obj.posts_found:
-        logger.info(f'Found post with duplicate content in r/{target_subreddit} ({comment.permalink}). Replying via same_post_bot.')
+        logger.info(f'Found post with duplicate content in r/{target_subreddit} ({reddit.full_url(comment.permalink)}). Replying via same_post_bot.')
         post_with_same_content = result_obj.posts[0]
         reply = reply_to_same_content_post_comment(comment, target_subreddit, post_with_same_content)
         if metrics:
             metrics.record_aux()
         return reply
     elif result_obj.unable_to_search and result_obj.unable_to_search_reason == 'SUBREDDIT_DOES_NOT_EXIST':
-        logger.info(f'Found reference to non-existent subreddit r/{target_subreddit} ({comment.permalink}). Replying via sub_doesnt_exist_bot.')
+        logger.info(f'Found reference to non-existent subreddit r/{target_subreddit} ({reddit.full_url(comment.permalink)}). Replying via sub_doesnt_exist_bot.')
         reply = reply_to_nonexistent_target_subreddit_comment(comment, target_subreddit)
         if metrics:
             metrics.record_aux()
@@ -56,7 +56,7 @@ def handle_incoming_comment(comment, metrics=None):
     if not is_top_level_comment(comment):
         return None
 
-    logger.info(f'Qualified recommendation match found: https://reddit.com/{comment.permalink} -> r/{target_subreddit}')
+    logger.info(f'Qualified recommendation match found: {reddit.full_url(comment.permalink)} -> r/{target_subreddit}')
     db.add_comment(comment, target_subreddit)
     if metrics:
         metrics.record_match()
@@ -249,7 +249,7 @@ def reply_to_same_content_post_comment(source_comment, target_subreddit, post_wi
 def reply_as_bot(source_comment, text, bot_name):
     """Replies to `source_comment` as `bot_name`, or only logs the reply when DRY_RUN is enabled."""
     if config.is_dry_run():
-        logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {source_comment.permalink}:\n{text}')
+        logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(source_comment.permalink)}:\n{text}')
         return None
     comment2 = get_comment_with_different_praw_instance(source_comment, bot_name)
     return comment2.reply(text)

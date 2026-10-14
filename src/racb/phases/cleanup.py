@@ -6,7 +6,7 @@ import praw
 import prawcore
 
 from racb import config
-from racb.core.reddit import get_reddit_instance, AUTO_CROSSPOST_BOT_NAME
+from racb.core.reddit import get_reddit_instance, full_url, AUTO_CROSSPOST_BOT_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +25,15 @@ def delete_unwanted_submissions():
     for submission in latest_submissions:
         if submission.score < MINIMUM_SCORE:
             logger.info(
-                f'Removing submission {submission.permalink} due to negative score ({submission.score})'
+                f'Removing submission {full_url(submission.permalink)} due to negative score ({submission.score})'
             )
             if config.is_dry_run():
-                logger.info(f'[DRY RUN] Would delete {submission.permalink}')
+                logger.info(f'[DRY RUN] Would delete {full_url(submission.permalink)}')
                 continue
             try:
                 submission.delete()
             except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
-                logger.warning(f'Could not delete {submission.permalink}: {e!r}')
+                logger.warning(f'Could not delete {full_url(submission.permalink)}: {e!r}')
                 continue
             removed_count += 1
     logger.debug(f'Finished cleanup of downvoted submissions ({removed_count} removed)')
