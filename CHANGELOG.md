@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-15
+
 ### Fixed
 - **Database Schema Time Bomb:** `instantiate_db.sql` re-added and dropped the legacy `score_checked` column on every database connection. PostgreSQL never reuses dropped column slots, so the table would have stopped accepting the script after ~1595 connections and bricked the bot. The migration is now idempotent; verified against PostgreSQL 16 with fresh and legacy databases.
 - **Bait-and-Switch Crossposts:** The target subreddit is now stored at scrape time (new `target_subreddit` column). Phases 2 and 3 reject comments that were edited to point at a different subreddit (`TARGET_SUBREDDIT_CHANGED`). Rows scraped before this release skip the check.
