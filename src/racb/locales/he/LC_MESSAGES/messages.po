@@ -1,0 +1,70 @@
+# Hebrew translations. Empty strings fall back to the en catalog.
+# Edit this file, then run `uv run pybabel compile -d src/racb/locales`
+# and commit the regenerated messages.mo next to it.
+msgid ""
+msgstr ""
+"Project-Id-Version: RedditAutoCrosspostBot\n"
+"Language: he\n"
+"Plural-Forms: nplurals=3; plural=(n == 1 ? 0 : n == 2 ? 1 : 2);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "POST_SUFFIX_TEXT"
+msgstr ""
+"\n"
+"\n"
+"---\n"
+"^(🤖 תגובה זו נכתבה על ידי בוט. ביפ בופ 🤖)\n"
+"\n"
+"^(תרגישו חופשי להגיב 'בוט רע' / 'בוט טוב', זה משוב שימושי)\n"
+"^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})"
+
+msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
+msgstr ""
+
+msgid "REPLY_TO_CROSSPOST"
+msgstr ""
+"\n"
+"עשיתי קרוספוסט מ־ r/{source_subreddit} ל־ r/{target_subreddit} אחרי שראיתי את [הקומענט הזה **שנכתב על ידי בן אדם**^1]({source_comment_permalink}) (ניקוד={source_comment_score}), שמרמז כי הפוסט הזה מתאים גם לכאן.\n"
+"\n"
+"חיכיתי {timedelta_string}^2 לפני שעשיתי קרוספוסט, למקרה שבן אדם היה רוצה לעשות את זה בעצמו.\n"
+"\n"
+"אם לדעתכם זו טעות, אתם מוזמנים להצביע־מטה; אסיר פוסטים עם ניקוד שלילי.\n"
+"\n"
+"---\n"
+"^(1 - בהנחה ש־{source_comment_author_name} בן־אנוש)\n"
+"\n"
+"^(2 - ערך זה נבחר באקראי)\n"
+"\n"
+
+msgid "THE_USER_WHO_COMMENTED"
+msgstr "המשתמש שהגיב"
+
+msgid "THATS_WHERE_WE_ARE"
+msgstr "כן, זה איפה שאנחנו."
+
+msgid "NONEXISTENT_SUBREDDIT"
+msgstr "הסאברעדיט r/{target_subreddit} לא קיים."
+
+msgid "ALTERNATE_SUBS_SUGGESTION"
+msgstr ""
+"אולי התכוונת?:\n"
+"\n"
+"{alternate_subreddits_string}"
+
+msgid "MAYBE_TYPO"
+msgstr "אולי יש תקלדה?"
+
+msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
+msgstr "אם לא, תשקול [ליצור אותו](/subreddits/create?name={target_subreddit})."
+
+msgid "FOUND_POST_WITH_SAME_CONTENT"
+msgstr "מצאתי את [הפוסט הזה]({same_content_post_url}) ב־ r/{target_subreddit} עם אותו התוכן כמו הפוסט הנוכחי."
+
+msgid "DURATION_IN_DAYS"
+msgid_plural "DURATION_IN_DAYS_PLURAL"
+msgstr[0] "יום אחד"
+msgstr[1] "יומיים"
+msgstr[2] "{days} ימים"
+

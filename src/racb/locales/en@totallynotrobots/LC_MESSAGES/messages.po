@@ -1,0 +1,70 @@
+# Variant of English for r/totallynotrobots (gettext @modifier syntax).
+# Empty strings fall back to the en catalog.
+# Edit this file, then run `uv run pybabel compile -d src/racb/locales`
+# and commit the regenerated messages.mo next to it.
+msgid ""
+msgstr ""
+"Project-Id-Version: RedditAutoCrosspostBot\n"
+"Language: en@totallynotrobots\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "POST_SUFFIX_TEXT"
+msgstr ""
+"\n"
+"\n"
+"---\n"
+"^(🧑 THIS COMMENT WAS WRITTEN BY A HUMAN. SCHLERP SCHLORP 🧑)\n"
+"\n"
+"^(FEEL WELCOME TO RESPOND 'BAD HUMAN'/'GOOD HUMAN', IT'S USEFUL FEEDBACK.)\n"
+"^[GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[RANK](https://botranks.com?bot={bot_name})"
+
+msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
+msgstr ""
+
+msgid "REPLY_TO_CROSSPOST"
+msgstr ""
+"\n"
+"I CROSSPOSTED THIS FROM r/{source_subreddit} TO r/{target_subreddit} AFTER SEEING [THIS DECENTLY UPVOTED **HUMAN-MADE**^1 COMMENT]({source_comment_permalink}) (SCORE={source_comment_score}), THAT SEEMS TO SUGGEST THAT THIS POST WOULD BE A GOOD FIT HERE TOO.\n"
+"\n"
+"I WAITED {timedelta_string}^2 BEFORE CROSSPOSTING, TO GIVE OTHER HUMANS A CHANCE TO CROSSPOST THIS THEMSELVES.\n"
+"\n"
+"IF YOU THINK THIS WAS A MISTAKE, GO AHEAD AND DOWNVOTE; I'LL REMOVE POSTS WITH NEGATIVE SCORES.\n"
+"\n"
+"---\n"
+"^(1 - ASSUMING {source_comment_author_name} IS HUMAN)\n"
+"\n"
+"^(2 - THIS VALUE WAS CHOSEN ARBITRARILY)\n"
+"\n"
+
+msgid "THE_USER_WHO_COMMENTED"
+msgstr "THE USER WHO COMMENTED"
+
+msgid "THATS_WHERE_WE_ARE"
+msgstr "YES, THAT'S WHERE WE ARE."
+
+msgid "NONEXISTENT_SUBREDDIT"
+msgstr "THE SUBREDDIT r/{target_subreddit} DOES NOT EXIST."
+
+msgid "ALTERNATE_SUBS_SUGGESTION"
+msgstr ""
+"DID YOU MEAN?:\n"
+"\n"
+"{alternate_subreddits_string}"
+
+msgid "MAYBE_TYPO"
+msgstr "MAYBE THERE'S A TYPO?"
+
+msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
+msgstr "IF NOT, CONSIDER [CREATING IT](/subreddits/create?name={target_subreddit})."
+
+msgid "FOUND_POST_WITH_SAME_CONTENT"
+msgstr "I FOUND [THIS POST]({same_content_post_url}) IN r/{target_subreddit} WITH THE SAME CONTENT AS THE CURRENT POST."
+
+msgid "DURATION_IN_DAYS"
+msgid_plural "DURATION_IN_DAYS_PLURAL"
+msgstr[0] "{days} DAY"
+msgstr[1] "{days} DAYS"
+

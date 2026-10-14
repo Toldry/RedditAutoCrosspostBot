@@ -1,0 +1,73 @@
+# English source strings. Message ids are symbolic keys, and every other
+# locale falls back to this catalog for any string it leaves empty.
+# Edit this file, then run `uv run pybabel compile -d src/racb/locales`
+# and commit the regenerated messages.mo next to it.
+msgid ""
+msgstr ""
+"Project-Id-Version: RedditAutoCrosspostBot\n"
+"Language: en\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "POST_SUFFIX_TEXT"
+msgstr ""
+"\n"
+"\n"
+"---\n"
+"^(🤖 𝚃𝙷𝙸𝚂 𝙲𝙾𝙼𝙼𝙴𝙽𝚃 𝚆𝙰𝚂 𝚆𝚁𝙸𝚃𝚃𝙴𝙽 𝙱𝚈 𝙰 𝙱𝙾𝚃. 𝙱𝙴𝙴𝙿 𝙱𝙾𝙾𝙿 🤖)\n"
+"\n"
+"^(feel welcome to respond 'Bad bot'/'Good bot', it's useful feedback.)\n"
+"^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})"
+
+msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
+msgstr ""
+"\n"
+"Thanks for the feedback, would you mind detailing why this post/comment was inappropriate?\n"
+"\n"
+"The creator of this bot will look at the responses and try to change the code to reduce incidences like these."
+
+msgid "REPLY_TO_CROSSPOST"
+msgstr ""
+"\n"
+"I crossposted this from r/{source_subreddit} to r/{target_subreddit} after seeing [this decently upvoted comment]({source_comment_permalink}) (score={source_comment_score}) written {timedelta_string} ago by {source_comment_author_name}, that seems to suggest that this post would be a good fit here too.\n"
+"\n"
+"I waited {timedelta_string}^1 before crossposting in case a human might've wanted to crosspost this themselves.\n"
+"\n"
+"\n"
+"If you think this was a mistake, please downvote the OP; I'll remove posts with negative scores.\n"
+"\n"
+"---\n"
+"^(1 - This value was chosen arbitrarily)\n"
+"\n"
+
+msgid "THE_USER_WHO_COMMENTED"
+msgstr "the user who commented"
+
+msgid "THATS_WHERE_WE_ARE"
+msgstr "Yes, that's where we are."
+
+msgid "NONEXISTENT_SUBREDDIT"
+msgstr "The subreddit r/{target_subreddit} does not exist."
+
+msgid "ALTERNATE_SUBS_SUGGESTION"
+msgstr ""
+"Did you mean?:\n"
+"\n"
+"{alternate_subreddits_string}"
+
+msgid "MAYBE_TYPO"
+msgstr "Maybe there's a typo?"
+
+msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
+msgstr "Consider [**creating a new subreddit** r/{target_subreddit}](/subreddits/create?name={target_subreddit})."
+
+msgid "FOUND_POST_WITH_SAME_CONTENT"
+msgstr "I found [this post]({same_content_post_url}) in r/{target_subreddit} with the same content as the current post."
+
+msgid "DURATION_IN_DAYS"
+msgid_plural "DURATION_IN_DAYS_PLURAL"
+msgstr[0] "{days} day"
+msgstr[1] "{days} days"
+

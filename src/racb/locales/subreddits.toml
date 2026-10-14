@@ -1,0 +1,84 @@
+# Which locale the bot writes in, per subreddit.
+# Keys are locale directories under src/racb/locales; subreddit names are case-insensitive.
+# Subreddits not listed here get English (en).
+
+# Hebrew
+he = [
+    "ani_bm",
+    "israel",
+    "sabamba",
+    "hebrew",
+    "yeladim_kamoni",
+    "besederhavertipesh",
+    "okhavermugbal",
+    "ISR_historymemes",
+    "IshKiriatGat",
+    "ISR_copypasta",
+    "HayaLiSHabatz",
+    "hmmm_but_in_hebrew",
+    "yapanfasha",
+    "HibatGufotComedit",
+    "mischakim",
+    "TmonotMekolalot",
+    "ani_bmcirclejerk",
+    "Arsim",
+    "memim",
+]
+
+# Spanish
+es = [
+    "yo_elvr",
+]
+
+# German
+de = [
+    "ich_iel",
+    "LTB_iel",
+    "schkreckl",
+    "wasletztepreis",
+    "OkBrudiMongo",
+    "GeschichtsMaimais",
+    "de_IAmA",
+    "Bundesliga",
+    "de",
+    "GermanAustriaberlin",
+    "Switzerland",
+    "Rammstein",
+    "borussiadortmundwien",
+    "Munich",
+    "berlinsocialclub",
+    "GermanPractice",
+    "kreiswichsFragReddit",
+    "SCHLAND",
+    "GermanRap",
+    "BUENZLI",
+    "schweiz",
+    "hamburg",
+    "germanmusic",
+    "frankfurt",
+    "zurichEasy_German",
+    "GermanFacts",
+    "Dokumentationen",
+    "cologne",
+    "schalke04",
+    "germantrees",
+    "stuttgart",
+    "de_podcasts",
+    "germanpuns",
+    "GermanMovies",
+    "Wissenschaft",
+    "dtm",
+    "Kochen",
+    "NettHier",
+]
+
+# French
+fr = [
+    "moi_dlvv",
+    "rance",
+]
+
+# Variant of English
+"en@totallynotrobots" = [
+    "totallynotrobots",
+]

@@ -1,0 +1,60 @@
+# French translations. Empty strings fall back to the en catalog.
+# Edit this file, then run `uv run pybabel compile -d src/racb/locales`
+# and commit the regenerated messages.mo next to it.
+msgid ""
+msgstr ""
+"Project-Id-Version: RedditAutoCrosspostBot\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "POST_SUFFIX_TEXT"
+msgstr ""
+"\n"
+"\n"
+"---\n"
+"^(🤖 ce commentaire a été écrit par un bot. bip boop 🤖)\n"
+"\n"
+"^(N'hésitez pas à répondre 'Mauvais bot' / 'Bon bot', c'est un retour utile)\n"
+"^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://botranks.com?bot={bot_name})"
+
+msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
+msgstr ""
+
+msgid "REPLY_TO_CROSSPOST"
+msgstr ""
+"\n"
+"J'ai crossposté ceci de r/{source_subreddit} vers r/{target_subreddit} après avoir vu [ce commentaire **écrit par un humain** et plutôt bien noté]({source_comment_permalink}) (score={source_comment_score}), qui semble suggérer que cette publication aurait aussi sa place ici.\n"
+"\n"
+"J'ai attendu {timedelta_string} avant de crossposter, au cas où un humain aurait voulu le faire lui-même.\n"
+"\n"
+"Si vous pensez que c'était une erreur, votez contre ; je supprimerai les publications ayant un score négatif.\n"
+
+msgid "THE_USER_WHO_COMMENTED"
+msgstr ""
+
+msgid "THATS_WHERE_WE_ARE"
+msgstr ""
+
+msgid "NONEXISTENT_SUBREDDIT"
+msgstr ""
+
+msgid "ALTERNATE_SUBS_SUGGESTION"
+msgstr ""
+
+msgid "MAYBE_TYPO"
+msgstr ""
+
+msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
+msgstr ""
+
+msgid "FOUND_POST_WITH_SAME_CONTENT"
+msgstr ""
+
+msgid "DURATION_IN_DAYS"
+msgid_plural "DURATION_IN_DAYS_PLURAL"
+msgstr[0] "{days} jour"
+msgstr[1] "{days} jours"
+

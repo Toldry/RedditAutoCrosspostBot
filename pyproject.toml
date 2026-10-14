@@ -26,6 +26,8 @@ dependencies = [
 [dependency-groups]
 # Installed by `uv sync` by default; the Docker image uses `--no-dev`
 dev = [
+    # Compiles src/racb/locales/*/LC_MESSAGES/messages.po to the committed .mo files
+    "babel>=2.17",
     "bump-my-version>=1.5.1",
     "pytest>=9.1.1",
     "pytest-mock>=3.16.0",

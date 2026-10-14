@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Plural Day Counts:** Durations use plural forms, so a 1-day waiting period reads "1 day" instead of "1 days" (and "יום אחד" / "יומיים" for 1 and 2 days in Hebrew).
 - **Database Schema Time Bomb:** `instantiate_db.sql` re-added and dropped the legacy `score_checked` column on every database connection. PostgreSQL never reuses dropped column slots, so the table would have stopped accepting the script after ~1595 connections and bricked the bot. The migration is now idempotent; verified against PostgreSQL 16 with fresh and legacy databases.
 - **Bait-and-Switch Crossposts:** The target subreddit is now stored at scrape time (new `target_subreddit` column). Phases 2 and 3 reject comments that were edited to point at a different subreddit (`TARGET_SUBREDDIT_CHANGED`). Rows scraped before this release skip the check.
 - **Stream Disruption on Per-Comment Errors:** Errors while handling a single comment (e.g. `403 Forbidden` because an auxiliary bot is banned from a subreddit) now skip only that comment. Previously they caused a 30-second sleep and a stream reset that dropped comments, or crashed the process.
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AGENTS.md Diagram:** The lifecycle Mermaid diagram failed to render on GitHub, because an unquoted edge label contained parentheses (`reddit.info()`).
 
 ### Added
+- **gettext Translations:** Bot replies are now translated with standard gettext catalogs (`src/racb/locales/<locale>/LC_MESSAGES/messages.po`, compiled to committed `.mo` files with Babel) instead of a hardcoded dictionary in `i18n.py`. The r/totallynotrobots style is now the `en@totallynotrobots` locale, an English variant that falls back to English. The subreddit-to-language map moved to `src/racb/locales/subreddits.toml`. All existing replies are unchanged, apart from the plural fix below.
 - **`DRY_RUN` Mode:** Logs auxiliary replies, crossposts and cleanup deletions instead of performing them. Phase 3 keeps the rows it would have crossposted.
 - **Inbox Feedback for All Bots:** A scheduled job reads the unread inboxes of all 4 bots every 10 minutes and logs good/bad bot feedback. It replaces the continuous `AutoCrosspostBot`-only inbox stream, which polled without pause and shared the request budget with the `r/all` stream.
 - **`racb.config` Module:** Single place for environment parsing (booleans, durations, flags); it replaces three inconsistent boolean parsers.
