@@ -75,15 +75,26 @@ def test_process_comment_entries_keeps_rows_in_dry_run():
 
 
 @pytest.mark.unit
-def test_reply_to_crosspost_localizes_waiting_period(make_mock_comment):
+def test_reply_to_crosspost_formats_waiting_period(make_mock_comment):
     comment = make_mock_comment(subreddit='test_source')
     cross_post = MagicMock()
     with patch.dict('os.environ', {'PHASE3_WAITING_PERIOD': '3 months'}):
-        phase3.reply_to_crosspost(comment, cross_post, 'ich_iel')
+        phase3.reply_to_crosspost(comment, cross_post, 'pics')
     reply_text = cross_post.reply.call_args.args[0]
-    assert '90 Tage' in reply_text
+    assert 'written 90 days ago' in reply_text
     assert '3 months' not in reply_text
     assert 'repostsleuth' not in reply_text.lower()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'totallynotrobots'])
+def test_reply_to_crosspost_omits_waiting_and_downvote_notes(make_mock_comment, target_subreddit):
+    comment = make_mock_comment(subreddit='test_source')
+    cross_post = MagicMock()
+    phase3.reply_to_crosspost(comment, cross_post, target_subreddit)
+    reply_text = cross_post.reply.call_args.args[0].lower()
+    for removed_phrase in ['waited', 'arbitrar', 'downvote', 'gewartet', 'esperé', 'attendu', 'חיכיתי', 'באקראי']:
+        assert removed_phrase not in reply_text
 
 
 
