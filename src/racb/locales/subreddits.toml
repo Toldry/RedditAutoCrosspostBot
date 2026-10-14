@@ -30,7 +30,8 @@ es = [
     "yo_elvr",
 ]
 
-# German
+# German. r/German and r/Easy_German are left out on purpose: they are for learners,
+# who mostly write in English.
 de = [
     "ich_iel",
     "LTB_iel",
@@ -41,14 +42,17 @@ de = [
     "de_IAmA",
     "Bundesliga",
     "de",
-    "GermanAustriaberlin",
+    "Austria",
+    "berlin",
     "Switzerland",
     "Rammstein",
-    "borussiadortmundwien",
+    "borussiadortmund",
+    "wien",
     "Munich",
     "berlinsocialclub",
     "GermanPractice",
-    "kreiswichsFragReddit",
+    "kreiswichs",
+    "FragReddit",
     "SCHLAND",
     "GermanRap",
     "BUENZLI",
@@ -56,7 +60,7 @@ de = [
     "hamburg",
     "germanmusic",
     "frankfurt",
-    "zurichEasy_German",
+    "zurich",
     "GermanFacts",
     "Dokumentationen",
     "cologne",

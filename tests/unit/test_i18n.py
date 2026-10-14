@@ -117,7 +117,7 @@ def test_subreddit_language_map_rejects_a_subreddit_in_two_locales(tmp_path):
 def test_get_suffix_for_all_bots():
     for bot in [AUTO_CROSSPOST_BOT_NAME, SUB_DOESNT_EXIST_BOT_NAME, SAME_SUBREDDIT_BOT_NAME, SAME_POST_BOT_NAME]:
         suffix = i18n.get_suffix('pics', bot_name=bot)
-        assert bot in suffix
+        assert f'(https://www.botrank.net/bots/{bot})' in suffix
         assert '🤖' in suffix or '🧑' in suffix
 
 
@@ -139,7 +139,7 @@ def test_untranslated_string_falls_back_to_english_with_an_english_suffix():
     # THATS_WHERE_WE_ARE has no Spanish translation
     text = i18n.get_translated_string('THATS_WHERE_WE_ARE', 'yo_elvr', bot_name='BotX')
     assert text.startswith("Yes, that's where we are.")
-    assert 'feel welcome to respond' in text
+    assert '𝙱𝙴𝙴𝙿 𝙱𝙾𝙾𝙿' in text  # the English footer
     assert 'escrito por un bot' not in text
 
 
