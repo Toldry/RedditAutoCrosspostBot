@@ -15,8 +15,9 @@ from racb.phases import phase1, phase3, cleanup
 TEST_SOURCE_SUBREDDIT = 'racb_test_1'
 TEST_TARGET_SUBREDDIT = 'racb_test_2'
 
-# Flag to disable cleanup of created submissions and comments across all integration tests
-DISABLE_CLEANUP = True
+# Flag to disable cleanup of created submissions and comments across all integration tests.
+# Set RACB_KEEP_TEST_ARTIFACTS=true to keep them on Reddit for debugging.
+DISABLE_CLEANUP = os.environ.get('RACB_KEEP_TEST_ARTIFACTS', '').strip().lower() in ('true', '1', 'yes')
 
 
 def cleanup_reddit_objects(*objects):
@@ -287,6 +288,10 @@ def test_live_duplicate_detector_query():
             variations = generate_test_image_variations(base_image_path, tmp_dir)
 
             for var_name, var_path in variations.items():
+                if var_name == 'rotate':
+                    # Rotation is deliberately not matched: the per-region check that rejects
+                    # same-template memes with different captions also rejects rotated images
+                    continue
                 source_submission = source_sub.submit(
                     title=f'[Test Variation {var_name}] {uuid.uuid4().hex[:8]}',
                     image=PostMedia(var_path),

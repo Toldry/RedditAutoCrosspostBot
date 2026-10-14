@@ -39,8 +39,8 @@ def test_db_operations(make_mock_comment):
 
     with patch('racb.core.db.get_connection', return_value=mock_conn):
         # 1. add_comment
-        db.add_comment(comment)
-        mock_cursor.callproc.assert_called_with('insert_scraped_comment', (comment.permalink,))
+        db.add_comment(comment, 'target_sub')
+        mock_cursor.callproc.assert_called_with('insert_scraped_comment', (comment.permalink, 'target_sub'))
         mock_conn.commit.assert_called()
 
         # 2. get_comments_older_than

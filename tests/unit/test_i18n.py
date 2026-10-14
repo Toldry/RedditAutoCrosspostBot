@@ -50,3 +50,58 @@ def test_get_translated_string_fallback():
 def test_get_translated_string_totallynotrobots():
     text = i18n.get_translated_string('THATS_WHERE_WE_ARE', 'totallynotrobots')
     assert 'YES, THAT\'S WHERE WE ARE' in text or 'YES' in text
+
+
+ALL_TEMPLATE_KWARGS = {
+    'bot_name': 'AutoCrosspostBot',
+    'source_subreddit': 'src',
+    'target_subreddit': 'dst',
+    'source_comment_permalink': 'https://reddit.com/r/src/comments/1/t/c/',
+    'source_comment_score': 42,
+    'source_submission_id': 'abc123',
+    'timedelta_string': '90 days',
+    'source_comment_author_name': '/u/someone',
+    'same_content_post_url': '/r/dst/comments/2/t/',
+    'alternate_subreddits_string': '* r/x',
+    'days': 90,
+}
+
+
+def iterate_templates():
+    for key, by_language in i18n.translations.items():
+        for language, template in by_language.items():
+            if template is not None:
+                yield key, language, template
+
+
+@pytest.mark.unit
+def test_all_templates_format_without_missing_placeholders():
+    for key, language, template in iterate_templates():
+        template.format(**ALL_TEMPLATE_KWARGS)  # raises KeyError/IndexError on a bad placeholder
+
+
+@pytest.mark.unit
+def test_no_markdown_link_is_broken_by_a_space():
+    for key, language, template in iterate_templates():
+        assert '] (' not in template, f'{key}/{language} has "] (" which breaks the Markdown link'
+
+
+@pytest.mark.unit
+def test_every_superscript_group_is_closed_on_its_line():
+    for key, language, template in iterate_templates():
+        for line in template.splitlines():
+            if '^(' in line:
+                assert line.rstrip().endswith(')'), f'{key}/{language} has an unclosed ^( group: {line!r}'
+
+
+@pytest.mark.unit
+def test_no_template_claims_a_repostsleuth_check():
+    for key, language, template in iterate_templates():
+        assert 'repostsleuth' not in template.lower(), f'{key}/{language} still mentions RepostSleuth'
+
+
+@pytest.mark.unit
+def test_format_duration_in_days_is_localized():
+    assert i18n.format_duration_in_days(90 * 86400, 'pics') == '90 days'
+    assert i18n.format_duration_in_days(90 * 86400, 'ich_iel') == '90 Tage'
+    assert i18n.format_duration_in_days(90 * 86400, 'ani_bm') == '90 ימים'

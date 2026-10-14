@@ -9,22 +9,30 @@ import time
 
 import praw
 import prawcore
+import psycopg2
 import requests
 import schedule
-import urllib3
 
 from racb.version import __version__
-from racb.core import reddit
+from racb import config
+from racb.config import env_bool
+from racb.core import db, reddit
 from racb.phases import phase1, phase2, phase3, inbox, cleanup
 
 logger = logging.getLogger(__name__)
 
+NETWORK_RETRY_DELAY_SECONDS = 30
+TOO_MANY_REQUESTS_DELAY_SECONDS = 60
 
-def env_bool(key, default=False):
-    val = os.environ.get(key)
-    if val is None:
-        return default
-    return str(val).strip().lower() in ('true', '1', 'yes', 'y', 't')
+# Network-level failures: back off, then rebuild the stream
+TRANSIENT_NETWORK_ERRORS = (
+    prawcore.exceptions.ServerError,
+    prawcore.exceptions.RequestException,
+    prawcore.exceptions.TooManyRequests,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+)
+DATABASE_CONNECTION_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
 
 
 class StreamMetrics:
@@ -105,34 +113,63 @@ def configure_logging():
     logging.getLogger().setLevel(level)
 
 
-def init_streams():
-    logger.info('Initializing Reddit comment and inbox streams...')
+def init_comment_stream():
+    logger.info('Initializing Reddit comment stream...')
     reddit_instance = reddit.get_reddit_instance()
     scanned_subreddits = 'all'
     subreddit = reddit_instance.subreddit(scanned_subreddits)
     c_stream = subreddit.stream.comments(skip_existing=True, pause_after=-1)
-    i_stream = reddit_instance.inbox.stream(mark_read=False, pause_after=-1)
-    logger.info('Streams initialized successfully. Listening for comments on r/all...')
-    return (c_stream, i_stream)
+    logger.info('Stream initialized successfully. Listening for comments on r/all...')
+    return c_stream
+
+
+def run_job_safely(job_func):
+    """Runs a scheduled job, logging (instead of propagating) its errors.
+
+    The `schedule` library only computes a job's next run after the job returns normally, so a job
+    that raises would be re-run on every loop iteration. It would also reset the comment stream.
+    """
+    try:
+        return job_func()
+    except Exception as e:
+        if config.is_debug():
+            raise
+        if isinstance(e, DATABASE_CONNECTION_ERRORS):
+            db.reset_connection()
+        logger.exception(f'Scheduled job {job_func.__name__} failed: {e!r}')
+        return None
 
 
 def set_schedule():
     logger.info('Configuring background task schedule...')
-    schedule.every(7).minutes.do(cleanup.delete_unwanted_submissions)
+    schedule.every(7).minutes.do(run_job_safely, cleanup.delete_unwanted_submissions)
     schedule.every(10).minutes.do(metrics.log_heartbeat)
-    schedule.every(20).minutes.do(phase2.filter_comments_from_db)
+    schedule.every(10).minutes.do(run_job_safely, inbox.process_unread_inboxes)
+    schedule.every(20).minutes.do(run_job_safely, phase2.filter_comments_from_db)
     listen_only = env_bool('LISTEN_ONLY', False)
     if not listen_only:
-        schedule.every(6).minutes.do(phase3.process_comment_entries)
+        schedule.every(6).minutes.do(run_job_safely, phase3.process_comment_entries)
 
     debug = env_bool('DEBUG', False)
     if debug:
-        schedule.run_all()
+        # Only jobs that never write to Reddit; cleanup and Phase 3 keep their normal schedule
+        run_job_safely(phase2.filter_comments_from_db)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="RedditAutoCrosspostBot runner")
+    parser.add_argument('--only-phase2', action='store_true', help="Run Phase 2 filtering only and exit")
+    return parser.parse_args()
 
 
 def main():
+    # .env must be loaded before anything reads configuration, logging setup included
+    config.load_environment()
     configure_logging()
+    args = parse_args()
     logger.info(f'=== Starting RedditAutoCrosspostBot v{__version__} ===')
+    if config.is_dry_run():
+        logger.info('DRY_RUN is enabled: no replies, crossposts or deletions will be made')
 
     try:
         reddit.authenticate_all_bots()
@@ -140,9 +177,6 @@ def main():
         logger.critical(f'Startup authentication failed: {e}')
         sys.exit(1)
 
-    parser = argparse.ArgumentParser(description="RedditAutoCrosspostBot runner")
-    parser.add_argument('--only-phase2', action='store_true', help="Run Phase 2 filtering only and exit")
-    args = parser.parse_args()
     if args.only_phase2:
         phase2.filter_comments_from_db(verbose=True)
         return
@@ -152,47 +186,39 @@ def main():
 
 def start_bot():
     set_schedule()
-    c_stream, i_stream = init_streams()
+    c_stream = init_comment_stream()
 
     while True:
         try:
-            main_loop(c_stream, i_stream)
+            main_loop(c_stream)
         except Exception as e:
             should_raise = handle_exception(e)
             if should_raise:
                 raise
             else:
-                c_stream, i_stream = init_streams()
+                c_stream = init_comment_stream()
 
 
 def handle_exception(e):
+    """Handles errors that escaped the per-comment and per-job handlers (mostly stream fetches)."""
     should_raise = True
     debug = env_bool('DEBUG', False)
     if debug:
         return should_raise
 
-    if type(e) in (
-        prawcore.exceptions.ServerError,
-        prawcore.exceptions.Forbidden,
-        requests.exceptions.ConnectTimeout,
-    ):
-        logger.info(f'Encountered network error {e}. Waiting 30s and retrying.')
-        time.sleep(30)
+    if isinstance(e, prawcore.exceptions.TooManyRequests):
+        logger.warning(f'Rate limited by Reddit ({e}). Waiting {TOO_MANY_REQUESTS_DELAY_SECONDS}s and retrying.')
+        time.sleep(TOO_MANY_REQUESTS_DELAY_SECONDS)
         should_raise = False
-    elif type(e) is prawcore.exceptions.RequestException:
-        is_max_retry_or_read_timeout_error = (
-            e.original_exception
-            and hasattr(e.original_exception, 'args')
-            and len(e.original_exception.args) > 0
-            and (
-                isinstance(e.original_exception.args[0], urllib3.exceptions.MaxRetryError)
-                or isinstance(e.original_exception.args[0], urllib3.exceptions.ReadTimeoutError)
-            )
-        )
-        if is_max_retry_or_read_timeout_error:
-            logger.info(f'Encountered network error {e}. Waiting 30s and retrying.')
-            time.sleep(30)
-            should_raise = False
+    elif isinstance(e, TRANSIENT_NETWORK_ERRORS + (prawcore.exceptions.Forbidden,)):
+        logger.info(f'Encountered network error {e!r}. Waiting {NETWORK_RETRY_DELAY_SECONDS}s and retrying.')
+        time.sleep(NETWORK_RETRY_DELAY_SECONDS)
+        should_raise = False
+    elif isinstance(e, DATABASE_CONNECTION_ERRORS):
+        logger.warning(f'Database connection error {e!r}. Reconnecting in {NETWORK_RETRY_DELAY_SECONDS}s.')
+        db.reset_connection()
+        time.sleep(NETWORK_RETRY_DELAY_SECONDS)
+        should_raise = False
     elif isinstance(e, praw.exceptions.RedditAPIException):
         error_types = []
         if hasattr(e, 'items') and e.items:
@@ -210,15 +236,35 @@ def handle_exception(e):
     return should_raise
 
 
-def main_loop(c_stream, i_stream):
+def handle_comment_safely(comment):
+    """Runs Phase 1 for one comment so that an error affecting only this comment skips just this comment.
+
+    Previously every such error (e.g. a 403 because an auxiliary bot is banned from the subreddit)
+    escaped to `handle_exception`, which slept and rebuilt the stream, dropping comments.
+    Network-level errors still propagate so the outer loop can back off.
+    """
+    try:
+        phase1.handle_incoming_comment(comment, metrics=metrics)
+    except TRANSIENT_NETWORK_ERRORS:
+        raise
+    except Exception as e:
+        if env_bool('DEBUG', False):
+            raise
+        permalink = getattr(comment, 'permalink', '?')
+        if isinstance(e, DATABASE_CONNECTION_ERRORS):
+            db.reset_connection()
+            logger.error(f'Database error while storing {permalink}: {e!r}')
+        elif isinstance(e, (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException)):
+            logger.info(f'Skipping comment {permalink} after Reddit error: {e!r}')
+        else:
+            logger.exception(f'Unexpected error while handling comment {permalink}: {e!r}')
+
+
+def main_loop(c_stream):
     for comment in c_stream:
         if comment is None:
             break
-        phase1.handle_incoming_comment(comment, metrics=metrics)
-    for comment in i_stream:
-        if comment is None:
-            break
-        inbox.respond_to_comment(comment)
+        handle_comment_safely(comment)
     schedule.run_pending()
 
 

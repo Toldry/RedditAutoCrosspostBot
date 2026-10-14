@@ -66,3 +66,26 @@ def test_run_filters_passes(make_mock_comment):
             res = phase2.run_filters(comment_entry, comment=valid_comment)
             assert res.passes_filter is True
             assert res.target_subreddit == 'target_sub'
+
+
+@pytest.mark.unit
+def test_run_filters_rejects_comment_edited_to_point_elsewhere(make_mock_comment):
+    comment_entry = {'permalink': '/r/test/comments/1/2/3/', 'target_subreddit': 'aww'}
+    edited_comment = make_mock_comment(body='r/some_other_sub', score=500)
+    with patch.dict('os.environ', {'COMMENT_SCORE_THRESHOLD': '10'}):
+        with patch('racb.phases.phase1.get_posts_with_same_content') as mock_search:
+            res = phase2.run_filters(comment_entry, comment=edited_comment)
+            mock_search.assert_not_called()
+    assert res.passes_filter is False
+    assert res.reason == 'TARGET_SUBREDDIT_CHANGED'
+
+
+@pytest.mark.unit
+def test_run_filters_target_comparison_is_case_insensitive(make_mock_comment):
+    comment_entry = {'permalink': '/r/test/comments/1/2/3/', 'target_subreddit': 'AWW'}
+    comment = make_mock_comment(body='r/aww', score=500)
+    mock_gpwsc = MagicMock(posts_found=False, unable_to_search=False)
+    with patch.dict('os.environ', {'COMMENT_SCORE_THRESHOLD': '10'}):
+        with patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_gpwsc):
+            res = phase2.run_filters(comment_entry, comment=comment)
+    assert res.passes_filter is True

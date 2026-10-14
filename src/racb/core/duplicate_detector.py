@@ -2,6 +2,7 @@
 
 import io
 import logging
+from collections import namedtuple
 from functools import lru_cache
 from urllib.parse import urlparse
 
@@ -11,12 +12,28 @@ import prawcore
 import requests
 
 from racb.core.reddit import get_reddit_instance
+from racb.version import __version__
 
 logger = logging.getLogger(__name__)
 
 IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.webp', '.bmp')
 IMAGE_DOMAINS = ('i.redd.it', 'i.imgur.com', 'preview.redd.it', 'imgur.com')
 DEFAULT_HASH_THRESHOLD = 5  # Maximum Hamming distance to consider two images identical
+
+# A whole-image 64-bit dhash cannot tell apart two memes made from the same template, because the
+# differing captions are a small part of the image. Each image is therefore also split into a
+# REGION_GRID_SIZE x REGION_GRID_SIZE grid, and every region must match too.
+# Trade-off: rotated reposts (even by ~1.5 degrees) no longer match, since rotation moves the edges most.
+REGION_GRID_SIZE = 4
+REGION_PIXELS = 32
+DEFAULT_REGION_HASH_THRESHOLD = 10
+
+MAX_IMAGE_BYTES = 20 * 1024 * 1024  # The VM has 1 GB of RAM; never buffer arbitrarily large downloads
+DOWNLOAD_TIMEOUT_SECONDS = 6
+DOWNLOAD_CHUNK_BYTES = 64 * 1024
+HTTP_HEADERS = {'User-Agent': f'RACB/{__version__} (+https://github.com/Toldry/RedditAutoCrosspostBot)'}
+
+ImageFingerprint = namedtuple('ImageFingerprint', ['global_hash', 'region_hashes'])
 
 
 def is_image_url(url):
@@ -31,24 +48,78 @@ def is_image_url(url):
     return False
 
 
+def download_image_bytes(url):
+    """Downloads an image, giving up (returning None) if it is larger than MAX_IMAGE_BYTES."""
+    with requests.get(url, headers=HTTP_HEADERS, timeout=DOWNLOAD_TIMEOUT_SECONDS, stream=True) as response:
+        if response.status_code != 200:
+            return None
+        declared_length = response.headers.get('Content-Length', '')
+        if declared_length.isdigit() and int(declared_length) > MAX_IMAGE_BYTES:
+            logger.debug(f'Skipping {url}: declared size {declared_length} bytes exceeds limit')
+            return None
+        buffer = bytearray()
+        for chunk in response.iter_content(DOWNLOAD_CHUNK_BYTES):
+            buffer.extend(chunk)
+            if len(buffer) > MAX_IMAGE_BYTES:
+                logger.debug(f'Skipping {url}: size exceeds {MAX_IMAGE_BYTES} bytes')
+                return None
+        return bytes(buffer)
+
+
+def compute_region_hashes(img):
+    """Computes a dhash for every cell of a REGION_GRID_SIZE x REGION_GRID_SIZE grid over the image."""
+    side = REGION_GRID_SIZE * REGION_PIXELS
+    grayscale = img.convert('L').resize((side, side))
+    region_hashes = []
+    for row in range(REGION_GRID_SIZE):
+        for column in range(REGION_GRID_SIZE):
+            box = (
+                column * REGION_PIXELS,
+                row * REGION_PIXELS,
+                (column + 1) * REGION_PIXELS,
+                (row + 1) * REGION_PIXELS,
+            )
+            region_hashes.append(imagehash.dhash(grayscale.crop(box)))
+    return tuple(region_hashes)
+
+
 @lru_cache(maxsize=256)
-def compute_image_hash(url):
-    """Downloads an image from a URL and computes its 64-bit difference hash (dhash)."""
+def compute_image_fingerprint(url):
+    """Downloads an image from a URL and computes its whole-image dhash plus per-region dhashes."""
     if not is_image_url(url):
         return None
 
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RACB/2.2'}
-        response = requests.get(url, headers=headers, timeout=6, stream=True)
-        if response.status_code != 200:
+        image_bytes = download_image_bytes(url)
+        if image_bytes is None:
             return None
-
-        image_bytes = io.BytesIO(response.content)
-        with Image.open(image_bytes) as img:
-            return imagehash.dhash(img)
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            return ImageFingerprint(imagehash.dhash(img), compute_region_hashes(img))
     except Exception as e:
         logger.debug(f'Could not compute perceptual hash for {url}: {e}')
         return None
+
+
+def compute_image_hash(url):
+    """Downloads an image from a URL and computes its 64-bit difference hash (dhash)."""
+    fingerprint = compute_image_fingerprint(url)
+    return fingerprint.global_hash if fingerprint else None
+
+
+def max_region_distance(fingerprint_a, fingerprint_b):
+    return max(
+        region_a - region_b
+        for region_a, region_b in zip(fingerprint_a.region_hashes, fingerprint_b.region_hashes)
+    )
+
+
+def fingerprints_match(fingerprint_a, fingerprint_b, hash_threshold=DEFAULT_HASH_THRESHOLD,
+                       region_hash_threshold=DEFAULT_REGION_HASH_THRESHOLD):
+    """Returns (is_match, whole_image_distance)."""
+    distance = fingerprint_a.global_hash - fingerprint_b.global_hash
+    if distance > hash_threshold:
+        return False, distance
+    return max_region_distance(fingerprint_a, fingerprint_b) <= region_hash_threshold, distance
 
 
 def get_reposts_in_sub(source_comment, target_subreddit, hash_threshold=DEFAULT_HASH_THRESHOLD, limit=50):
@@ -69,8 +140,8 @@ def get_reposts_in_sub(source_comment, target_subreddit, hash_threshold=DEFAULT_
     if not source_url or not is_image_url(source_url):
         return []
 
-    source_hash = compute_image_hash(source_url)
-    if source_hash is None:
+    source_fingerprint = compute_image_fingerprint(source_url)
+    if source_fingerprint is None:
         return []
 
     target_subreddit = target_subreddit.lower()
@@ -112,12 +183,12 @@ def get_reposts_in_sub(source_comment, target_subreddit, hash_threshold=DEFAULT_
                 })
                 continue
 
-            candidate_hash = compute_image_hash(candidate_url)
-            if candidate_hash is None:
+            candidate_fingerprint = compute_image_fingerprint(candidate_url)
+            if candidate_fingerprint is None:
                 continue
 
-            distance = source_hash - candidate_hash
-            if distance <= hash_threshold:
+            is_match, distance = fingerprints_match(source_fingerprint, candidate_fingerprint, hash_threshold)
+            if is_match:
                 logger.info(
                     f'Perceptual image duplicate found in r/{target_subreddit}: '
                     f'Source={source_url} vs Candidate={candidate_url} (distance={distance})'

@@ -1,11 +1,10 @@
 """Phase 2: Retrieves aged comment entries from the DB and batch-validates them against Reddit API."""
 
 import logging
-import os
 import praw
 import prawcore
-import pytimeparse
 
+from racb import config
 from racb.core import db, reddit
 from racb.phases import phase1
 
@@ -16,10 +15,9 @@ BATCH_SIZE = 100
 
 def filter_comments_from_db(verbose=False):
     logger.info('Running phase 2 comment filter pass...')
-    PHASE2_WAITING_PERIOD = os.environ.get('PHASE2_WAITING_PERIOD', '2 hours')
-    waiting_period_seconds = pytimeparse.timeparse.timeparse(PHASE2_WAITING_PERIOD) or 7200
+    waiting_period_seconds = config.phase2_waiting_period_seconds()
     comment_entries = db.get_unchecked_comments_older_than(waiting_period_seconds)
-    logger.info(f'Found {len(comment_entries)} unchecked comment(s) older than {PHASE2_WAITING_PERIOD}')
+    logger.info(f'Found {len(comment_entries)} unchecked comment(s) older than {waiting_period_seconds}s')
 
     if not comment_entries:
         logger.info('Finished phase 2 comment filter (0 comments to process)')
@@ -96,7 +94,7 @@ def run_filters(comment_entry, comment=None):
         result.reason = 'COMMENT_DELETED_OR_REMOVED'
         return result
 
-    comment_score_threshold = int(os.environ.get('COMMENT_SCORE_THRESHOLD', '1'))
+    comment_score_threshold = config.comment_score_threshold()
     if getattr(comment, 'score', 0) < comment_score_threshold:
         result.reason = 'COMMENT_SCORE_TOO_LOW'
         return result
@@ -106,6 +104,14 @@ def run_filters(comment_entry, comment=None):
     if target_subreddit is None:
         # this can happen when the source comment was edited since it was scraped
         result.reason = 'TARGET_SUBREDDIT_NOT_FOUND'
+        return result
+
+    # Guards against bait-and-switch edits: a comment that gathered upvotes for one subreddit
+    # must not be able to redirect the crosspost to another. Rows scraped before the
+    # target_subreddit column existed have no stored target and skip this check.
+    stored_target_subreddit = comment_entry.get('target_subreddit')
+    if stored_target_subreddit and stored_target_subreddit.lower() != target_subreddit.lower():
+        result.reason = 'TARGET_SUBREDDIT_CHANGED'
         return result
 
     gpwsc_result = phase1.get_posts_with_same_content(comment, target_subreddit)
