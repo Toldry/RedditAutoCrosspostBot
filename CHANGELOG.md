@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
-- **Dependabot:** Removed `.github/dependabot.yml`, so Dependabot no longer opens version-update pull requests. Dependencies are upgraded manually with `uv lock --upgrade-package`.
+### Changed
+- **Dependabot Paused:** `.github/dependabot.yml` now sets `open-pull-requests-limit: 0`, so Dependabot no longer opens version-update pull requests. Dependencies are upgraded manually with `uv lock --upgrade-package`. Remove those lines to resume.
 
 ## [2.3.0] - 2026-10-15
 
