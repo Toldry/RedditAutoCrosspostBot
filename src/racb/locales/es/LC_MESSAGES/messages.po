@@ -1,0 +1,59 @@
+# Spanish translations. Empty strings fall back to the en catalog.
+# Edit this file, then run `uv run pybabel compile -d src/racb/locales`
+# and commit the regenerated messages.mo next to it.
+msgid ""
+msgstr ""
+"Project-Id-Version: RedditAutoCrosspostBot\n"
+"Language: es\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "POST_SUFFIX_TEXT"
+msgstr ""
+"\n"
+"\n"
+"--- \n"
+"^(🤖 este comentario fue escrito por un bot. bip boop 🤖)\n"
+"\n"
+"^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://www.botrank.net/bots/{bot_name})"
+
+msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
+msgstr ""
+
+msgid "REPLY_TO_CROSSPOST"
+msgstr ""
+"\n"
+"Compartí esto de r/{source_subreddit} en r/{target_subreddit} después de ver [este comentario **hecho por humanos** con una votación decente]({source_comment_permalink}) (score={source_comment_score}), que parece sugerir que esta publicación también encajaría bien aquí.\n"
+"\n"
+"Esperé {timedelta_string} antes de compartirlo, por si una persona quería hacerlo por su cuenta.\n"
+"\n"
+"Si cree que esto fue un error, vote negativo; eliminaré las publicaciones con puntuación negativa.\n"
+
+msgid "THE_USER_WHO_COMMENTED"
+msgstr ""
+
+msgid "THATS_WHERE_WE_ARE"
+msgstr ""
+
+msgid "NONEXISTENT_SUBREDDIT"
+msgstr ""
+
+msgid "ALTERNATE_SUBS_SUGGESTION"
+msgstr ""
+
+msgid "MAYBE_TYPO"
+msgstr ""
+
+msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
+msgstr ""
+
+msgid "FOUND_POST_WITH_SAME_CONTENT"
+msgstr ""
+
+msgid "DURATION_IN_DAYS"
+msgid_plural "DURATION_IN_DAYS_PLURAL"
+msgstr[0] "{days} día"
+msgstr[1] "{days} días"
+

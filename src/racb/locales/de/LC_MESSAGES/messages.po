@@ -1,0 +1,59 @@
+# German translations. Empty strings fall back to the en catalog.
+# Edit this file, then run `uv run pybabel compile -d src/racb/locales`
+# and commit the regenerated messages.mo next to it.
+msgid ""
+msgstr ""
+"Project-Id-Version: RedditAutoCrosspostBot\n"
+"Language: de\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "POST_SUFFIX_TEXT"
+msgstr ""
+"\n"
+"\n"
+"---\n"
+"^(🤖 Dieser Kommentar wurde von einem Bot geschrieben. Beep Boop 🤖)\n"
+"\n"
+"^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://www.botrank.net/bots/{bot_name})"
+
+msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
+msgstr ""
+
+msgid "REPLY_TO_CROSSPOST"
+msgstr ""
+"\n"
+"Ich habe diesen Beitrag von r/{source_subreddit} nach r/{target_subreddit} gecrosspostet, nachdem ich [diesen ordentlich hochgevoteten, von einem Menschen geschriebenen Kommentar]({source_comment_permalink}) (Score={source_comment_score}) gesehen habe, der nahelegt, dass dieser Beitrag auch hier gut passen würde.\n"
+"\n"
+"Ich habe {timedelta_string} gewartet, falls ein Mensch das lieber selbst crossposten wollte.\n"
+"\n"
+"Wenn du der Meinung bist, dass es hier nicht passt, downvote den Post. Ich werde Beiträge mit negativem Score entfernen.\n"
+
+msgid "THE_USER_WHO_COMMENTED"
+msgstr "der Nutzer, der kommentiert hat"
+
+msgid "THATS_WHERE_WE_ARE"
+msgstr "Ja, da sind wir."
+
+msgid "NONEXISTENT_SUBREDDIT"
+msgstr "Den Subreddit r/{target_subreddit} gibt es nicht."
+
+msgid "ALTERNATE_SUBS_SUGGESTION"
+msgstr ""
+
+msgid "MAYBE_TYPO"
+msgstr ""
+
+msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
+msgstr "Vielleicht [sollte man es erstellen](/subreddits/create?name={target_subreddit})."
+
+msgid "FOUND_POST_WITH_SAME_CONTENT"
+msgstr "Ich habe [diesen Post]({same_content_post_url}) in r/{target_subreddit} gefunden, der denselben Link enthält."
+
+msgid "DURATION_IN_DAYS"
+msgid_plural "DURATION_IN_DAYS_PLURAL"
+msgstr[0] "{days} Tag"
+msgstr[1] "{days} Tage"
+
