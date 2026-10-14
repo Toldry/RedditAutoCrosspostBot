@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Single-Entry Runs:** `python -m racb --process-one [ID]` runs Phase 3 on one database row and exits, for testing the bot in production one crosspost at a time. With an id, that row is processed even if it is not due yet; without one, the oldest due row is. Combine with `DRY_RUN=True` to only log. Adds the `get_scraped_comment_by_id` database function.
+- **Single-Entry Runs:** `python -m racb --process-one` runs Phase 3 on the oldest row in `scraped_comments` only and exits, for testing the bot in production one crosspost at a time. The row is processed even if it is not due yet. Combine with `DRY_RUN=True` to only log. Adds the `get_oldest_scraped_comment` database function.
 - **gettext Translations:** Bot replies are now translated with standard gettext catalogs (`src/racb/locales/<locale>/LC_MESSAGES/messages.po`, compiled to committed `.mo` files with Babel) instead of a hardcoded dictionary in `i18n.py`. The r/totallynotrobots style is now the `en@totallynotrobots` locale, an English variant that falls back to English. The subreddit-to-language map moved to `src/racb/locales/subreddits.toml`. All existing replies are unchanged, apart from the plural fix below.
 
 ### Changed

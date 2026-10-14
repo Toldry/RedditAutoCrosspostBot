@@ -73,8 +73,8 @@ END;
 $$
 LANGUAGE plpgsql;
 
-DROP FUNCTION IF EXISTS get_scraped_comment_by_id(INTEGER);
-CREATE OR REPLACE FUNCTION get_scraped_comment_by_id(p_id INTEGER)
+DROP FUNCTION IF EXISTS get_oldest_scraped_comment();
+CREATE OR REPLACE FUNCTION get_oldest_scraped_comment()
 RETURNS
     TABLE(id INTEGER, permalink VARCHAR, scraped_time TIMESTAMP, target_subreddit VARCHAR)
 AS
@@ -82,7 +82,8 @@ $$
 BEGIN RETURN QUERY
     SELECT sc.id, sc.permalink, sc.scraped_time, sc.target_subreddit
     FROM scraped_comments as sc
-    WHERE sc.id = p_id;
+    ORDER BY sc.scraped_time, sc.id
+    LIMIT 1;
 END;
 $$
 LANGUAGE plpgsql;

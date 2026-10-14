@@ -82,9 +82,9 @@ cp .env.example .env
 uv run python -m racb
 ```
 
-To test in production one entry at a time, `uv run python -m racb --process-one 42` runs the final checks and
-the crosspost for the database row with id 42 (or, with no id, the oldest row that is due) and exits. Add
-`DRY_RUN=True` to only log what it would do. See section 5 of [`AGENTS.md`](./AGENTS.md) for details.
+To test in production one entry at a time, `uv run python -m racb --process-one` runs the final checks and
+the crosspost for the oldest row in the database only, and exits. Add `DRY_RUN=True` to only log what it
+would do. See section 5 of [`AGENTS.md`](./AGENTS.md) for details.
 
 `uv run` uses `.venv` without activating it. To use plain `python`, `pytest` etc. directly, activate it first:
 ```bash

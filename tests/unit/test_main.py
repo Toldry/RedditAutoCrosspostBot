@@ -152,33 +152,18 @@ def test_help_does_not_require_reddit_authentication():
     mock_auth.assert_not_called()
 
 
+
 @pytest.mark.unit
-@pytest.mark.parametrize('argv, expected_entry_id', [
-    (['racb', '--process-one', '42'], 42),
-    (['racb', '--process-one'], None),
-])
-def test_process_one_runs_single_entry_and_exits(argv, expected_entry_id):
+@pytest.mark.parametrize('found, expected_exit_code', [(True, 0), (False, 1)])
+def test_process_one_runs_oldest_entry_and_exits(found, expected_exit_code):
     from racb.main import main
     with patch('racb.main.configure_logging'), \
          patch('racb.core.reddit.authenticate_all_bots'), \
-         patch('racb.main.phase3.process_single_entry', return_value=True) as mock_single, \
+         patch('racb.main.phase3.process_oldest_entry', return_value=found) as mock_oldest, \
          patch('racb.main.start_bot') as mock_start, \
-         patch('sys.argv', argv), \
+         patch('sys.argv', ['racb', '--process-one']), \
          pytest.raises(SystemExit) as excinfo:
         main()
-    assert excinfo.value.code == 0
-    mock_single.assert_called_once_with(expected_entry_id)
+    assert excinfo.value.code == expected_exit_code
+    mock_oldest.assert_called_once_with()
     mock_start.assert_not_called()
-
-
-@pytest.mark.unit
-def test_process_one_exits_nonzero_when_no_entry():
-    from racb.main import main
-    with patch('racb.main.configure_logging'), \
-         patch('racb.core.reddit.authenticate_all_bots'), \
-         patch('racb.main.phase3.process_single_entry', return_value=False), \
-         patch('racb.main.start_bot'), \
-         patch('sys.argv', ['racb', '--process-one', '5']), \
-         pytest.raises(SystemExit) as excinfo:
-        main()
-    assert excinfo.value.code == 1

@@ -34,10 +34,6 @@ TRANSIENT_NETWORK_ERRORS = (
 )
 DATABASE_CONNECTION_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
 
-# Value of --process-one when it is given without an ID. Not a string, because argparse would
-# pass a string const through type=int.
-NEXT_DUE_ENTRY = object()
-
 
 class StreamMetrics:
     """Tracks throughput and events for Reddit comment and inbox streaming."""
@@ -165,14 +161,10 @@ def parse_args():
     parser.add_argument('--only-phase2', action='store_true', help="Run Phase 2 filtering only and exit")
     parser.add_argument(
         '--process-one',
-        nargs='?',
-        const=NEXT_DUE_ENTRY,
-        type=int,
-        metavar='ID',
+        action='store_true',
         help=(
-            "Run Phase 3 (final checks, crosspost, reply, row delete) on one DB entry and exit. "
-            "ID is the scraped_comments id; it is processed even if it is not due yet. "
-            "Without ID, the oldest entry that is due is processed. Combine with DRY_RUN=True to only log."
+            "Run Phase 3 (final checks, crosspost, reply, row delete) on the oldest DB entry only and exit, "
+            "even if it is not due yet. Combine with DRY_RUN=True to only log."
         ),
     )
     return parser.parse_args()
@@ -197,9 +189,8 @@ def main():
         phase2.filter_comments_from_db(verbose=True)
         return
 
-    if args.process_one is not None:
-        entry_id = None if args.process_one is NEXT_DUE_ENTRY else args.process_one
-        found = phase3.process_single_entry(entry_id)
+    if args.process_one:
+        found = phase3.process_oldest_entry()
         sys.exit(0 if found else 1)
 
     start_bot()

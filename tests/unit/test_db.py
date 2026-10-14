@@ -61,7 +61,7 @@ def test_db_operations(make_mock_comment):
         db.set_comment_checked({'id': 42})
         mock_cursor.callproc.assert_called_with('set_comment_checked', (42,))
 
-        # 6. get_comment_by_id
+        # 6. get_oldest_comment
         mock_cursor.fetchone.return_value = {'id': 42, 'permalink': '/r/test/'}
-        assert db.get_comment_by_id(42)['id'] == 42
-        mock_cursor.callproc.assert_called_with('get_scraped_comment_by_id', (42,))
+        assert db.get_oldest_comment()['id'] == 42
+        mock_cursor.callproc.assert_called_with('get_oldest_scraped_comment')

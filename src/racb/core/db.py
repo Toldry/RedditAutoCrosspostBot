@@ -148,11 +148,11 @@ def get_unchecked_comments_older_than(num_seconds):
         return comment_entries
 
 
-def get_comment_by_id(comment_id):
-    """Returns the row with this id (regardless of its age), or None if there is none."""
+def get_oldest_comment():
+    """Returns the row with the earliest scraped_time (regardless of its age), or None if the table is empty."""
     conn = get_connection()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.callproc('get_scraped_comment_by_id', (comment_id,))
+        cur.callproc('get_oldest_scraped_comment')
         return cur.fetchone()
 
 
