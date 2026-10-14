@@ -265,11 +265,11 @@ def handle_comment_safely(comment):
         permalink = getattr(comment, 'permalink', '?')
         if isinstance(e, DATABASE_CONNECTION_ERRORS):
             db.reset_connection()
-            logger.error(f'Database error while storing {permalink}: {e!r}')
+            logger.error(f'Database error while storing {reddit.full_url(permalink)}: {e!r}')
         elif isinstance(e, (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException)):
-            logger.info(f'Skipping comment {permalink} after Reddit error: {e!r}')
+            logger.info(f'Skipping comment {reddit.full_url(permalink)} after Reddit error: {e!r}')
         else:
-            logger.exception(f'Unexpected error while handling comment {permalink}: {e!r}')
+            logger.exception(f'Unexpected error while handling comment {reddit.full_url(permalink)}: {e!r}')
 
 
 def main_loop(c_stream):
