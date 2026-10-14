@@ -1,6 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: pip
+  # Updates pyproject.toml lower bounds and uv.lock
+  - package-ecosystem: uv
     directory: /
     schedule:
       interval: monthly

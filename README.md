@@ -68,52 +68,58 @@ docker compose down
 ## Local Development (Without Docker)
 
 ### Requirements
-* Python 3.10+
+* [uv](https://docs.astral.sh/uv/getting-started/installation/), which manages the virtual environment, the dependencies and the Python version (3.11, from `.python-version`; uv downloads it if it is missing)
 * PostgreSQL 14+
 
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt # Optional: for release management (bump-my-version)
+# 1. Create .venv and install the locked dependencies, including the dev tools (pytest, bump-my-version)
+uv sync
 
 # 2. Configure .env with your local DATABASE_URL
 cp .env.example .env
 
-# 3. Set PYTHONPATH and run the bot module
-export PYTHONPATH=src          # Linux/macOS
-$env:PYTHONPATH="src"          # Windows PowerShell
-
-python -m racb
+# 3. Run the bot module inside the virtual environment
+uv run python -m racb
 ```
+
+`uv run` uses `.venv` without activating it. To use plain `python`, `pytest` etc. directly, activate it first:
+```bash
+source .venv/bin/activate      # Linux/macOS
+.venv\Scripts\Activate.ps1     # Windows PowerShell
+```
+
+### Managing Dependencies
+Dependencies are declared in [`pyproject.toml`](./pyproject.toml), and the exact version of every package,
+including indirect ones, is pinned in [`uv.lock`](./uv.lock). Commit both files together.
+```bash
+uv add some-package                   # add a runtime dependency
+uv add --dev some-package             # add a development-only dependency
+uv lock --upgrade-package praw        # upgrade one package within the bounds in pyproject.toml
+uv lock --upgrade                     # upgrade everything
+uv sync                               # apply the lock to .venv
+```
+Dependabot opens monthly pull requests that do the same.
 
 ### Running the Tests
 The unit tests are fully mocked: they need no Reddit credentials, network access or database.
 
 ```bash
-# 1. Create and activate a virtual environment (once)
-python -m venv .venv
-source .venv/bin/activate      # Linux/macOS
-.venv\Scripts\Activate.ps1     # Windows PowerShell
-
-# 2. Install runtime and test dependencies
-pip install -r requirements.txt -r requirements-dev.txt
-
-# 3. Run the unit tests (pytest.ini sets PYTHONPATH and skips the live tests)
-pytest
+uv sync          # once, or after the lock changes
+uv run pytest    # pytest.ini skips the live integration tests
 ```
 
 Useful variations:
 ```bash
-pytest tests/unit/test_phase1.py   # one file
-pytest -k duplicate                # tests whose name matches "duplicate"
-pytest -x -vv                      # stop at the first failure, verbose output
+uv run pytest tests/unit/test_phase1.py   # one file
+uv run pytest -k duplicate                # tests whose name matches "duplicate"
+uv run pytest -x -vv                      # stop at the first failure, verbose output
 ```
 
 > [!WARNING]
-> `pytest -m integration` runs the **live** integration tests. They log in as all 4 real bot accounts
+> `uv run pytest -m integration` runs the **live** integration tests. They log in as all 4 real bot accounts
 > (credentials from `.env`) and post real submissions and comments in the private test subreddits
 > `r/racb_test_1` and `r/racb_test_2`. They delete what they create; leftovers can be removed with
-> `python scripts/cleanup_test_history.py --dry-run` (preview) and then `--limit 0`.
+> `uv run python scripts/cleanup_test_history.py --dry-run` (preview) and then `--limit 0`.
 
 CI runs the unit tests on Python 3.11 for every pull request and every push to `master`
 (see [`.github/workflows/tests.yml`](./.github/workflows/tests.yml)).
@@ -121,7 +127,7 @@ CI runs the unit tests on Python 3.11 for every pull request and every push to `
 ### Versioning & Releases
 Releases adhere to [Semantic Versioning](https://semver.org/) and are managed with `bump-my-version`:
 ```bash
-bump-my-version bump patch   # or minor / major
+uv run bump-my-version bump patch   # or minor / major
 ```
 
 ---

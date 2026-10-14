@@ -4,6 +4,8 @@
 !.env.example
 !.gitignore
 !.bumpversion.toml
+!.python-version
+!.dockerignore
 !.github/
 old.py
 app.log*

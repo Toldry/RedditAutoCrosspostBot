@@ -29,11 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Inbox Feedback for All Bots:** A scheduled job reads the unread inboxes of all 4 bots every 10 minutes and logs good/bad bot feedback. It replaces the continuous `AutoCrosspostBot`-only inbox stream, which polled without pause and shared the request budget with the `r/all` stream.
 - **`racb.config` Module:** Single place for environment parsing (booleans, durations, flags); it replaces three inconsistent boolean parsers.
 - **CI & Dependabot:** GitHub Actions workflow running the unit tests on Python 3.11, and monthly Dependabot updates. `.github/` is now allowed by `.gitignore`.
-- **README Test Instructions:** How to set up a virtual environment, run the unit tests, and what the live integration tests do.
+- **README Test & Dependency Instructions:** How to set up the environment with uv, run the unit tests, manage dependencies, and what the live integration tests do.
 - **Unit Tests:** 33 new tests covering the fixes above (94 unit tests in total).
 
 ### Changed
-- **Pinned Dependencies:** `requirements*.txt` now pin exact, tested versions (a fresh install had already resolved PRAW 8 / prawcore 4).
+- **Dependency Management with uv:** `requirements.txt` and `requirements-dev.txt` are replaced by `pyproject.toml` and a cross-platform `uv.lock`. The lock pins every package, including transitive ones such as numpy and scipy that were previously unpinned, at the tested versions (PRAW 8.0.3 / prawcore 4.0.0, which a fresh install had already resolved). `racb` is now an installable package, so `PYTHONPATH=src` is no longer needed. The Docker image installs from the lock into `/opt/venv` without dev dependencies, CI uses `uv sync --locked`, and Dependabot updates the lock. A new `.dockerignore` keeps local virtualenvs and caches out of the image (`.env` is still included).
+- **Python Version:** `requires-python = ">=3.11"`, recorded in `.python-version`. The README previously claimed 3.10+, which was never tested.
 - **Default Test Selection:** A bare `pytest` no longer runs the live Reddit integration tests; use `pytest -m integration`.
 - **Integration Test Cleanup:** Integration tests delete what they create again by default; set `RACB_KEEP_TEST_ARTIFACTS=true` to keep it. The live image test no longer expects rotated images to match.
 - **`DEBUG` Mode:** At startup it now runs only Phase 2 immediately, instead of every job including real Phase 3 crossposts and cleanup deletions. It no longer disables TLS for remote databases.

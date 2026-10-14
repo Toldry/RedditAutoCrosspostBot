@@ -1,0 +1,42 @@
+[project]
+name = "racb"
+description = "Reddit bot that crossposts posts triggered by users."
+readme = "README.md"
+# Keep in sync with the Dockerfile base image and .python-version
+requires-python = ">=3.11"
+# The version lives in src/racb/version.py, where bump-my-version updates it
+dynamic = ["version"]
+# Lower bounds are the tested versions; the exact resolution of every package,
+# including transitive ones, is pinned in uv.lock. Upgrade with
+# `uv lock --upgrade-package <name>` (or `uv lock --upgrade` for everything).
+dependencies = [
+    "imagehash>=4.3.2",
+    "pillow>=12.3.0",
+    # Major versions of PRAW/prawcore change the API; upgrade them deliberately
+    "praw>=8.0.3,<9",
+    "prawcore>=4.0.0,<5",
+    "psycopg2-binary>=2.9.13",
+    "python-dotenv>=1.2.4",
+    "pytimeparse>=1.1.9",
+    "requests>=2.34.2",
+    "schedule>=1.2.2",
+    "urllib3>=2.8.0",
+]
+
+[dependency-groups]
+# Installed by `uv sync` by default; the Docker image uses `--no-dev`
+dev = [
+    "bump-my-version>=1.5.1",
+    "pytest>=9.1.1",
+    "pytest-mock>=3.16.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/racb/version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/racb"]

@@ -10,11 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          # Keep in sync with the Dockerfile base image
-          python-version: '3.11'
-          cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt
+          # Keep in sync with the Dockerfile
+          version: '0.11.32'
+          enable-cache: true
+      # Python comes from .python-version (kept in sync with the Dockerfile base image).
+      # --locked fails the build if uv.lock is out of date with pyproject.toml.
+      - run: uv sync --locked
       # pytest.ini deselects the live integration tests by default
-      - run: pytest
+      - run: uv run pytest
