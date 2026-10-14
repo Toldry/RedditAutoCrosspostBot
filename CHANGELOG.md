@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-10-14
+
 ### Changed
 - **Clickable Log Links:** Log lines that mention a comment or submission now print its full URL (`https://reddit.com/r/.../comments/...`) instead of the bare permalink path, so it can be opened straight from the log. This also fixes the doubled slash in the "Qualified recommendation match found" line.
 
