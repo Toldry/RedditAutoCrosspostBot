@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **gettext Translations:** Bot replies are now translated with standard gettext catalogs (`src/racb/locales/<locale>/LC_MESSAGES/messages.po`, compiled to committed `.mo` files with Babel) instead of a hardcoded dictionary in `i18n.py`. The r/totallynotrobots style is now the `en@totallynotrobots` locale, an English variant that falls back to English. The subreddit-to-language map moved to `src/racb/locales/subreddits.toml`. All existing replies are unchanged, apart from the plural fix below.
 
 ### Changed
+- **Automatic Releases:** Nobody bumps the version by hand anymore. After the tests pass on `master`, a new `release` CI job picks the bump from the Conventional Commits since the last tag (`feat` minor, `!` or `BREAKING CHANGE:` major, anything else patch; see `scripts/release_level.py`), then runs `bump-my-version`, which moves these `[Unreleased]` entries into a dated section, commits and pushes a `vX.Y.Z` tag. It skips the release when `[Unreleased]` is empty.
 - **Dependabot Paused:** `.github/dependabot.yml` now sets `open-pull-requests-limit: 0`, so Dependabot no longer opens version-update pull requests. Dependencies are upgraded manually with `uv lock --upgrade-package`. Remove those lines to resume.
 - **Bot Footer:** Removed the "feel welcome to respond 'Bad bot'/'Good bot'" line in every language, and the Rank link now points to `https://www.botrank.net/bots/<bot name>` instead of botranks.com.
 
