@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Untranslated replies:** Spanish and French subreddits got their "subreddit doesn't exist", "that's where we are" and "same content" replies entirely in English, because those strings had no Spanish or French translation. Every locale now translates every string, including the "bad bot" question and the new "good bot" thank-you.
 
+## [2.6.0] - 2026-10-15
+
+### Changed
+- The negative feedback report shows only each thread's new feedback at first; the post and the full conversation open with a "Show full conversation" button.
+
+### Fixed
+- The negative feedback report no longer counts comments whose body is `[unavailable]` (or `[deleted]` / `[removed]` in any letter case) as written feedback.
+
 ## [2.5.0] - 2026-10-15
 
 ### Added
