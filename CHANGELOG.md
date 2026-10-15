@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-10-15
+
 ### Fixed
 - **"Human-Made" Footnote Restored:** the crosspost reply again calls the source comment **human-made**^1, with the footnote "1 - Assuming /u/<user> is human". English lost it in 2021 when the sentence was reworded; German, Spanish, French and Russian now have it too (Hebrew and r/totallynotrobots always kept it).
 
