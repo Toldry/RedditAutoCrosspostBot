@@ -73,8 +73,9 @@ jobs:
           fi
 
   # Live tests against Reddit as the 4 real bot accounts, in the private test subreddits r/racb_test_1 and
-  # r/racb_test_2, then a cleanup of what they posted. Both must pass before deploy runs, so they only run
-  # when auto-deploy is on. The credentials are the bots' .env values, stored as repository secrets.
+  # r/racb_test_2. They must pass before deploy runs, so they only run when auto-deploy is on. The
+  # credentials are the bots' .env values, stored as repository secrets. Each test deletes what it posts;
+  # the cleanup-test-history job below then sweeps up any leftovers, in parallel with deploy.
   integration-tests:
     needs: unit-tests
     if: >-
@@ -107,14 +108,45 @@ jobs:
       - run: uv sync --locked
       - name: Live integration tests
         run: uv run pytest -m integration
-      # Runs even when the tests failed, so a failed run leaves no test posts behind; --strict fails the job
-      # (and so blocks deploy) if any test item could not be deleted or any bot could not be checked
+
+  # Deletes test posts and comments the integration tests left behind. It is slow (it walks the recent
+  # history of all 4 bots), so it runs alongside deploy instead of before it, and also after failed or
+  # cancelled tests. --strict turns the job red if any test item could not be deleted or any bot could not
+  # be checked; that does not block deploy.
+  cleanup-test-history:
+    needs: integration-tests
+    if: ${{ !cancelled() && needs.integration-tests.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # Same group as integration-tests: sweeping while another run's tests are posting would delete their
+    # posts mid-test
+    concurrency:
+      group: reddit-integration-tests
+      cancel-in-progress: false
+    env:
+      PASSWORD: ${{ secrets.PASSWORD }}
+      APP_CLIENT_SECRET: ${{ secrets.APP_CLIENT_SECRET }}
+      PASSWORD__SUB_DOESNT_EXIST: ${{ secrets.PASSWORD__SUB_DOESNT_EXIST }}
+      APP_CLIENT_SECRET__SUB_DOESNT_EXIST: ${{ secrets.APP_CLIENT_SECRET__SUB_DOESNT_EXIST }}
+      PASSWORD__SAME_SUBREDDIT: ${{ secrets.PASSWORD__SAME_SUBREDDIT }}
+      APP_CLIENT_SECRET__SAME_SUBREDDIT: ${{ secrets.APP_CLIENT_SECRET__SAME_SUBREDDIT }}
+      PASSWORD__SAME_POST: ${{ secrets.PASSWORD__SAME_POST }}
+      APP_CLIENT_SECRET__SAME_POST: ${{ secrets.APP_CLIENT_SECRET__SAME_POST }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          # Keep in sync with the Dockerfile
+          version: '0.11.32'
+          enable-cache: true
+      - run: uv sync --locked
       - name: Clean up test posts and comments
-        if: success() || failure()
         run: uv run python scripts/cleanup_test_history.py --strict
 
-  # Rebuilds and restarts the bot on the VM at the commit the release job ended on, once the unit tests,
-  # the live integration tests and their cleanup all passed. Setup and security model:
+  # Rebuilds and restarts the bot on the VM at the commit the release job ended on, once the unit tests and
+  # the live integration tests passed. Setup and security model:
   # docs/auto-deploy.md. Off until the AUTO_DEPLOY variable is 'true'.
   deploy:
     needs: [release, integration-tests]

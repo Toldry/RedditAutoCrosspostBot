@@ -168,7 +168,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
 | [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether CHANGELOG `[Unreleased]` has entries. |
-| [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run`, `--limit N` (`0` means all) and `--strict` (exit code 1 if a bot could not be checked or a test item could not be deleted; CI uses it to gate deploys). |
+| [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run`, `--limit N` (`0` means all) and `--strict` (exit code 1 if a bot could not be checked or a test item could not be deleted; CI's `cleanup-test-history` job uses it). |
 | [`scripts/redeploy.sh`](./scripts/redeploy.sh) | Runs **on the VM**: resets the checkout to a commit of `origin/master` (argument, `SSH_ORIGINAL_COMMAND`, or the latest), runs `docker compose up --detach --build`, and fails if the bot is not running 30 s later. The CI `deploy` job's SSH key is pinned to it. Refuses to run on a dirty or diverged checkout. |
 | [`scripts/authorize_deploy_key.sh`](./scripts/authorize_deploy_key.sh) | Runs **on the VM** once: adds the CI deploy key to `~/.ssh/authorized_keys` as a forced command for `redeploy.sh` and prints the host key. |
 | [`scripts/setup_auto_deploy.sh`](./scripts/setup_auto_deploy.sh) | One-time setup of automatic deployment, run in Cloud Shell: service account, Workload Identity Federation, IAP firewall rule, deploy key, GitHub variables. See [`docs/auto-deploy.md`](./docs/auto-deploy.md). |
@@ -178,7 +178,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
-| [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. On `master`, a `release` job then bumps the version and tags it (section 5), and, when the `AUTO_DEPLOY` variable is `true`, an `integration-tests` job runs the live tests plus `cleanup_test_history.py --strict` with the bot credentials from repository secrets, after which a `deploy` job redeploys the VM at the released commit ([`docs/auto-deploy.md`](./docs/auto-deploy.md)). |
+| [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. On `master`, a `release` job then bumps the version and tags it (section 5), and, when the `AUTO_DEPLOY` variable is `true`, an `integration-tests` job runs the live tests with the bot credentials from repository secrets, after which a `deploy` job redeploys the VM at the released commit while a `cleanup-test-history` job runs `cleanup_test_history.py --strict` ([`docs/auto-deploy.md`](./docs/auto-deploy.md)). |
 | [`.github/dependabot.yml`](./.github/dependabot.yml) | Dependabot config for `pyproject.toml` / `uv.lock` (`uv` ecosystem) and GitHub Actions. Version updates are **paused** with `open-pull-requests-limit: 0`; delete those lines to resume monthly PRs. |
 | [`examples/example_reddit_comment.py`](./examples/example_reddit_comment.py) | Not executable code: a commented-out attribute dump of a PRAW `Comment` and `Submission`, kept for reference. |
 | [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
@@ -330,8 +330,9 @@ uv run pytest -m integration
   ```
   The script treats an item as test litter if its subreddit starts with `racb_test_` or `racb_fake_`, or if
   its title or body contains `[test`, `racb_test_` or `racb_fake_`.
-- CI runs them, followed by `scripts/cleanup_test_history.py --strict`, on every push to `master` while
-  auto-deploy is on (`integration-tests` job), and only deploys when both pass. Pull requests never run them.
+- CI runs them on every push to `master` while auto-deploy is on (`integration-tests` job) and only deploys
+  when they pass. `scripts/cleanup_test_history.py --strict` then runs in parallel with the deploy
+  (`cleanup-test-history` job) and does not gate it. Pull requests never run them.
 - The integration tests call the reply and crosspost helpers **directly**. They do not exercise detection
   (`get_posts_with_same_content`, `handle_incoming_comment`) against live Reddit, apart from the image-hash test.
 - Unit tests mock PRAW objects with `tests/conftest.py`. Patch at the import site actually used, e.g.
