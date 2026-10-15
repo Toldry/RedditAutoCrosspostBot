@@ -13,6 +13,7 @@ SRC_DIR = os.path.join(PROJECT_ROOT, 'src')
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
+import praw
 import prawcore
 from racb.core import reddit
 
@@ -83,6 +84,81 @@ def is_test_comment(comment) -> bool:
     return False
 
 
+def _is_already_deleted(thing) -> bool:
+    """Checks whether a submission or comment fetched from Reddit was deleted by its author."""
+    text = getattr(thing, 'body', None)
+    if text is None:
+        text = getattr(thing, 'selftext', None)
+    return thing.author is None and text == '[deleted]'
+
+
+def _subreddit_status(reddit_instance, sub_name: str) -> str:
+    """Describes whether the authenticated account can still open a subreddit."""
+    try:
+        subreddit_type = reddit_instance.subreddit(sub_name).subreddit_type
+    except prawcore.exceptions.Forbidden:
+        return f'r/{sub_name} is private and this account cannot see it (not an approved user?)'
+    except (prawcore.exceptions.NotFound, prawcore.exceptions.Redirect):
+        return f'r/{sub_name} is banned or no longer exists'
+    except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+        return f'r/{sub_name} could not be checked ({e})'
+    return f'r/{sub_name} is reachable ({subreddit_type})'
+
+
+def _account_status(reddit_instance, bot_name: str) -> str:
+    """Describes whether a bot account is visible to logged-out readers.
+
+    Shadowbanned and suspended accounts can still log in, but Reddit hides their profile and
+    content from everyone else, which also explains 404s on their own items.
+    """
+    previous_read_only = reddit_instance.read_only
+    try:
+        # A script app may switch to an app-only token, which sees Reddit like a logged-out reader
+        reddit_instance.read_only = True
+        if getattr(reddit_instance.redditor(bot_name), 'is_suspended', False):
+            return f'/u/{bot_name} is suspended'
+    except prawcore.exceptions.NotFound:
+        return f'/u/{bot_name} is invisible to logged-out readers (shadowbanned or suspended)'
+    except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+        return f'/u/{bot_name} visibility could not be checked ({e})'
+    finally:
+        reddit_instance.read_only = previous_read_only
+    return f'/u/{bot_name} is visible to logged-out readers'
+
+
+def diagnose_not_found(reddit_instance, thing, bot_name: str, account_status_cache: dict) -> bool:
+    """Logs why Reddit answered 404 to deleting `thing`.
+
+    Returns:
+        True if the item turns out to be deleted already, so the caller can count it as deleted.
+    """
+    try:
+        refetched = next(iter(reddit_instance.info(fullnames=[thing.fullname])), None)
+    except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+        logger.warning(f'  Could not re-fetch {thing.fullname}: {e}')
+        refetched = None
+    else:
+        if refetched is None:
+            logger.warning(f'  Reddit no longer returns {thing.fullname} at all')
+        elif _is_already_deleted(refetched):
+            logger.info(f'  {thing.fullname} was already deleted; counting it as deleted')
+            return True
+        elif getattr(refetched, 'removed_by_category', None):
+            logger.warning(f'  {thing.fullname} was removed (removed_by_category={refetched.removed_by_category})')
+
+    try:
+        sub_name = thing.subreddit.display_name
+    except Exception:
+        sub_name = None
+    if sub_name:
+        logger.warning(f'  {_subreddit_status(reddit_instance, sub_name)}')
+
+    if bot_name not in account_status_cache:
+        account_status_cache[bot_name] = _account_status(reddit_instance, bot_name)
+    logger.warning(f'  {account_status_cache[bot_name]}')
+    return False
+
+
 def purge_bot_history(bot_name: str, limit: int = None, dry_run: bool = False):
     """Purges test submissions and comments for a given bot account."""
     logger.info(f'=== Checking history for /u/{bot_name} ===')
@@ -98,6 +174,8 @@ def purge_bot_history(bot_name: str, limit: int = None, dry_run: bool = False):
 
     deleted_submissions = 0
     deleted_comments = 0
+    # The account check is the same for every item, so it runs at most once per bot
+    account_status_cache = {}
 
     # 1. Clean up Submissions
     try:
@@ -112,6 +190,10 @@ def purge_bot_history(bot_name: str, limit: int = None, dry_run: bool = False):
                         submission.delete()
                         logger.info(f'Deleted submission in {sub_desc}')
                         deleted_submissions += 1
+                    except prawcore.exceptions.NotFound as e:
+                        logger.error(f'Failed to delete submission {submission.id}: {e}')
+                        if diagnose_not_found(r, submission, bot_name, account_status_cache):
+                            deleted_submissions += 1
                     except Exception as e:
                         logger.error(f'Failed to delete submission {submission.id}: {e}')
     except Exception as e:
@@ -130,6 +212,10 @@ def purge_bot_history(bot_name: str, limit: int = None, dry_run: bool = False):
                         comment.delete()
                         logger.info(f'Deleted comment in {comment_desc}')
                         deleted_comments += 1
+                    except prawcore.exceptions.NotFound as e:
+                        logger.error(f'Failed to delete comment {comment.id}: {e}')
+                        if diagnose_not_found(r, comment, bot_name, account_status_cache):
+                            deleted_comments += 1
                     except Exception as e:
                         logger.error(f'Failed to delete comment {comment.id}: {e}')
     except Exception as e:

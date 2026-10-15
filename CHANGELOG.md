@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Automatic Deployment:** A new `deploy` CI job rebuilds and restarts the bot on the Google Cloud VM after every push to `master` that passes the tests, at the commit the `release` job ended on. It signs in to Google Cloud with Workload Identity Federation (no stored key), reaches the VM over an IAP tunnel, and runs the new `scripts/redeploy.sh` through an SSH key that can run nothing else. The script checks that the bot is still running 30 seconds later and fails the job otherwise. It stays off until the `AUTO_DEPLOY` repository variable is `true`; the one-time setup (`scripts/setup_auto_deploy.sh`, `scripts/authorize_deploy_key.sh`) is described in `docs/auto-deploy.md`.
 
+## [2.4.5] - 2026-10-15
+
+### Fixed
+- **Mixed-language "subreddit doesn't exist" replies:** German subreddits got "Den Subreddit r/… gibt es nicht. Maybe there's a typo?" because `MAYBE_TYPO` and `ALTERNATE_SUBS_SUGGESTION` had no German translation and each sentence fell back to English on its own. Both are now translated, the German creation prompt says "ihn" (der Subreddit) instead of "es", and the reply now picks one language for all of its sentences and its footer, switching entirely to English when any piece is untranslated.
+
+## [2.4.4] - 2026-10-15
+
+### Fixed
+- **Deleting Posts and Comments:** Every delete failed with `404 HTTP response`, because Reddit no longer routes PRAW's delete URL (`POST /api/del/`, with a trailing slash) and answers it with a plain-text "404 page not found". `racb.core.reddit` now points PRAW at `/api/del`, which works. This fixes `scripts/cleanup_test_history.py`, the scheduled removal of negative-score crossposts, and the integration tests' own cleanup.
+
+## [2.4.3] - 2026-10-14
+
+### Fixed
+- **Test History Cleanup 404s:** When Reddit answers 404 to deleting an item, `scripts/cleanup_test_history.py` now says why instead of only logging the error: it re-fetches the item (an item that turns out to be deleted already now counts as deleted), checks whether the bot can still open the item's subreddit (banned, or private without approved-user access), and checks once per bot whether logged-out readers can see the account (a 404 there means shadowbanned or suspended). The live integration tests now log failed teardown deletes instead of silently ignoring them, which is how test posts piled up unnoticed.
+
+## [2.4.2] - 2026-10-14
+
+### Changed
+- **Clickable Log Links:** Log lines that mention a comment or submission now print its full URL (`https://reddit.com/r/.../comments/...`) instead of the bare permalink path, so it can be opened straight from the log. This also fixes the doubled slash in the "Qualified recommendation match found" line.
+
 ## [2.4.1] - 2026-10-14
 
 ### Changed

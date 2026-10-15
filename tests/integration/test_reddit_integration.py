@@ -1,5 +1,6 @@
 """Integration tests interacting directly with live Reddit APIs using test subreddits."""
 
+import logging
 import os
 import tempfile
 import time
@@ -10,6 +11,8 @@ from praw.models import PostMedia
 
 from racb.core import reddit
 from racb.phases import phase1, phase3, cleanup
+
+logger = logging.getLogger(__name__)
 
 # Hardcoded test subreddits created for integration testing
 TEST_SOURCE_SUBREDDIT = 'racb_test_1'
@@ -33,8 +36,9 @@ def cleanup_reddit_objects(*objects):
             continue
         try:
             obj.delete()
-        except Exception:
-            pass
+        except Exception as e:
+            # Not fatal for the test, but a silent failure here hid leftover artifacts before
+            logger.warning(f'Could not delete test artifact {getattr(obj, "fullname", obj)}: {e}')
 
 
 @pytest.fixture(autouse=True)

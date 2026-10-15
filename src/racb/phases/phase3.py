@@ -50,10 +50,10 @@ def process_oldest_entry():
 
 
 def handle_comment(comment_entry):
-    logger.info(f'Begin processing comment entry: {comment_entry["permalink"]}')
+    logger.info(f'Begin processing comment entry: {reddit.full_url(comment_entry["permalink"])}')
     result = phase2.run_filters(comment_entry)
     if not result.passes_filter:
-        logger.info(f'Comment {comment_entry["permalink"]} did not pass final filter: {result.reason}')
+        logger.info(f'Comment {reddit.full_url(comment_entry["permalink"])} did not pass final filter: {result.reason}')
         return
 
     source_comment = result.comment
@@ -71,7 +71,7 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
     crosspost_title = get_crosspost_title_for_crosspost(source_comment.submission, target_subreddit)
 
     if config.is_dry_run():
-        logger.info(f'[DRY RUN] Would crosspost {source_comment.submission.permalink} to r/{target_subreddit}')
+        logger.info(f'[DRY RUN] Would crosspost {reddit.full_url(source_comment.submission.permalink)} to r/{target_subreddit}')
         result.failure_reason = 'DRY_RUN'
         return result
 
@@ -81,7 +81,7 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
             title=crosspost_title,
             send_replies=False,
         )
-        logger.info(f'Crosspost successful: https://www.reddit.com{cross_post.permalink}')
+        logger.info(f'Crosspost successful: {reddit.full_url(cross_post.permalink)}')
         result.success = True
         result.crosspost = cross_post
         if reply_to_crosspost_flag:
@@ -90,10 +90,10 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
         hce_res = handle_crosspost_exception(e, source_comment, target_subreddit)
         if hce_res.handled_with_grace:
             result.failure_reason = hce_res.error_type
-            logger.info(f'Crosspost was rejected gracefully ({hce_res.error_type}) for comment {source_comment.permalink}')
+            logger.info(f'Crosspost was rejected gracefully ({hce_res.error_type}) for comment {reddit.full_url(source_comment.permalink)}')
         else:
             logger.error(
-                f'Crosspost failed unexpectedly: {e} | Source comment: {source_comment.permalink}',
+                f'Crosspost failed unexpectedly: {e} | Source comment: {reddit.full_url(source_comment.permalink)}',
                 exc_info=True,
             )
             if config.is_debug():

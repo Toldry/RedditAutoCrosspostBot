@@ -143,3 +143,16 @@ def test_authenticate_all_bots_attempts_all_before_raising():
         assert 'Authentication failed for 2 bot(s)' in error_message
         assert 'AutoCrosspostBot' in error_message
         assert 'same_subreddit_bot' in error_message
+
+
+@pytest.mark.parametrize('permalink, expected', [
+    (
+        '/r/skyrim/comments/1w6ciq0/some_title/p7lxnri/',
+        'https://reddit.com/r/skyrim/comments/1w6ciq0/some_title/p7lxnri/',
+    ),
+    ('https://reddit.com/r/skyrim/', 'https://reddit.com/r/skyrim/'),
+    ('?', '?'),
+    ('unknown', 'unknown'),
+])
+def test_full_url(permalink, expected):
+    assert reddit.full_url(permalink) == expected

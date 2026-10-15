@@ -7,19 +7,40 @@ __all__ = [
     'SUB_DOESNT_EXIST_BOT_NAME',
     'SAME_SUBREDDIT_BOT_NAME',
     'SAME_POST_BOT_NAME',
+    'full_url',
 ]
 
 import logging
 import os
 
 import praw
+import praw.endpoints
 import dotenv
 
 from racb.version import __version__
 
 logger = logging.getLogger(__name__)
 
+# Reddit answers PRAW's delete path, `POST /api/del/`, with a plain-text "404 page not found" (its router
+# has no route with the trailing slash), so every `Submission.delete()` / `Comment.delete()` failed. The same
+# endpoint without the slash works (confirmed live, October 2026). PRAW reads this shared dict on each
+# call, so patching it here fixes every delete made through any PRAW instance in this process.
+praw.endpoints.API_PATH['del'] = 'api/del'
+
 praw_instances = None
+
+REDDIT_BASE_URL = 'https://reddit.com'
+
+
+def full_url(permalink):
+    """Turn a Reddit permalink such as `/r/sub/comments/abc/title/def/` into a clickable URL.
+
+    Values that are not site-relative paths (already a URL, or a placeholder like `?`) are returned as is.
+    """
+    permalink = str(permalink)
+    if not permalink.startswith('/'):
+        return permalink
+    return REDDIT_BASE_URL + permalink
 
 AUTO_CROSSPOST_BOT_NAME = 'AutoCrosspostBot'
 SUB_DOESNT_EXIST_BOT_NAME = 'sub_doesnt_exist_bot'

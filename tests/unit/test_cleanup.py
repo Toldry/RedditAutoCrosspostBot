@@ -64,3 +64,19 @@ def test_delete_unwanted_submissions_continues_after_delete_error():
     with patch('racb.phases.cleanup.get_latest_submissions', return_value=[failing, other]):
         cleanup.delete_unwanted_submissions()
     other.delete.assert_called_once()
+
+
+@pytest.mark.unit
+def test_praw_delete_posts_to_api_del_without_trailing_slash():
+    """Reddit 404s on `POST /api/del/`; importing racb.core.reddit must make PRAW use `api/del`."""
+    import praw
+    import racb.core.reddit  # noqa: F401  (applies the endpoint patch)
+
+    reddit_instance = praw.Reddit(client_id='id', client_secret='secret', user_agent='test', username='u', password='p')
+    with patch.object(reddit_instance, 'post') as mock_post:
+        reddit_instance.submission('abc123').delete()
+        reddit_instance.comment('def456').delete()
+
+    assert [call.args[0] for call in mock_post.call_args_list] == ['api/del', 'api/del']
+    assert mock_post.call_args_list[0].kwargs == {'data': {'id': 't3_abc123'}}
+    assert mock_post.call_args_list[1].kwargs == {'data': {'id': 't1_def456'}}

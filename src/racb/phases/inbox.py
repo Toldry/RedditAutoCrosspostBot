@@ -60,7 +60,7 @@ def handle_comment_reply(comment, reddit_instance=None):
         return
     sentiment = check_sentiment(comment.body)
     if sentiment is not None:
-        logger.info(f'Received {sentiment} feedback: {getattr(comment, "permalink", "?")}')
+        logger.info(f'Received {sentiment} feedback: {reddit.full_url(getattr(comment, "permalink", "?"))}')
     try:
         if sentiment == 'positive':
             respond_to_positive_sentiment(comment)

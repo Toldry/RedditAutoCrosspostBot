@@ -16,7 +16,7 @@ def handle_incoming_comment(comment, metrics=None):
     if metrics:
         metrics.record_comment()
 
-    logger.debug(f'Handling a comment: {comment.permalink}')
+    logger.debug(f'Handling a comment: {reddit.full_url(comment.permalink)}')
     target_subreddit = check_pattern(comment)
     if target_subreddit is None:
         return
@@ -32,7 +32,7 @@ def handle_incoming_comment(comment, metrics=None):
         return
 
     if target_subreddit.lower() == source_subreddit:
-        logger.info(f'Found "same subreddit" comment ({comment.permalink}). Replying via same_subreddit_bot.')
+        logger.info(f'Found "same subreddit" comment ({reddit.full_url(comment.permalink)}). Replying via same_subreddit_bot.')
         reply = reply_to_source_equals_target_comment(comment)
         if metrics:
             metrics.record_aux()
@@ -40,14 +40,14 @@ def handle_incoming_comment(comment, metrics=None):
 
     result_obj = get_posts_with_same_content(comment, target_subreddit)
     if result_obj.posts_found:
-        logger.info(f'Found post with duplicate content in r/{target_subreddit} ({comment.permalink}). Replying via same_post_bot.')
+        logger.info(f'Found post with duplicate content in r/{target_subreddit} ({reddit.full_url(comment.permalink)}). Replying via same_post_bot.')
         post_with_same_content = result_obj.posts[0]
         reply = reply_to_same_content_post_comment(comment, target_subreddit, post_with_same_content)
         if metrics:
             metrics.record_aux()
         return reply
     elif result_obj.unable_to_search and result_obj.unable_to_search_reason == 'SUBREDDIT_DOES_NOT_EXIST':
-        logger.info(f'Found reference to non-existent subreddit r/{target_subreddit} ({comment.permalink}). Replying via sub_doesnt_exist_bot.')
+        logger.info(f'Found reference to non-existent subreddit r/{target_subreddit} ({reddit.full_url(comment.permalink)}). Replying via sub_doesnt_exist_bot.')
         reply = reply_to_nonexistent_target_subreddit_comment(comment, target_subreddit)
         if metrics:
             metrics.record_aux()
@@ -56,7 +56,7 @@ def handle_incoming_comment(comment, metrics=None):
     if not is_top_level_comment(comment):
         return None
 
-    logger.info(f'Qualified recommendation match found: https://reddit.com/{comment.permalink} -> r/{target_subreddit}')
+    logger.info(f'Qualified recommendation match found: {reddit.full_url(comment.permalink)} -> r/{target_subreddit}')
     db.add_comment(comment, target_subreddit)
     if metrics:
         metrics.record_match()
@@ -163,49 +163,34 @@ def reply_to_source_equals_target_comment(source_comment):
 
 def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
     source_subreddit = source_comment.subreddit.display_name
-    text = i18n.get_translated_string(
-        'NONEXISTENT_SUBREDDIT',
-        source_subreddit,
-        add_suffix=False,
-    )
-    text = text.format(target_subreddit=target_subreddit)
 
     matches = sub_search.get_matches(target_subreddit)
     suggestion_lines = [get_subreddit_suggestion_list_line(sub) for sub in matches]
     formatted_matches = [line for line in suggestion_lines if line is not None]
 
+    # (key, separator before it, format arguments) for each piece of the reply
+    parts = [('NONEXISTENT_SUBREDDIT', '', {'target_subreddit': target_subreddit})]
     if len(formatted_matches) == 0:
-        text2 = i18n.get_translated_string(
-            'MAYBE_TYPO',
-            source_subreddit,
-            add_suffix=False,
-        )
-        text = f'{text} {text2}'
+        parts.append(('MAYBE_TYPO', ' ', {}))
     else:
-        text2 = i18n.get_translated_string(
-            'ALTERNATE_SUBS_SUGGESTION',
-            source_subreddit,
-            add_suffix=False,
-        )
         alternate_subreddits_string = '\n'.join(formatted_matches)
-        text2 = text2.format(alternate_subreddits_string=alternate_subreddits_string)
-        text = f'{text}\n\n{text2}'
-
-    if is_subreddit_name_length_valid(target_subreddit):
-        text3 = i18n.get_translated_string(
-            'PROMPT_NONEXISTENT_SUBREDDIT_CREATION',
-            source_subreddit,
-            add_suffix=False,
-            bot_name=reddit.SUB_DOESNT_EXIST_BOT_NAME,
+        parts.append(
+            ('ALTERNATE_SUBS_SUGGESTION', '\n\n', {'alternate_subreddits_string': alternate_subreddits_string})
         )
-        text3 = text3.format(target_subreddit=target_subreddit)
-        text = f'{text}\n\n{text3}'
+    if is_subreddit_name_length_valid(target_subreddit):
+        parts.append(('PROMPT_NONEXISTENT_SUBREDDIT_CREATION', '\n\n', {'target_subreddit': target_subreddit}))
 
-    # The body above is in the source subreddit's language, so the suffix must be too
-    text += i18n.get_suffix(
-        subreddit=source_subreddit,
-        bot_name=reddit.SUB_DOESNT_EXIST_BOT_NAME,
-    )
+    # Every piece and the suffix use one language, so a partly translated locale gets an all-English reply
+    # rather than English sentences in the middle of a translated one
+    keys = [key for key, _, _ in parts] + [i18n.SUFFIX_KEY]
+    language = i18n.language_with_all(keys, source_subreddit)
+    text = ''
+    for key, separator, format_kwargs in parts:
+        _, piece = i18n.lookup_in_languages(key, [language])
+        text += separator + piece.format(**format_kwargs)
+
+    _, suffix_text = i18n.lookup_in_languages(i18n.SUFFIX_KEY, [language])
+    text += i18n.format_suffix(suffix_text, reddit.SUB_DOESNT_EXIST_BOT_NAME)
     return reply_as_bot(source_comment, text, reddit.SUB_DOESNT_EXIST_BOT_NAME)
 
 
@@ -249,7 +234,7 @@ def reply_to_same_content_post_comment(source_comment, target_subreddit, post_wi
 def reply_as_bot(source_comment, text, bot_name):
     """Replies to `source_comment` as `bot_name`, or only logs the reply when DRY_RUN is enabled."""
     if config.is_dry_run():
-        logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {source_comment.permalink}:\n{text}')
+        logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(source_comment.permalink)}:\n{text}')
         return None
     comment2 = get_comment_with_different_praw_instance(source_comment, bot_name)
     return comment2.reply(text)
