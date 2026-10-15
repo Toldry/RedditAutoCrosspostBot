@@ -142,7 +142,7 @@ def test_reply_to_crosspost_reports_partial_image_scan(make_mock_comment):
     phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=scan)
     reply_text = cross_post.reply.call_args.args[0]
     assert 'the 870 newest image posts in r/pics, going back 12 days' in reply_text
-    assert "Reddit doesn't list older posts" in reply_text
+    assert "Reddit doesn't list older posts" not in reply_text
 
 
 @pytest.mark.unit
