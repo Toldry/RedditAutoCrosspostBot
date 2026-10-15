@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-10-15
+
 ### Added
 - **Negative Feedback Report:** `uv run python scripts/negative_feedback_report.py` writes an HTML report of the "bad bot" exchanges in which someone explained what was wrong: a reply below the bots' `RESPOND_TO_NEGATIVE_SENTIMENT` question, or a "bad bot" comment, that says more than a bare "bad bot". Each exchange is shown with its post as a Reddit-style comment tree, with the new feedback highlighted. A report covers only feedback that no earlier report in `reports/negative_feedback/` covered, and links to those earlier reports.
 - **Replies to Feedback:** The bots answer feedback again. A "bad bot" style reply gets the question asking why the post or comment was inappropriate, and the first "good bot" under a bot comment gets "Thank you (◕ᴗ◕✿)", translated into every locale (later ones under the same comment are not thanked). Both use the usual footer and respect `DRY_RUN`.
