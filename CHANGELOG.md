@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-15
+
 ### Changed
 - The negative feedback report shows only each thread's new feedback at first; the post and the full conversation open with a "Show full conversation" button.
 
