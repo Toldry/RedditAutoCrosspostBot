@@ -37,6 +37,19 @@ die() {
   exit 1
 }
 gcloud_in_project() { gcloud --project="$GCP_PROJECT_ID" "$@"; }
+# A new service account takes up to a minute or so to become visible to IAM policies, so a binding made
+# right after creating it can fail with "does not exist". Retry such commands for a while.
+retry_iam() {
+  local attempt
+  for attempt in 1 2 3 4 5 6 7 8; do
+    if "$@"; then
+      return 0
+    fi
+    echo "IAM may not see the new service account yet; retrying in 15s ($attempt/8)" >&2
+    sleep 15
+  done
+  die "gave up after 8 attempts: $*"
+}
 
 command -v gcloud >/dev/null || die "gcloud is not installed"
 command -v ssh-keygen >/dev/null || die "ssh-keygen is not installed"
@@ -57,7 +70,7 @@ if ! gcloud_in_project iam service-accounts describe "$service_account_email" >/
 fi
 # tunnelResourceAccessor opens the IAP tunnel; compute.viewer lets gcloud look the VM up by name
 for role in roles/iap.tunnelResourceAccessor roles/compute.viewer; do
-  gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" --member="serviceAccount:$service_account_email" \
+  retry_iam gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" --member="serviceAccount:$service_account_email" \
     --role="$role" --condition=None --quiet >/dev/null
 done
 
@@ -81,7 +94,7 @@ else
     --display-name="$GITHUB_REPOSITORY" --issuer-uri="$GITHUB_OIDC_ISSUER" \
     --attribute-mapping="$attribute_mapping" --attribute-condition="$attribute_condition"
 fi
-gcloud_in_project iam service-accounts add-iam-policy-binding "$service_account_email" \
+retry_iam gcloud_in_project iam service-accounts add-iam-policy-binding "$service_account_email" \
   --role=roles/iam.workloadIdentityUser \
   --member="principalSet://iam.googleapis.com/$pool_resource/attribute.repository/$GITHUB_REPOSITORY" \
   >/dev/null
