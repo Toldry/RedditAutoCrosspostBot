@@ -45,9 +45,7 @@ msgstr ""
 "\n"
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK"
-msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PLURAL"
-msgstr[0] " También revisé todas las publicaciones con imágenes de los últimos {scan_period} en r/{target_subreddit} (en total, {image_post_count}) y [busqué duplicados]({duplicate_detector_url}) de esta imagen. No se encontró ninguno."
-msgstr[1] " También revisé todas las publicaciones con imágenes de los últimos {scan_period} en r/{target_subreddit} (en total, {image_post_count}) y [busqué duplicados]({duplicate_detector_url}) de esta imagen. No se encontró ninguno."
+msgstr " También revisé todas las publicaciones con imágenes de los últimos {scan_period} en r/{target_subreddit} (en total, {image_post_count}) y [busqué duplicados]({duplicate_detector_url}) de esta imagen. No se encontró ninguno."
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"

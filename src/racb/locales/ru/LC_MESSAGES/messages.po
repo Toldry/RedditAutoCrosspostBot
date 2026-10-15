@@ -45,10 +45,7 @@ msgstr ""
 "\n"
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK"
-msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PLURAL"
-msgstr[0] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) все посты с картинками, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {image_post_count}). Совпадений не нашлось."
-msgstr[1] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) все посты с картинками, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {image_post_count}). Совпадений не нашлось."
-msgstr[2] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) все посты с картинками, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {image_post_count}). Совпадений не нашлось."
+msgstr " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) все посты с картинками, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {image_post_count}). Совпадений не нашлось."
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"

@@ -46,9 +46,7 @@ msgstr ""
 "\n"
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK"
-msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PLURAL"
-msgstr[0] " I ALSO LOOKED THROUGH THE ONLY IMAGE POST MADE IN r/{target_subreddit} IN THE LAST {scan_period} AND [CHECKED WHETHER IT DUPLICATES]({duplicate_detector_url}) THIS IMAGE. IT DOESN'T."
-msgstr[1] " I ALSO LOOKED THROUGH ALL {image_post_count} IMAGE POSTS MADE IN r/{target_subreddit} IN THE LAST {scan_period} AND [CHECKED FOR DUPLICATES]({duplicate_detector_url}) OF THIS IMAGE. NONE WERE FOUND."
+msgstr " I ALSO LOOKED THROUGH ALL {image_post_count} IMAGE POSTS MADE IN r/{target_subreddit} IN THE LAST {scan_period} AND [CHECKED FOR DUPLICATES]({duplicate_detector_url}) OF THIS IMAGE. NONE WERE FOUND."
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"
