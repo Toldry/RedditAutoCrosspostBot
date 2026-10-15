@@ -150,21 +150,38 @@ def compute_region_hashes(img):
     return tuple(region_hashes)
 
 
-@lru_cache(maxsize=2048)
+class ImageUnavailable(Exception):
+    """An image could not be downloaded or read."""
+
+
 def compute_image_fingerprint(url):
     """Downloads an image and returns its ImageFingerprint, or None if it cannot be downloaded or read."""
     if not is_image_url(url):
         return None
+    try:
+        return fingerprint_image_at(url)
+    except ImageUnavailable:
+        return None
 
+
+@lru_cache(maxsize=2048)
+def fingerprint_image_at(url):
+    """Like compute_image_fingerprint, but raises ImageUnavailable instead of returning None.
+
+    lru_cache does not cache exceptions, so a failed download (a timeout, or a preview Reddit has not made yet)
+    is tried again next time instead of being remembered as unreadable.
+    """
     try:
         image_bytes = download_image_bytes(url)
         if image_bytes is None:
-            return None
+            raise ImageUnavailable(url)
         with Image.open(io.BytesIO(image_bytes)) as img:
             return ImageFingerprint(imagehash.dhash(img), compute_region_hashes(img))
+    except ImageUnavailable:
+        raise
     except Exception as e:
         logger.debug(f'Could not compute perceptual hash for {url}: {e}')
-        return None
+        raise ImageUnavailable(url) from e
 
 
 def compute_image_hash(url):
