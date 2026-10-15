@@ -8,7 +8,7 @@ import prawcore
 
 from racb.core import reddit
 from racb.core.reddit import get_reddit_instance
-from racb import i18n
+from racb import config, i18n
 
 logger = logging.getLogger(__name__)
 
@@ -42,20 +42,21 @@ def process_unread_inboxes(limit=100):
             continue
         for item in unread_items:
             try:
-                respond_to_comment(item, reddit_instance=reddit_instance)
+                respond_to_comment(item, reddit_instance=reddit_instance, bot_name=bot_name)
             except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
                 logger.warning(f'Could not process inbox item {getattr(item, "id", "?")} of /u/{bot_name}: {e!r}')
 
 
-def respond_to_comment(comment, reddit_instance=None):
+def respond_to_comment(comment, reddit_instance=None, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
     if comment.type == 'username_mention':
         pass
     elif comment.type == 'comment_reply':
-        handle_comment_reply(comment, reddit_instance=reddit_instance)
+        handle_comment_reply(comment, reddit_instance=reddit_instance, bot_name=bot_name)
 
 
-def handle_comment_reply(comment, reddit_instance=None):
-    reddit = reddit_instance or get_reddit_instance()
+def handle_comment_reply(comment, reddit_instance=None, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
+    # Not called `reddit`, which would shadow the module and break `reddit.full_url` below
+    reddit_instance = reddit_instance or get_reddit_instance()
     if not isinstance(comment, praw.models.Comment):
         return
     sentiment = check_sentiment(comment.body)
@@ -63,18 +64,22 @@ def handle_comment_reply(comment, reddit_instance=None):
         logger.info(f'Received {sentiment} feedback: {reddit.full_url(getattr(comment, "permalink", "?"))}')
     try:
         if sentiment == 'positive':
-            respond_to_positive_sentiment(comment)
+            respond_to_positive_sentiment(comment, bot_name)
         elif sentiment == 'negative':
-            respond_to_negative_sentiment(comment)
+            respond_to_negative_sentiment(comment, bot_name)
 
         if sentiment is not None:
-            reddit.inbox.mark_read([comment])
+            reddit_instance.inbox.mark_read([comment])
     except prawcore.exceptions.Forbidden as e:
         if e.response.reason == 'Forbidden':
             logger.info(f'Got 403 Forbidden error, probably because the bot is banned in {comment.subreddit_name_prefixed}')
-            reddit.inbox.mark_read([comment])
+            reddit_instance.inbox.mark_read([comment])
         else:
             raise
+    except praw.exceptions.RedditAPIException as e:
+        # E.g. a locked thread or an archived post. Retrying would fail the same way every 10 minutes.
+        logger.info(f'Could not reply to feedback {reddit.full_url(getattr(comment, "permalink", "?"))}: {e}')
+        reddit_instance.inbox.mark_read([comment])
 
 
 def check_sentiment(text):
@@ -86,13 +91,39 @@ def check_sentiment(text):
     return None
 
 
-def respond_to_positive_sentiment(comment):
-    # comment.reply('🤖🌹')
-    pass
+def is_first_positive_reply(comment):
+    """Checks that no older "good bot" style reply sits next to `comment` under the same bot comment.
+
+    Only replies Reddit returns with the parent are compared; ones hidden behind "load more" are not.
+    """
+    parent = comment.parent()
+    if not isinstance(parent, praw.models.Comment):
+        return True
+    parent.refresh()
+    own_key = (comment.created_utc, comment.id)
+    for sibling in parent.replies:
+        if not isinstance(sibling, praw.models.Comment) or sibling.id == comment.id:
+            continue
+        if check_sentiment(sibling.body or '') == 'positive' and (sibling.created_utc, sibling.id) < own_key:
+            return False
+    return True
 
 
-def respond_to_negative_sentiment(comment):
-    # source_subreddit = comment.subreddit.display_name
-    # text = i18n.get_translated_string('RESPOND_TO_NEGATIVE_SENTIMENT', subreddit=source_subreddit)
-    # return comment.reply(text)
-    pass
+def reply_to_feedback(comment, string_key, bot_name):
+    """Replies to `comment` in its subreddit's language, or only logs the reply when DRY_RUN is enabled."""
+    text = i18n.get_translated_string(string_key, subreddit=comment.subreddit.display_name, bot_name=bot_name)
+    if config.is_dry_run():
+        logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(comment.permalink)}:\n{text}')
+        return None
+    return comment.reply(text)
+
+
+def respond_to_positive_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
+    if not is_first_positive_reply(comment):
+        logger.info(f'Not thanking {reddit.full_url(comment.permalink)}: an earlier reply already said the same')
+        return None
+    return reply_to_feedback(comment, 'RESPOND_TO_POSITIVE_SENTIMENT', bot_name)
+
+
+def respond_to_negative_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
+    return reply_to_feedback(comment, 'RESPOND_TO_NEGATIVE_SENTIMENT', bot_name)

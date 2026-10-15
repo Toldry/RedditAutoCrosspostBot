@@ -14,6 +14,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Known Subreddits Table:** every subreddit the `r/all` stream sees a comment in is recorded in a new `known_subreddits` table (buffered in memory, written in one batch every 5 minutes). "Did you mean" suggestions now also come from this table, matched with PostgreSQL's `pg_trgm` trigram similarity (GIN-indexed), so they no longer depend only on Reddit's search. The extension is created automatically; if it cannot be, suggestions fall back to Reddit's search alone.
 
+## [2.6.0] - 2026-10-15
+
+### Changed
+- The negative feedback report shows only each thread's new feedback at first; the post and the full conversation open with a "Show full conversation" button.
+
+### Fixed
+- The negative feedback report no longer counts comments whose body is `[unavailable]` (or `[deleted]` / `[removed]` in any letter case) as written feedback.
+
+## [2.5.0] - 2026-10-15
+
+### Added
+- **Negative Feedback Report:** `uv run python scripts/negative_feedback_report.py` writes an HTML report of the "bad bot" exchanges in which someone explained what was wrong: a reply below the bots' `RESPOND_TO_NEGATIVE_SENTIMENT` question, or a "bad bot" comment, that says more than a bare "bad bot". Each exchange is shown with its post as a Reddit-style comment tree, with the new feedback highlighted. A report covers only feedback that no earlier report in `reports/negative_feedback/` covered, and links to those earlier reports.
+- **Replies to Feedback:** The bots answer feedback again. A "bad bot" style reply gets the question asking why the post or comment was inappropriate, and the first "good bot" under a bot comment gets "Thank you (◕ᴗ◕✿)", translated into every locale (later ones under the same comment are not thanked). Both use the usual footer and respect `DRY_RUN`.
+
+### Fixed
+- **Inbox Feedback Crash:** Every "good bot" or "bad bot" reply raised `AttributeError` since 2.4.2, because the inbox handler called `full_url` on the PRAW instance instead of the `racb.core.reddit` module, so feedback was never logged or marked read. A reply that Reddit rejects (locked or archived thread) is now marked read instead of being retried every 10 minutes.
+
+## [2.4.11] - 2026-10-15
+
+### Changed
+- **Quick Test Cleanup:** The integration tests now record every post and comment they create, and the `integration-tests` CI job ends with the new `scripts/delete_test_artifacts.py --strict`, which deletes only those recorded items that are still on Reddit. It replaces the `cleanup-test-history` job, whose sweep of all 4 bots' history took minutes. It runs even after failed or cancelled tests, never touches another run's posts, and blocks the deploy if a recorded item could not be deleted. `scripts/cleanup_test_history.py` stays for manual use.
+
+## [2.4.10] - 2026-10-15
+
+### Changed
+- **Newer Pushes Cancel Stale Test Runs:** A push to `master` that reaches the `integration-tests` CI job now cancels the previous run's `cleanup-test-history` sweep, or its still-running integration tests, instead of waiting for them. The newer run's own sweep removes the leftovers. A sweep no longer runs after cancelled integration tests.
+
+## [2.4.9] - 2026-10-15
+
+### Fixed
+- **Half-Applied Deploys:** `scripts/redeploy.sh` now checks that it can write to every directory of the checkout before resetting it, and stops with the `chown` command to run if not. A directory owned by another user (for example after a `sudo git pull`) used to make `git reset --hard` fail partway, leaving the checkout half-updated.
+
+## [2.4.8] - 2026-10-15
+
+### Changed
+- **Faster Deploys:** The slow sweep of leftover test posts (`scripts/cleanup_test_history.py --strict`) moved out of the `integration-tests` CI job into its own `cleanup-test-history` job, which runs in parallel with `deploy` instead of before it. A failed sweep now turns that job red but no longer blocks the deploy. It still runs after failed or cancelled integration tests, and never while another run's tests are posting.
+
+## [2.4.7] - 2026-10-15
+
+### Fixed
+- **Auto-Deploy Setup on a Fresh Project:** `scripts/setup_auto_deploy.sh` failed with "Service account ... does not exist" when granting roles right after creating the `github-deployer` service account, because IAM takes a short while to see a new account. It now retries those grants for up to 2 minutes.
+
+## [2.4.6] - 2026-10-15
+
+### Added
+- **Automatic Deployment:** A new `deploy` CI job rebuilds and restarts the bot on the Google Cloud VM after every push to `master` that passes the unit tests, the live integration tests and their cleanup, at the commit the `release` job ended on. The live tests run in a new `integration-tests` job with the bot credentials stored as repository secrets, followed by `scripts/cleanup_test_history.py --strict`, which removes leftover test posts and fails if any could not be deleted. If `master` moved on during a run, that run deploys nothing and the newer push's run deploys instead. It signs in to Google Cloud with Workload Identity Federation (no stored key), reaches the VM over an IAP tunnel, and runs the new `scripts/redeploy.sh` through an SSH key that can run nothing else. The script checks that the bot is still running 30 seconds later and fails the job otherwise. It stays off until the `AUTO_DEPLOY` repository variable is `true`; the one-time setup (`scripts/setup_auto_deploy.sh`, `scripts/authorize_deploy_key.sh`) is described in `docs/auto-deploy.md`.
+- **Strict Test Cleanup:** `scripts/cleanup_test_history.py --strict` exits with code 1 when a bot could not be checked or a test item could not be deleted, and any such problems are now listed at the end of every run.
+
 ## [2.4.5] - 2026-10-15
 
 ### Fixed
