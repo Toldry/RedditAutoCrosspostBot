@@ -84,24 +84,31 @@ Docker caches locally. To turn it off, delete the line and run `docker compose u
 
 ### 3. Read the logs
 
-In the Cloud Console, open **Logging > Logs Explorer** (https://console.cloud.google.com/logs/query) and run
-this query. **Stream logs** follows new lines live.
+In the Cloud Console, open **Logging > Logs Explorer** (https://console.cloud.google.com/logs/query), turn on
+**Show query**, paste this into the query editor (not the search bar at the top, which wraps text in a
+full-text `SEARCH()`), and click **Run query**. **Stream logs** follows new lines live.
 
 ```
-logName:gcplogs-docker-driver
+log_id("gcplogs-docker-driver")
 ```
 
 Errors only:
 
 ```
-logName:gcplogs-docker-driver AND (jsonPayload.message:ERROR OR jsonPayload.message:CRITICAL)
+log_id("gcplogs-docker-driver") AND jsonPayload.message:("ERROR" OR "CRITICAL")
 ```
 
-From any computer with `gcloud`, newest first (same in bash and PowerShell):
+From any computer with `gcloud`, newest first. In bash, and in PowerShell 7.3 or later:
 
 ```bash
-gcloud logging read "logName:gcplogs-docker-driver" --freshness=1h --limit=100 --format="value(jsonPayload.message)"
-gcloud logging read "logName:gcplogs-docker-driver AND jsonPayload.message:ERROR" --freshness=7d --format="value(timestamp,jsonPayload.message)"
+gcloud logging read 'log_id("gcplogs-docker-driver")' --freshness=1h --limit=100 --format="value(jsonPayload.message)"
+gcloud logging read 'log_id("gcplogs-docker-driver") AND jsonPayload.message:"ERROR"' --freshness=7d --format="value(timestamp,jsonPayload.message)"
+```
+
+Windows PowerShell 5.1 drops double quotes inside arguments to programs, so escape them there:
+
+```powershell
+gcloud logging read 'log_id(\"gcplogs-docker-driver\")' --freshness=1h --limit=100 --format="value(jsonPayload.message)"
 ```
 
 Each entry's `jsonPayload` also holds the container's name and image, and the VM is its resource.
@@ -113,4 +120,4 @@ the message rather than on the entry's severity.
 | Symptom | Cause and fix |
 |---|---|
 | A deploy fails with `the bot is not running cleanly` and `docker compose up` printed `unable to connect or authenticate with Google Cloud Logging` | The VM lost access to Cloud Logging, or Cloud Logging was unreachable when the container started. Fix access (step 1), or delete the `COMPOSE_FILE` line from `.env` and run `docker compose up -d` to log locally again. |
-| No entries in the Logs Explorer, but the bot runs | Check the time range of the query, and that `docker inspect racb --format '{{.HostConfig.LogConfig.Type}}'` prints `gcplogs`. If it prints `json-file`, the `COMPOSE_FILE` line is missing or the bot was not recreated. |
+| No entries in the Logs Explorer, but the bot runs | Check that the query is in the query editor as `log_id("gcplogs-docker-driver")` and not a `SEARCH(...)` from the search bar, and the time range of the query. Then check that `docker inspect racb --format '{{.HostConfig.LogConfig.Type}}'` prints `gcplogs`. If it prints `json-file`, the `COMPOSE_FILE` line is missing or the bot was not recreated. |
