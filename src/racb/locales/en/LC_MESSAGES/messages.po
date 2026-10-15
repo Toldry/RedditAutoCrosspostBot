@@ -64,21 +64,3 @@ msgstr[1] "{days} days"
 
 msgid "SUGGESTION_SUBSCRIBERS"
 msgstr "subscribers: {subscribers}"
-
-msgid "SUBREDDIT_STATE_RESTRICTED"
-msgstr "restricted"
-
-msgid "SUBREDDIT_STATE_ARCHIVED"
-msgstr "archived"
-
-msgid "SUBREDDIT_STATE_PRIVATE"
-msgstr "private"
-
-msgid "SUBREDDIT_STATE_QUARANTINED"
-msgstr "quarantined"
-
-msgid "SUBREDDIT_STATE_BANNED"
-msgstr "banned"
-
-msgid "SUBREDDIT_STATE_UNAVAILABLE"
-msgstr "unavailable"

@@ -203,15 +203,15 @@ def test_nonexistent_subreddit_reply_uses_one_language(make_mock_comment, subred
     with patch('racb.phases.phase1.describe_subreddit', side_effect=descriptions.get):
         reply_text = nonexistent_subreddit_reply(make_mock_comment, subreddit, matches)
     english_pieces = ['does not exist', "Maybe there's a typo?", 'Did you mean?', 'creating a new subreddit',
-                      'subscribers:', '**private**']
+                      'subscribers:']
     language = i18n.language_with_all(
         ['NONEXISTENT_SUBREDDIT', 'MAYBE_TYPO', 'ALTERNATE_SUBS_SUGGESTION',
-         'PROMPT_NONEXISTENT_SUBREDDIT_CREATION', 'SUGGESTION_SUBSCRIBERS', 'SUBREDDIT_STATE_PRIVATE',
-         i18n.SUFFIX_KEY],
+         'PROMPT_NONEXISTENT_SUBREDDIT_CREATION', 'SUGGESTION_SUBSCRIBERS', i18n.SUFFIX_KEY],
         subreddit,
     )
     if has_matches:
-        assert '* r/bilder (' in reply_text and '* r/bildr (**' in reply_text
+        # The state is Reddit's own word, never translated
+        assert '* r/bilder (' in reply_text and '* r/bildr (**private**)' in reply_text
     if language == 'en':
         assert reply_text.startswith('The subreddit r/bilze does not exist.')
     else:
@@ -237,6 +237,8 @@ def describe_with_fetch_error(error):
     (make_prawcore_error(prawcore.exceptions.Forbidden, 403, 'quarantined'), 'quarantined'),
     (make_prawcore_error(prawcore.exceptions.NotFound, 404, 'banned'), 'banned'),
     (make_prawcore_error(prawcore.exceptions.NotFound, 404, None), 'unavailable'),
+    (make_prawcore_error(prawcore.exceptions.Forbidden, 403, 'gold_only'), 'gold_only'),
+    (make_prawcore_error(prawcore.exceptions.Forbidden, 403, None), 'private'),
 ])
 def test_describe_subreddit_keeps_unavailable_subreddits_with_their_state(error, expected_state):
     info = describe_with_fetch_error(error)
@@ -283,6 +285,6 @@ def test_subreddit_suggestion_list_line(suggestion, expected_line):
 
 
 @pytest.mark.unit
-def test_german_suggestion_line_is_german():
-    suggestion = {'name': 'geheim', 'state': 'private', 'subscribers': 7, 'over18': False}
-    assert phase1.get_subreddit_suggestion_list_line(suggestion, 'de') == '* r/geheim (**privat**, Abonnenten: 7)'
+def test_german_suggestion_line_translates_subscribers_but_not_the_state():
+    suggestion = {'name': 'geheim', 'state': 'restricted', 'subscribers': 7, 'over18': False}
+    assert phase1.get_subreddit_suggestion_list_line(suggestion, 'de') == '* r/geheim (**restricted**, Abonnenten: 7)'

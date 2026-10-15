@@ -203,15 +203,9 @@ def is_subreddit_name_length_valid(subreddit_name):
     return NEW_SUBREDDIT_NAME_MINIMUM_LENGTH <= len(subreddit_name) <= NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH
 
 
-# Message key for each subreddit state worth pointing out in a suggestion (None means nothing to add)
-SUBREDDIT_STATE_KEYS = {
-    'restricted': 'SUBREDDIT_STATE_RESTRICTED',
-    'archived': 'SUBREDDIT_STATE_ARCHIVED',
-    'private': 'SUBREDDIT_STATE_PRIVATE',
-    'quarantined': 'SUBREDDIT_STATE_QUARANTINED',
-    'banned': 'SUBREDDIT_STATE_BANNED',
-    'unavailable': 'SUBREDDIT_STATE_UNAVAILABLE',
-}
+# Subreddit types that are worth pointing out in a suggestion. The state is shown as Reddit names it
+# (untranslated), e.g. `* r/name (**private**)`.
+NOTABLE_SUBREDDIT_TYPES = ('restricted', 'archived')
 SUBSCRIBERS_KEY = 'SUGGESTION_SUBSCRIBERS'
 
 
@@ -226,8 +220,9 @@ def _error_reason(exception):
 def describe_subreddit(subreddit_name):
     """Fetches a suggested subreddit once and returns what its suggestion line shows.
 
-    Returns a dict with `name`, `state` (a SUBREDDIT_STATE_KEYS key, or None if it is a normal public
-    subreddit), `subscribers` (None when unknown) and `over18`. A subreddit that cannot be fetched is
+    Returns a dict with `name`, `state` (Reddit's own word, such as 'private', 'banned', 'quarantined' or
+    'restricted', 'unavailable' when Reddit gives none, or None for a normal public subreddit),
+    `subscribers` (None when unknown) and `over18`. A subreddit that cannot be fetched is
     still described, so the reply can list it with its state instead of silently dropping it.
     """
     info = {'name': subreddit_name, 'state': None, 'subscribers': None, 'over18': False}
@@ -239,13 +234,12 @@ def describe_subreddit(subreddit_name):
         subreddit_type = getattr(sub_obj, 'subreddit_type', 'public')
         if getattr(sub_obj, 'quarantine', False):
             info['state'] = 'quarantined'
-        elif subreddit_type in SUBREDDIT_STATE_KEYS:
+        elif subreddit_type in NOTABLE_SUBREDDIT_TYPES:
             info['state'] = subreddit_type
     except prawcore.exceptions.Forbidden as e:
-        reason = _error_reason(e)
-        info['state'] = 'quarantined' if reason == 'quarantined' else 'private'
+        info['state'] = _error_reason(e) or 'private'
     except prawcore.exceptions.NotFound as e:
-        info['state'] = 'banned' if _error_reason(e) == 'banned' else 'unavailable'
+        info['state'] = _error_reason(e) or 'unavailable'
     except prawcore.exceptions.Redirect:
         # Reddit redirects a name that does not exist (any more) to its search page
         info['state'] = 'unavailable'
@@ -257,19 +251,16 @@ def describe_subreddit(subreddit_name):
 
 def suggestion_message_keys(suggestions):
     """Returns the message keys the suggestion lines for `suggestions` will use."""
-    keys = []
     if any(suggestion['subscribers'] is not None for suggestion in suggestions):
-        keys.append(SUBSCRIBERS_KEY)
-    keys += sorted({SUBREDDIT_STATE_KEYS[s['state']] for s in suggestions if s['state'] is not None})
-    return keys
+        return [SUBSCRIBERS_KEY]
+    return []
 
 
 def get_subreddit_suggestion_list_line(suggestion, language):
     """Formats a suggestion bullet such as `* r/name (**NSFW**, subscribers: 1,234)` in `language`."""
     details = []
     if suggestion['state'] is not None:
-        _, state_text = i18n.lookup_in_languages(SUBREDDIT_STATE_KEYS[suggestion['state']], [language])
-        details.append(f'**{state_text}**')
+        details.append(f"**{suggestion['state']}**")
     if suggestion['over18']:
         details.append('**NSFW**')
     if suggestion['subscribers'] is not None:

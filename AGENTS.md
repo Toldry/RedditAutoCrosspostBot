@@ -36,7 +36,8 @@ auxiliary bot's PRAW instance (`get_comment_with_different_praw_instance`). All 
      not name, so every candidate must have a `difflib` name similarity of at least `MIN_NAME_SIMILARITY` (0.6);
      the best 4 are kept, most similar first. Each suggestion is fetched once (`phase1.describe_subreddit`):
      a private, quarantined, banned, restricted, archived or otherwise unavailable one is **still listed**,
-     with its state in bold (e.g. `* r/name (**private**)`).
+     with its state in bold, as Reddit names it (the 403/404 `reason`, or `subreddit_type`) and untranslated
+     (e.g. `* r/name (**private**)`).
 2. **`same_subreddit_bot`** (`u/same_subreddit_bot`):
    - Trigger: Comment links to the exact same subreddit where it was posted.
    - Behavior: Replies humorously (*"Yes, that's where we are."*).
@@ -177,7 +178,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether CHANGELOG `[Unreleased]` has entries. |
 | [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run` and `--limit N` (`0` means all). |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 181 mocked unit tests (`@pytest.mark.unit`), one file per module. |
+| [`tests/unit/`](./tests/unit/) | 183 mocked unit tests (`@pytest.mark.unit`), one file per module. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
