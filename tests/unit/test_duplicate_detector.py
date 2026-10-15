@@ -91,9 +91,9 @@ def test_scan_matches_a_resized_copy_of_the_image(make_mock_comment):
 
     with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit):
         with patch('requests.get', side_effect=mock_requests_get):
-            scan = duplicate_detector.scan_subreddit_for_image(source_comment.submission, 'target_sub')
+            scan = duplicate_detector.scan_subreddit_for_duplicates(source_comment.submission, 'target_sub')
             duplicates = scan.duplicates
-            assert scan.image_posts_checked == 1
+            assert scan.posts_checked == 1
             assert len(duplicates) == 1
             assert duplicates[0]['post_id'] == 'candidate_123'
             assert duplicates[0]['distance'] <= duplicate_detector.DEFAULT_HASH_THRESHOLD
@@ -135,10 +135,10 @@ def test_scan_ignores_different_images(make_mock_comment):
 
     with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit):
         with patch('requests.get', side_effect=mock_requests_get):
-            scan = duplicate_detector.scan_subreddit_for_image(
+            scan = duplicate_detector.scan_subreddit_for_duplicates(
                 source_comment.submission, 'target_sub', hash_threshold=2,
             )
-            assert scan.image_posts_checked == 1
+            assert scan.posts_checked == 1
             assert len(scan.duplicates) == 0
 
 
@@ -238,11 +238,12 @@ def test_download_image_bytes_rejects_oversized_images():
 
 
 
-def make_post(post_id, url, created_utc, preview_resolutions=None):
+def make_post(post_id, url, created_utc, preview_resolutions=None, is_video=False):
     post = MagicMock()
     post.id = post_id
     post.url = url
     post.created_utc = created_utc
+    post.is_video = is_video
     if preview_resolutions is None:
         del post.preview
     else:
@@ -250,11 +251,13 @@ def make_post(post_id, url, created_utc, preview_resolutions=None):
     return post
 
 
-def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None):
-    """Runs scan_subreddit_for_image over a fake "new" listing; every image is plain green unless given."""
-    source = make_post('source', 'https://i.redd.it/source.png', created_utc=0)
+def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None, source=None, top_posts=None,
+                 top_limit=0):
+    """Runs scan_subreddit_for_duplicates over a fake "new" listing; every image is plain green unless given."""
+    source = source or make_post('source', 'https://i.redd.it/source.png', created_utc=0)
     mock_reddit = MagicMock()
     mock_reddit.subreddit.return_value.new.return_value = posts[:limit]
+    mock_reddit.subreddit.return_value.top.return_value = (top_posts or [])[:top_limit]
     image_bytes_by_url = image_bytes_by_url or {}
     downloaded_urls = []
 
@@ -264,14 +267,16 @@ def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None):
 
     with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit), \
             patch('requests.get', side_effect=mock_requests_get):
-        scan = duplicate_detector.scan_subreddit_for_image(source, 'target_sub', posted_after=posted_after, limit=limit)
+        scan = duplicate_detector.scan_subreddit_for_duplicates(
+            source, 'target_sub', posted_after=posted_after, limit=limit, top_limit=top_limit,
+        )
     return scan, downloaded_urls
 
 
 @pytest.mark.unit
 def test_scan_returns_none_for_a_post_that_is_not_an_image():
     link_post = make_post('link', 'https://example.com/article', created_utc=0)
-    assert duplicate_detector.scan_subreddit_for_image(link_post, 'target_sub') is None
+    assert duplicate_detector.scan_subreddit_for_duplicates(link_post, 'target_sub') is None
 
 
 @pytest.mark.unit
@@ -283,7 +288,7 @@ def test_scan_stops_at_the_first_post_older_than_posted_after():
     ]
     scan, downloaded_urls = scan_listing(posts, posted_after=200)
     assert scan.complete is True
-    assert scan.image_posts_checked == 1  # the link post is skipped, the old image is never read
+    assert scan.posts_checked == 1  # the link post is skipped, the old image is never read
     assert scan.oldest_post_utc == 250
     assert 'https://i.redd.it/c.png' not in downloaded_urls
     assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['new_image']
@@ -294,7 +299,7 @@ def test_scan_is_incomplete_when_the_listing_runs_out_first():
     posts = [make_post(f'p{i}', f'https://i.redd.it/{i}.png', created_utc=1000 - i) for i in range(3)]
     scan, _ = scan_listing(posts, posted_after=0, limit=3)
     assert scan.complete is False
-    assert scan.image_posts_checked == 3
+    assert scan.posts_checked == 3
     assert scan.oldest_post_utc == 998
 
 
@@ -309,7 +314,7 @@ def test_scan_is_complete_when_the_subreddit_has_fewer_posts_than_the_limit():
 def test_scan_does_not_count_images_it_could_not_read():
     posts = [make_post('broken', 'https://i.redd.it/broken.png', created_utc=500)]
     scan, _ = scan_listing(posts, image_bytes_by_url={'https://i.redd.it/broken.png': b'not an image'})
-    assert scan.image_posts_checked == 0
+    assert scan.posts_checked == 0
     assert scan.duplicates == []
 
 
@@ -324,3 +329,83 @@ def test_scan_compares_small_previews_instead_of_full_images():
     _, downloaded_urls = scan_listing(posts)
     assert 'https://preview.redd.it/a.png?width=320&s=2' in downloaded_urls
     assert 'https://i.redd.it/a.png' not in downloaded_urls
+
+
+def png_bytes(img):
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    return buffer.getvalue()
+
+
+def video_preview(name):
+    return [{'url': f'https://external-preview.redd.it/{name}.jpg?width=320&amp;s=x', 'width': 320, 'height': 180}]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('url, is_video, expected', [
+    ('https://i.redd.it/cat.png', False, duplicate_detector.IMAGE),
+    ('https://v.redd.it/abc123', True, duplicate_detector.VIDEO),
+    ('https://v.redd.it/abc123', False, duplicate_detector.VIDEO),
+    ('https://www.youtube.com/watch?v=abc', False, duplicate_detector.VIDEO),
+    ('https://youtu.be/abc', False, duplicate_detector.VIDEO),
+    ('https://streamable.com/abc', False, duplicate_detector.VIDEO),
+    ('https://example.com/article', False, None),
+    ('https://www.reddit.com/r/pics/comments/abc/title/', False, None),
+])
+def test_media_kind(url, is_video, expected):
+    assert duplicate_detector.media_kind(make_post('p', url, created_utc=0, is_video=is_video)) == expected
+
+
+@pytest.mark.unit
+def test_video_without_a_preview_cannot_be_compared():
+    video = make_post('v', 'https://v.redd.it/abc123', created_utc=0, is_video=True)
+    assert duplicate_detector.preview_image_url(video) is None
+    assert scan_listing([], source=video)[0] is None
+
+
+@pytest.mark.unit
+def test_video_scan_compares_preview_frames_of_videos_only():
+    source = make_post('source', 'https://v.redd.it/source', created_utc=0, preview_resolutions=video_preview('source'),
+                       is_video=True)
+    posts = [
+        make_post('image', 'https://i.redd.it/image.png', created_utc=300),
+        make_post('copy', 'https://youtu.be/copy', created_utc=200, preview_resolutions=video_preview('copy')),
+        make_post('other', 'https://v.redd.it/other', created_utc=100, preview_resolutions=video_preview('other'),
+                  is_video=True),
+    ]
+    frame = load_sample_image()
+    different_frame = frame.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    scan, downloaded_urls = scan_listing(posts, source=source, image_bytes_by_url={
+        'https://external-preview.redd.it/source.jpg?width=320&s=x': png_bytes(frame),
+        'https://external-preview.redd.it/copy.jpg?width=320&s=x': png_bytes(frame),
+        'https://external-preview.redd.it/other.jpg?width=320&s=x': png_bytes(different_frame),
+    })
+    assert scan.media == duplicate_detector.VIDEO
+    assert scan.posts_checked == 2
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['copy']
+    assert 'https://i.redd.it/image.png' not in downloaded_urls
+
+
+@pytest.mark.unit
+def test_scan_also_compares_the_top_posts_of_all_time():
+    newest = [make_post(f'new{i}', f'https://i.redd.it/new{i}.png', created_utc=1000 - i) for i in range(3)]
+    old_famous = make_post('famous', 'https://i.redd.it/famous.png', created_utc=5)
+    top_posts = [old_famous, newest[0]]  # The newest post is also a top post; it must be compared once
+    scan, downloaded_urls = scan_listing(
+        newest, limit=3, top_posts=top_posts, top_limit=100,
+        image_bytes_by_url={'https://i.redd.it/source.png': png_bytes(load_sample_image()),
+                            'https://i.redd.it/famous.png': png_bytes(load_sample_image())},
+    )
+    assert scan.posts_checked == 4
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['famous']
+    assert downloaded_urls.count('https://i.redd.it/new0.png') == 1
+    # The top posts say nothing about how far back the newest posts reach
+    assert scan.complete is False
+    assert scan.oldest_post_utc == 998
+
+
+@pytest.mark.unit
+def test_scan_reads_no_top_posts_by_default():
+    old_famous = make_post('famous', 'https://i.redd.it/famous.png', created_utc=5)
+    scan, _ = scan_listing([], top_posts=[old_famous], top_limit=0)
+    assert scan.posts_checked == 0

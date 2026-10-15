@@ -89,3 +89,15 @@ def test_run_filters_target_comparison_is_case_insensitive(make_mock_comment):
         with patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_gpwsc):
             res = phase2.run_filters(comment_entry, comment=comment)
     assert res.passes_filter is True
+
+
+@pytest.mark.unit
+def test_full_media_scan_reads_back_to_the_comment_without_top_posts(make_mock_comment):
+    comment_entry = {'permalink': '/r/test/comments/1/2/3/'}
+    comment = make_mock_comment(body='r/target_sub', score=100)
+    mock_gpwsc = MagicMock(posts_found=False, unable_to_search=False)
+    with patch.dict('os.environ', {'COMMENT_SCORE_THRESHOLD': '10'}):
+        with patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_gpwsc) as mock_search:
+            phase2.run_filters(comment_entry, comment=comment, full_media_scan=True)
+    assert mock_search.call_args.kwargs['media_scan_limit'] == 1000
+    assert mock_search.call_args.kwargs['media_scan_top_limit'] == 0

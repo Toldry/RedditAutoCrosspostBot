@@ -95,12 +95,13 @@ def check_pattern(comment):
     return target_subreddit
 
 
-def get_posts_with_same_content(comment, subreddit, image_scan_since=None,
-                                image_scan_limit=duplicate_detector.DEFAULT_SCAN_LIMIT):
-    """Looks for posts in `subreddit` that link to the same URL or, for an image post, show the same image.
+def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
+                                media_scan_limit=duplicate_detector.QUICK_SCAN_NEWEST_LIMIT,
+                                media_scan_top_limit=duplicate_detector.QUICK_SCAN_TOP_LIMIT):
+    """Looks for posts in `subreddit` that link to the same URL or, for an image or video post, look the same.
 
-    The image comparison reads at most `image_scan_limit` of the newest posts, stopping at the first one older
-    than `image_scan_since` (a Unix timestamp). Its outcome is kept in `image_scan` (None if no images were
+    The picture comparison reads at most `media_scan_limit` of the newest posts, stopping at the first one older
+    than `media_scan_since` (a Unix timestamp), plus the `media_scan_top_limit` top posts of all time. Its outcome is kept in `media_scan` (None if nothing was
     compared).
     """
     class Result:
@@ -108,7 +109,7 @@ def get_posts_with_same_content(comment, subreddit, image_scan_since=None,
         posts = []
         unable_to_search = False
         unable_to_search_reason = None
-        image_scan = None
+        media_scan = None
 
     result = Result()
     reddit_instance = reddit.get_reddit_instance()
@@ -151,12 +152,13 @@ def get_posts_with_same_content(comment, subreddit, image_scan_since=None,
         result.posts = submissions
         return result
 
-    result.image_scan = duplicate_detector.scan_subreddit_for_image(
-        comment.submission, subreddit, posted_after=image_scan_since, limit=image_scan_limit,
+    result.media_scan = duplicate_detector.scan_subreddit_for_duplicates(
+        comment.submission, subreddit, posted_after=media_scan_since, limit=media_scan_limit,
+        top_limit=media_scan_top_limit,
     )
-    if result.image_scan and result.image_scan.duplicates:
+    if result.media_scan and result.media_scan.duplicates:
         result.posts_found = True
-        result.posts = [duplicate['post'] for duplicate in result.image_scan.duplicates]
+        result.posts = [duplicate['post'] for duplicate in result.media_scan.duplicates]
 
     return result
 

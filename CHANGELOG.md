@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Video Repost Scan Before Crossposting:** video posts (Reddit-hosted, YouTube and Streamable) are now compared with the target subreddit's video posts since the source comment was written, the same way images are, by perceptual hashing of Reddit's preview frame. The crosspost reply gets a matching sentence in every language ("I also looked through all N video posts made in r/<target> in the last D days and checked for duplicates of this video. None were found."). A trimmed or re-edited copy usually has a different preview frame and is missed.
+
+- **Wider Quick Duplicate Check:** the check made when a comment is first seen (the one `u/same_post_bot` answers with, also re-run by Phase 2) now compares an image or video with the target subreddit's 100 newest posts instead of 50, plus its 100 top posts of all time, where famous reposts usually come from. Phase 3's full scan is unchanged.
+
+### Changed
+- **Shorter Cut-Short Scan Sentence:** when Reddit's listing ends before the scan reaches the source comment's date, the crosspost reply no longer adds "Reddit doesn't list older posts, so I couldn't check further back." (in any language); it still says how many of the newest posts were checked and how far back they go. The singular wording for a cut-short scan that found exactly one image or video post ("the newest image post ... It doesn't.") is gone too; that rare case now reads "the 1 newest image posts". A scan that found no image (or video) posts at all adds no sentence; `REPLY_TO_CROSSPOST_NO_IMAGE_POSTS` is gone.
+- **Duplicate Detector Renames:** `scan_subreddit_for_image` is now `scan_subreddit_for_duplicates`, `ImageRepostScan` is now `RepostScan` (with a `media` field), and `phase2.run_filters(full_image_scan=...)` is now `full_media_scan`.
+
 ## [2.10.0] - 2026-10-15
 
 ### Changed

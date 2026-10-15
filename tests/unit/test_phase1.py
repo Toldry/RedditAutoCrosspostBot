@@ -288,3 +288,17 @@ def test_subreddit_suggestion_list_line(suggestion, expected_line):
 def test_german_suggestion_line_translates_subscribers_but_not_the_state():
     suggestion = {'name': 'geheim', 'state': 'restricted', 'subscribers': 7, 'over18': False}
     assert phase1.get_subreddit_suggestion_list_line(suggestion, 'de') == '* r/geheim (**restricted**, Abonnenten: 7)'
+
+
+@pytest.mark.unit
+def test_quick_duplicate_check_reads_newest_and_all_time_top_posts(make_mock_comment):
+    comment = make_mock_comment(body='r/target_sub')
+    mock_reddit = MagicMock()
+    mock_reddit.subreddit.return_value.search.return_value = []
+
+    with patch('racb.core.reddit.get_reddit_instance', return_value=mock_reddit), \
+            patch('racb.core.duplicate_detector.scan_subreddit_for_duplicates', return_value=None) as mock_scan:
+        phase1.get_posts_with_same_content(comment, 'target_sub')
+
+    assert mock_scan.call_args.kwargs['limit'] == 100
+    assert mock_scan.call_args.kwargs['top_limit'] == 100

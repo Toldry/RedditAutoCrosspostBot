@@ -45,15 +45,16 @@ msgstr ""
 "\n"
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK"
-msgstr " J'ai aussi parcouru toutes les publications d'images faites dans r/{target_subreddit} au cours des {scan_period} précédents (au total : {image_post_count}) et [cherché des doublons]({duplicate_detector_url}) de cette image. Aucun n'a été trouvé."
+msgstr " J'ai aussi parcouru toutes les publications d'images faites dans r/{target_subreddit} au cours des {scan_period} précédents (au total : {post_count}) et [cherché des doublons]({duplicate_detector_url}) de cette image. Aucun n'a été trouvé."
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
-msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"
-msgstr[0] " J'ai aussi parcouru les publications d'images les plus récentes de r/{target_subreddit} (au total : {image_post_count}, jusqu'à il y a {scan_period}) et [cherché des doublons]({duplicate_detector_url}) de cette image. Aucun n'a été trouvé. Reddit ne liste pas les publications plus anciennes."
-msgstr[1] " J'ai aussi parcouru les publications d'images les plus récentes de r/{target_subreddit} (au total : {image_post_count}, jusqu'à il y a {scan_period}) et [cherché des doublons]({duplicate_detector_url}) de cette image. Aucun n'a été trouvé. Reddit ne liste pas les publications plus anciennes."
+msgstr " J'ai aussi parcouru les publications d'images les plus récentes de r/{target_subreddit} (au total : {post_count}, jusqu'à il y a {scan_period}) et [cherché des doublons]({duplicate_detector_url}) de cette image. Aucun n'a été trouvé."
 
-msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
-msgstr " Aucune image n'a été publiée dans r/{target_subreddit} au cours des {scan_period} précédents, il n'y avait donc rien à [comparer]({duplicate_detector_url})."
+msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK"
+msgstr " J'ai aussi parcouru toutes les publications de vidéos faites dans r/{target_subreddit} au cours des {scan_period} précédents (au total : {post_count}) et [cherché des doublons]({duplicate_detector_url}) de cette vidéo. Aucun n'a été trouvé."
+
+msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
+msgstr " J'ai aussi parcouru les publications de vidéos les plus récentes de r/{target_subreddit} (au total : {post_count}, jusqu'à il y a {scan_period}) et [cherché des doublons]({duplicate_detector_url}) de cette vidéo. Aucun n'a été trouvé."
 
 msgid "BAD_BOT_PHRASE"
 msgstr "Mauvais bot"
