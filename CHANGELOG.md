@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Comment Footer Link:** the footer of every bot comment now reads "GitHub" instead of "github". The compiled `.mo` catalogs are regenerated so the change actually ships (the `.po` edit alone left the unit tests red).
+
 ## [2.8.0] - 2026-10-15
 
 ### Fixed
