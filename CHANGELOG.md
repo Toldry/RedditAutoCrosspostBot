@@ -14,6 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Inbox Feedback Crash:** Every "good bot" or "bad bot" reply raised `AttributeError` since 2.4.2, because the inbox handler called `full_url` on the PRAW instance instead of the `racb.core.reddit` module, so feedback was never logged or marked read. A reply that Reddit rejects (locked or archived thread) is now marked read instead of being retried every 10 minutes.
 
+## [2.4.10] - 2026-10-15
+
+### Changed
+- **Newer Pushes Cancel Stale Test Runs:** A push to `master` that reaches the `integration-tests` CI job now cancels the previous run's `cleanup-test-history` sweep, or its still-running integration tests, instead of waiting for them. The newer run's own sweep removes the leftovers. A sweep no longer runs after cancelled integration tests.
+
+## [2.4.9] - 2026-10-15
+
+### Fixed
+- **Half-Applied Deploys:** `scripts/redeploy.sh` now checks that it can write to every directory of the checkout before resetting it, and stops with the `chown` command to run if not. A directory owned by another user (for example after a `sudo git pull`) used to make `git reset --hard` fail partway, leaving the checkout half-updated.
+
+## [2.4.8] - 2026-10-15
+
+### Changed
+- **Faster Deploys:** The slow sweep of leftover test posts (`scripts/cleanup_test_history.py --strict`) moved out of the `integration-tests` CI job into its own `cleanup-test-history` job, which runs in parallel with `deploy` instead of before it. A failed sweep now turns that job red but no longer blocks the deploy. It still runs after failed or cancelled integration tests, and never while another run's tests are posting.
+
+## [2.4.7] - 2026-10-15
+
+### Fixed
+- **Auto-Deploy Setup on a Fresh Project:** `scripts/setup_auto_deploy.sh` failed with "Service account ... does not exist" when granting roles right after creating the `github-deployer` service account, because IAM takes a short while to see a new account. It now retries those grants for up to 2 minutes.
+
+## [2.4.6] - 2026-10-15
+
+### Added
+- **Automatic Deployment:** A new `deploy` CI job rebuilds and restarts the bot on the Google Cloud VM after every push to `master` that passes the unit tests, the live integration tests and their cleanup, at the commit the `release` job ended on. The live tests run in a new `integration-tests` job with the bot credentials stored as repository secrets, followed by `scripts/cleanup_test_history.py --strict`, which removes leftover test posts and fails if any could not be deleted. If `master` moved on during a run, that run deploys nothing and the newer push's run deploys instead. It signs in to Google Cloud with Workload Identity Federation (no stored key), reaches the VM over an IAP tunnel, and runs the new `scripts/redeploy.sh` through an SSH key that can run nothing else. The script checks that the bot is still running 30 seconds later and fails the job otherwise. It stays off until the `AUTO_DEPLOY` repository variable is `true`; the one-time setup (`scripts/setup_auto_deploy.sh`, `scripts/authorize_deploy_key.sh`) is described in `docs/auto-deploy.md`.
+- **Strict Test Cleanup:** `scripts/cleanup_test_history.py --strict` exits with code 1 when a bot could not be checked or a test item could not be deleted, and any such problems are now listed at the end of every run.
+
 ## [2.4.5] - 2026-10-15
 
 ### Fixed

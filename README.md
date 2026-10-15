@@ -126,7 +126,10 @@ uv run pytest -x -vv                      # stop at the first failure, verbose o
 > `uv run python scripts/cleanup_test_history.py --dry-run` (preview) and then `--limit 0`.
 
 CI runs the unit tests on Python 3.11 for every pull request and every push to `master`
-(see [`.github/workflows/tests.yml`](./.github/workflows/tests.yml)).
+(see [`.github/workflows/tests.yml`](./.github/workflows/tests.yml)). When automatic deployment is on, pushes
+to `master` also run the live integration tests, deploy only if they pass, and sweep up leftover test posts
+alongside the deploy
+([`docs/auto-deploy.md`](./docs/auto-deploy.md)).
 
 ### Versioning & Releases
 Releases adhere to [Semantic Versioning](https://semver.org/) and are automatic: after the tests pass on
@@ -147,6 +150,8 @@ You can run this bot 100% free on Google Cloud's Always Free `e2-micro` tier:
    ```
 2. The VM will automatically execute [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) on first boot, provisioning 2GB swap space, Docker, and Docker Compose.
 3. See [`AGENTS.md`](./AGENTS.md) for architecture details.
+4. Optionally, have every push to `master` that passes the unit and integration tests redeploy the VM automatically: see
+   [`docs/auto-deploy.md`](./docs/auto-deploy.md) for the one-time setup.
 
 ---
 

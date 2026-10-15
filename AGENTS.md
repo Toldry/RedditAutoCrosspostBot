@@ -172,14 +172,18 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
 | [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether CHANGELOG `[Unreleased]` has entries. |
-| [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run` and `--limit N` (`0` means all). |
+| [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run`, `--limit N` (`0` means all) and `--strict` (exit code 1 if a bot could not be checked or a test item could not be deleted; CI's `cleanup-test-history` job uses it). |
+| [`scripts/redeploy.sh`](./scripts/redeploy.sh) | Runs **on the VM**: resets the checkout to a commit of `origin/master` (argument, `SSH_ORIGINAL_COMMAND`, or the latest), runs `docker compose up --detach --build`, and fails if the bot is not running 30 s later. The CI `deploy` job's SSH key is pinned to it. Refuses to run on a dirty or diverged checkout. |
+| [`scripts/authorize_deploy_key.sh`](./scripts/authorize_deploy_key.sh) | Runs **on the VM** once: adds the CI deploy key to `~/.ssh/authorized_keys` as a forced command for `redeploy.sh` and prints the host key. |
+| [`scripts/setup_auto_deploy.sh`](./scripts/setup_auto_deploy.sh) | One-time setup of automatic deployment, run in Cloud Shell: service account, Workload Identity Federation, IAP firewall rule, deploy key, GitHub variables. See [`docs/auto-deploy.md`](./docs/auto-deploy.md). |
+| [`docs/auto-deploy.md`](./docs/auto-deploy.md) | How the CI `deploy` job works, its security model, setup, rollback and troubleshooting. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase. Each qualifying exchange is shown with its post as a Reddit-style tree. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
 | [`tests/unit/`](./tests/unit/) | 124 mocked unit tests (`@pytest.mark.unit`), one file per module. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
-| [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. On `master`, a `release` job then bumps the version and tags it (section 5). |
+| [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. On `master`, a `release` job then bumps the version and tags it (section 5), and, when the `AUTO_DEPLOY` variable is `true`, an `integration-tests` job runs the live tests with the bot credentials from repository secrets, after which a `deploy` job redeploys the VM at the released commit while a `cleanup-test-history` job runs `cleanup_test_history.py --strict` ([`docs/auto-deploy.md`](./docs/auto-deploy.md)). |
 | [`.github/dependabot.yml`](./.github/dependabot.yml) | Dependabot config for `pyproject.toml` / `uv.lock` (`uv` ecosystem) and GitHub Actions. Version updates are **paused** with `open-pull-requests-limit: 0`; delete those lines to resume monthly PRs. |
 | [`examples/example_reddit_comment.py`](./examples/example_reddit_comment.py) | Not executable code: a commented-out attribute dump of a PRAW `Comment` and `Submission`, kept for reference. |
 | [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
@@ -331,6 +335,9 @@ uv run pytest -m integration
   ```
   The script treats an item as test litter if its subreddit starts with `racb_test_` or `racb_fake_`, or if
   its title or body contains `[test`, `racb_test_` or `racb_fake_`.
+- CI runs them on every push to `master` while auto-deploy is on (`integration-tests` job) and only deploys
+  when they pass. `scripts/cleanup_test_history.py --strict` then runs in parallel with the deploy
+  (`cleanup-test-history` job) and does not gate it. Pull requests never run them.
 - The integration tests call the reply and crosspost helpers **directly**. They do not exercise detection
   (`get_posts_with_same_content`, `handle_incoming_comment`) against live Reddit, apart from the image-hash test.
 - Unit tests mock PRAW objects with `tests/conftest.py`. Patch at the import site actually used, e.g.
@@ -497,6 +504,10 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 - `deploy/cloud-init.yaml` adds **every** account under `/home` to the `docker` group (root-equivalent)
   and makes `/opt` group-writable. This is deliberate, for the GCP web-SSH workflow on a single-admin VM;
   do not reuse it on a shared machine. It installs Docker only; cloning and starting the bot is manual.
+- **Automatic deploys** ([`docs/auto-deploy.md`](./docs/auto-deploy.md)) build on the VM, never in CI, because
+  the image contains `.env`. They `git reset --hard` the VM checkout, so `scripts/redeploy.sh` refuses to run
+  when tracked files were edited on the VM. Keep `redeploy.sh`'s body inside `main()`: the reset rewrites the
+  running script.
 - Python versions: `requires-python = ">=3.11"`. The Docker image, CI and `.python-version` use 3.11, and the
   unit tests also pass on 3.13. 3.10 is not supported.
 - Mermaid diagrams: GitHub's renderer rejects unquoted labels that contain parentheses, e.g.
