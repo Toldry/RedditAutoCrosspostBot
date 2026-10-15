@@ -11,6 +11,7 @@ from praw.models import PostMedia
 
 from racb.core import reddit
 from racb.phases import phase1, phase3, cleanup
+from scripts.delete_test_artifacts import record_artifact
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,17 @@ TEST_TARGET_SUBREDDIT = 'racb_test_2'
 # Flag to disable cleanup of created submissions and comments across all integration tests.
 # Set RACB_KEEP_TEST_ARTIFACTS=true to keep them on Reddit for debugging.
 DISABLE_CLEANUP = os.environ.get('RACB_KEEP_TEST_ARTIFACTS', '').strip().lower() in ('true', '1', 'yes')
+
+
+def track(reddit_object):
+    """Records a post or comment this test created, then returns it.
+
+    The CI step after the tests runs scripts/delete_test_artifacts.py, which deletes every recorded item
+    that is still there, e.g. because a test was killed before its own cleanup ran.
+    """
+    if reddit_object is not None:
+        record_artifact(reddit_object._reddit.config.username, reddit_object.fullname)
+    return reddit_object
 
 
 def cleanup_reddit_objects(*objects):
@@ -102,20 +114,20 @@ def test_live_same_subreddit_bot_trigger():
     r = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)
     sub = r.subreddit(TEST_SOURCE_SUBREDDIT)
 
-    submission = sub.submit(
+    submission = track(sub.submit(
         title=f'[Test] Same Sub Test {uuid.uuid4().hex[:8]}',
         selftext='Test post body for same_subreddit_bot integration test',
-    )
+    ))
     raw_comment = None
     bot_reply = None
 
     try:
-        raw_comment = submission.reply(f'r/{TEST_SOURCE_SUBREDDIT}')
+        raw_comment = track(submission.reply(f'r/{TEST_SOURCE_SUBREDDIT}'))
         time.sleep(2)
         comment = r.comment(id=raw_comment.id)
 
         # Trigger same_subreddit_bot reply
-        bot_reply = phase1.reply_to_source_equals_target_comment(comment)
+        bot_reply = track(phase1.reply_to_source_equals_target_comment(comment))
 
         assert bot_reply is not None, f"Expected reply from {reddit.SAME_SUBREDDIT_BOT_NAME}"
         assert bot_reply.author.name.lower() == reddit.SAME_SUBREDDIT_BOT_NAME.lower()
@@ -132,20 +144,20 @@ def test_live_sub_doesnt_exist_bot_trigger():
     sub = r.subreddit(TEST_SOURCE_SUBREDDIT)
 
     fake_sub_name = f'racb_fake_{uuid.uuid4().hex[:10]}'
-    submission = sub.submit(
+    submission = track(sub.submit(
         title=f'[Test] Nonexistent Sub Test {uuid.uuid4().hex[:8]}',
         selftext='Test post body for sub_doesnt_exist_bot integration test',
-    )
+    ))
     raw_comment = None
     bot_reply = None
 
     try:
-        raw_comment = submission.reply(f'r/{fake_sub_name}')
+        raw_comment = track(submission.reply(f'r/{fake_sub_name}'))
         time.sleep(2)
         comment = r.comment(id=raw_comment.id)
 
         # Trigger sub_doesnt_exist_bot reply
-        bot_reply = phase1.reply_to_nonexistent_target_subreddit_comment(comment, fake_sub_name)
+        bot_reply = track(phase1.reply_to_nonexistent_target_subreddit_comment(comment, fake_sub_name))
 
         assert bot_reply is not None, f"Expected reply from {reddit.SUB_DOESNT_EXIST_BOT_NAME}"
         assert bot_reply.author.name.lower() == reddit.SUB_DOESNT_EXIST_BOT_NAME.lower()
@@ -163,28 +175,28 @@ def test_live_same_post_bot_reply():
     source_sub = r.subreddit(TEST_SOURCE_SUBREDDIT)
     target_sub = r.subreddit(TEST_TARGET_SUBREDDIT)
 
-    target_submission = target_sub.submit(
+    target_submission = track(target_sub.submit(
         title=f'[Test Prior Post] {uuid.uuid4().hex[:8]}',
         selftext='Target post content',
-    )
-    source_submission = source_sub.submit(
+    ))
+    source_submission = track(source_sub.submit(
         title=f'[Test Current Post] {uuid.uuid4().hex[:8]}',
         selftext='Source post content',
-    )
+    ))
     raw_comment = None
     bot_reply = None
 
     try:
-        raw_comment = source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}')
+        raw_comment = track(source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}'))
         time.sleep(2)
         comment = r.comment(id=raw_comment.id)
 
         # Trigger same_post_bot reply directly with target submission
-        bot_reply = phase1.reply_to_same_content_post_comment(
+        bot_reply = track(phase1.reply_to_same_content_post_comment(
             comment,
             TEST_TARGET_SUBREDDIT,
             target_submission,
-        )
+        ))
 
         assert bot_reply is not None
         assert bot_reply.author.name.lower() == reddit.SAME_POST_BOT_NAME.lower()
@@ -201,14 +213,14 @@ def test_live_phase3_graceful_private_crosspost():
     r = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)
     source_sub = r.subreddit(TEST_SOURCE_SUBREDDIT)
 
-    source_submission = source_sub.submit(
+    source_submission = track(source_sub.submit(
         title=f'[Test Private Source] {uuid.uuid4().hex[:8]}',
         selftext='Source content in private sub',
-    )
+    ))
     raw_comment = None
 
     try:
-        raw_comment = source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}')
+        raw_comment = track(source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}'))
         time.sleep(2)
         comment = r.comment(id=raw_comment.id)
 
@@ -277,11 +289,11 @@ def test_live_duplicate_detector_query():
     base_image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'test_sample.png')
     assert os.path.exists(base_image_path), f"Asset missing at {base_image_path}"
 
-    target_submission = target_sub.submit(
+    target_submission = track(target_sub.submit(
         title=f'[Test Target Base Image] {uuid.uuid4().hex[:8]}',
         image=PostMedia(base_image_path),
         timeout=25,
-    )
+    ))
     time.sleep(4.0)  # Allow Reddit listing index to propagate new post
 
     created_source_submissions = []
@@ -296,14 +308,14 @@ def test_live_duplicate_detector_query():
                     # Rotation is deliberately not matched: the per-region check that rejects
                     # same-template memes with different captions also rejects rotated images
                     continue
-                source_submission = source_sub.submit(
+                source_submission = track(source_sub.submit(
                     title=f'[Test Variation {var_name}] {uuid.uuid4().hex[:8]}',
                     image=PostMedia(var_path),
                     timeout=25,
-                )
+                ))
                 created_source_submissions.append(source_submission)
 
-                raw_comment = source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}')
+                raw_comment = track(source_submission.reply(f'r/{TEST_TARGET_SUBREDDIT}'))
                 created_comments.append(raw_comment)
                 time.sleep(2)
                 comment = r.comment(id=raw_comment.id)
