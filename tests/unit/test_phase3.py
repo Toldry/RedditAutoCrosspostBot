@@ -96,6 +96,8 @@ def test_reply_to_crosspost_asks_for_bad_bot_feedback_instead_of_downvotes(make_
     assert 'downvote' not in reply_text.lower()
     assert 'bad bot' in reply_text.lower()  # the inbox only recognizes the English phrase
     assert '^3' in reply_text
+    assert '^(2)' in reply_text
+    assert '^(2 - ' in reply_text
     assert '^(3 - ' in reply_text
 
 
