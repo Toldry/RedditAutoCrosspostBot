@@ -17,6 +17,7 @@ from scripts.negative_feedback_report import (
     message_markers,
     read_previous_reports,
     render_report,
+    report_file_url,
     write_report,
 )
 
@@ -225,3 +226,13 @@ def test_write_report_creates_the_directory(tmp_path):
 
     assert path.endswith('negative-feedback-20261015-083005.html')
     assert os.path.isfile(path)
+
+
+@pytest.mark.unit
+def test_report_file_url_is_an_absolute_file_url(tmp_path):
+    path = tmp_path / 'negative-feedback-20261015-083005.html'
+
+    url = report_file_url(str(path))
+
+    assert url.startswith('file:///')
+    assert url.endswith('/negative-feedback-20261015-083005.html')

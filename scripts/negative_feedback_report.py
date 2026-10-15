@@ -21,6 +21,7 @@ import html
 import json
 import logging
 import os
+import pathlib
 import re
 import sys
 
@@ -418,6 +419,11 @@ def write_report(reports_dir, html_text, now):
     return path
 
 
+def report_file_url(path):
+    """Returns a file:/// URL for `path`, which terminals show as a clickable link."""
+    return pathlib.Path(path).resolve().as_uri()
+
+
 def main():
     parser = argparse.ArgumentParser(description='Write an HTML report of new replies to the bot\'s requests for feedback.')
     parser.add_argument('--reports-dir', default=DEFAULT_REPORTS_DIR, help=f'Where reports are read and written (default: {DEFAULT_REPORTS_DIR}).')
@@ -444,6 +450,7 @@ def main():
     html_text = render_report(threads, previous_reports, now.strftime('%Y-%m-%d %H:%M UTC'), bot_names)
     path = write_report(args.reports_dir, html_text, now)
     logger.info(f'Wrote {path}')
+    logger.info(report_file_url(path))
 
 
 if __name__ == '__main__':
