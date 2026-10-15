@@ -67,6 +67,8 @@ DELETED_BODIES = {'[deleted]', '[removed]'}
 INFO_BATCH_SIZE = 100
 # Upper bound on "load more" requests per thread, so one huge thread cannot stall the run
 MAX_MORE_COMMENTS_REQUESTS = 50
+# Number of parent comments Reddit shows above a linked comment; large enough for any thread
+COMMENT_LINK_CONTEXT = 10000
 
 
 @dataclasses.dataclass
@@ -245,6 +247,11 @@ def collect_subtree(root_comment):
     return list(comments.values())
 
 
+def comment_url(comment):
+    """Links a comment with all of its parent comments shown, not just the comment itself."""
+    return f'{reddit.full_url(comment.permalink)}?context={COMMENT_LINK_CONTEXT}'
+
+
 def to_node(comment):
     return CommentNode(
         comment_id=comment.id,
@@ -252,7 +259,7 @@ def to_node(comment):
         body=comment.body,
         score=comment.score,
         created_utc=comment.created_utc,
-        permalink=reddit.full_url(comment.permalink),
+        permalink=comment_url(comment),
         is_bot=is_bot_account(comment),
     )
 

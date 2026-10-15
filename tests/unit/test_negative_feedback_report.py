@@ -193,6 +193,7 @@ def test_thread_with_written_feedback_is_shown_as_a_full_tree():
     assert sorted(thread.feedback_ids()) == ['b1', 'c1']
     assert thread.new_feedback_ids() == ['b1']
     assert thread.submission_text == 'post text'
+    assert question_node.children[1].permalink == 'https://reddit.com/r/pics/comments/abc/title/b1/?context=10000'
 
 
 @pytest.mark.unit
