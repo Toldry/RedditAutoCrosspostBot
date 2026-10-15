@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Irrelevant Subreddit Suggestions:** `u/sub_doesnt_exist_bot` suggested unrelated subreddits (e.g. r/nocontext for r/wtfdidijustread) because Reddit's `/subreddits/search` matches on a subreddit's topic, not its name. `sub_search.get_matches()` now keeps only results whose name is at least 60% similar to the requested one (`difflib`), ranked most similar first, and looks at 25 results instead of 10. If none is similar enough, the reply falls back to the "maybe a typo" text.
 
+## [2.4.5] - 2026-10-15
+
+### Fixed
+- **Mixed-language "subreddit doesn't exist" replies:** German subreddits got "Den Subreddit r/… gibt es nicht. Maybe there's a typo?" because `MAYBE_TYPO` and `ALTERNATE_SUBS_SUGGESTION` had no German translation and each sentence fell back to English on its own. Both are now translated, the German creation prompt says "ihn" (der Subreddit) instead of "es", and the reply now picks one language for all of its sentences and its footer, switching entirely to English when any piece is untranslated.
+
+## [2.4.4] - 2026-10-15
+
+### Fixed
+- **Deleting Posts and Comments:** Every delete failed with `404 HTTP response`, because Reddit no longer routes PRAW's delete URL (`POST /api/del/`, with a trailing slash) and answers it with a plain-text "404 page not found". `racb.core.reddit` now points PRAW at `/api/del`, which works. This fixes `scripts/cleanup_test_history.py`, the scheduled removal of negative-score crossposts, and the integration tests' own cleanup.
+
 ## [2.4.3] - 2026-10-14
 
 ### Fixed

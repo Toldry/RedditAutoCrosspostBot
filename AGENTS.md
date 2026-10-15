@@ -163,7 +163,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
 | [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on **every new DB connection**, so every statement must be idempotent (see section 6). |
 | [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore (`SUB_BLACKLIST`). |
-| [`src/racb/i18n.py`](./src/racb/i18n.py) | Loads the gettext catalogs, picks the locale for a subreddit, and falls back to English for untranslated strings (body and footer always share one language). |
+| [`src/racb/i18n.py`](./src/racb/i18n.py) | Loads the gettext catalogs, picks the locale for a subreddit, and falls back to English for untranslated strings (body and footer always share one language; a reply built from several messages, like the nonexistent-subreddit reply, switches entirely to English if any piece is untranslated). |
 | [`src/racb/locales/`](./src/racb/locales/) | gettext catalogs: `<locale>/LC_MESSAGES/messages.po` (edited) and `messages.mo` (compiled, committed). Locales: `en` (source text), `es`, `de`, `fr`, `he`, and `en@totallynotrobots`, an English variant using the gettext `@modifier` syntax. |
 | [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
@@ -377,6 +377,11 @@ Mechanics worth knowing:
   Precisely: request-rate limiting (the per-minute OAuth quota) is handled by prawcore. `ratelimit_seconds`
   only controls how long PRAW will **sleep** on a `RATELIMIT` API error ("you are doing that too much")
   before retrying. Up to 300 s of that sleep happens on the single main thread, so the stream stalls meanwhile.
+- **PRAW delete endpoint patch:**
+  [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) sets `praw.endpoints.API_PATH['del'] = 'api/del'` at import.
+  Reddit answers PRAW's default `POST /api/del/` (trailing slash) with a plain-text `404 page not found`,
+  so `Submission.delete()` and `Comment.delete()` always failed. Keep the patch until PRAW changes its path.
+  A plain-text `404 page not found` body on any other endpoint suggests the same trailing-slash problem.
 - **PostgreSQL Stored Procedures:**
   Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `get_oldest_scraped_comment`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](./src/racb/core/db.py).
 - **Batch Comment Processing in Phase 2:**

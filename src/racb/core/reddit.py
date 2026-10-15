@@ -14,11 +14,18 @@ import logging
 import os
 
 import praw
+import praw.endpoints
 import dotenv
 
 from racb.version import __version__
 
 logger = logging.getLogger(__name__)
+
+# Reddit answers PRAW's delete path, `POST /api/del/`, with a plain-text "404 page not found" (its router
+# has no route with the trailing slash), so every `Submission.delete()` / `Comment.delete()` failed. The same
+# endpoint without the slash works (confirmed live, October 2026). PRAW reads this shared dict on each
+# call, so patching it here fixes every delete made through any PRAW instance in this process.
+praw.endpoints.API_PATH['del'] = 'api/del'
 
 praw_instances = None
 
