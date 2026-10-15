@@ -34,13 +34,9 @@ sequenceDiagram
     par after the unit tests
         GH->>GH: release job, version bump commit and tag if any
     and
-        GH->>GH: integration-tests job, live Reddit tests
+        GH->>GH: integration-tests job, live Reddit tests, then deletes what they created
     end
-    par after the integration tests
-        GH->>GH: cleanup-test-history job, sweeps leftover test posts
-    and
-        GH->>GCP: deploy job signs in with a GitHub OIDC token (no stored GCP key)
-    end
+    GH->>GCP: deploy job signs in with a GitHub OIDC token (no stored GCP key)
     GH->>VM: SSH through an IAP tunnel, sending the commit SHA
     VM->>VM: scripts/redeploy.sh: git reset to the SHA, docker compose up --detach --build
     VM->>VM: wait 30 s, check that the bot container is running and not restarting
@@ -52,16 +48,17 @@ sequenceDiagram
    - `integration-tests`: the live tests (`uv run pytest -m integration`), which log in as all 4 bot accounts
      and post in the private test subreddits r/racb_test_1 and r/racb_test_2. Each test deletes what it posts.
 
-   In parallel with `deploy`, the `cleanup-test-history` job runs `scripts/cleanup_test_history.py --strict`,
-   which sweeps up any test posts and comments the tests left behind. It walks the recent history of all 4
-   bots, which is slow, so it does not hold up the deploy. It also runs when the tests failed, so a failed run
-   leaves no litter. `--strict` turns the job red if any bot could not be checked
-   or any test item could not be deleted, but that does not undo or block the deploy. It shares a
-   concurrency group with `integration-tests`, so it never sweeps while another run's tests are posting.
-   When a newer push reaches `integration-tests`, it cancels the older run's sweep (or, if the older run is
-   still testing, its integration tests) instead of waiting. Nothing is lost: the newer run's own sweep
-   picks up the leftovers, and the newer commit is the one that gets deployed. If the newer commit fails
-   its tests, though, the older one is not deployed either; the next passing push deploys.
+   The tests also record every post and comment they create in a manifest file. The job's last step,
+   `scripts/delete_test_artifacts.py --strict`, deletes any recorded item that is still on Reddit, as the
+   bot that wrote it. It only looks up those items, so it takes seconds, and it never touches anything
+   another run created. It runs even when the tests failed or were cancelled, since a killed test never
+   reaches its own cleanup. `--strict` fails the job, and so blocks the deploy, if a recorded item could not
+   be deleted.
+
+   Only one run's integration tests post at a time. When a newer push reaches `integration-tests`, it
+   cancels the older run's tests instead of waiting; the older run still deletes what it created, and the
+   newer commit is the one that gets deployed. If the newer commit fails its tests, though, the older one is
+   not deployed either; the next passing push deploys.
 2. It deploys the commit `release` ended on: the `chore(release)` commit when a version was bumped, so the
    version in the bot's User-Agent is right, or the tested commit itself when nothing was released. If
    someone pushed to `master` while the run was going, `release` sees the newer, not yet tested commit;
@@ -255,12 +252,12 @@ To test the deploy path without waiting for a push, re-run only the `deploy` job
 
 - **Normal flow:** merge to `master`. Nothing else to do. A failed deploy shows as a red `deploy` job, and
   GitHub emails you about the failed run.
-- **A failing integration test blocks the deploy.** A red `cleanup-test-history` job does not; it means some
-  test posts are still on Reddit (see Troubleshooting). The version is still released, since `release` does not wait for the integration tests. Fix forward;
+- **A failing integration test blocks the deploy**, and so does a recorded test post or comment that could
+  not be deleted (see Troubleshooting). The version is still released, since `release` does not wait for the integration tests. Fix forward;
   the next push to `master` tests and deploys again. If Reddit itself is having a bad day, re-run the
   failed `integration-tests` job; `deploy` runs once it passes.
 - **Pause auto-deploy:** set the `AUTO_DEPLOY` variable to anything other than `true` (or delete it). Pushes
-  still run the unit tests and releases; `integration-tests`, `cleanup-test-history` and `deploy` are skipped. Set it back to `true` to resume; the next push
+  still run the unit tests and releases; `integration-tests` and `deploy` are skipped. Set it back to `true` to resume; the next push
   deploys everything merged in between.
 - **Roll back:** re-run the `deploy` job of an older successful run; it redeploys that run's commit. Or, on
   the VM: `./scripts/redeploy.sh <full commit sha>`. The next push to `master` deploys the latest code again,
@@ -290,7 +287,7 @@ To test the deploy path without waiting for a push, re-run only the `deploy` job
 | `redeploy: the bot is not running cleanly` | The new code crashes on start. The last 50 log lines are in the job log. Fix forward, or roll back (see above). |
 | `permission denied while trying to connect to the Docker daemon socket` | `VM_USER` is not in the `docker` group: `sudo usermod -aG docker <user>`, then log out and in. |
 | `integration-tests` fails at `Live integration tests` | A real failure, or Reddit being unavailable. The pytest output names the test. Integration tests that fail on login usually mean a bot credential secret is missing or out of date; update it to match the VM's `.env`. |
-| `cleanup-test-history` fails | The script lists the problems at the end of its log (`could not delete ...`, `failed to authenticate ...`). A 404 on delete comes with a diagnosis (subreddit private or banned, account shadowbanned). Leftovers can be removed later with `uv run python scripts/cleanup_test_history.py --limit 0`. |
+| `integration-tests` fails at `Delete the posts and comments the tests created` | The script lists the problems at the end of its log (`could not look up ...`, `could not delete ...`). Usually Reddit was briefly unavailable: re-run the job. To find leftovers from older runs, or to diagnose a 404 on delete (subreddit private or banned, account shadowbanned), run the full history sweep `uv run python scripts/cleanup_test_history.py --limit 0` locally. |
 | `deploy` is skipped | `AUTO_DEPLOY` is not exactly `true`, the push was not to `master`, `integration-tests` or `release` failed (for example its push lost a race with another merge), or `master` moved on during the run (the newer push's run deploys it; look for the `master moved past` notice in `release`). Also: a newer push cancels an older run's `integration-tests` that is still running, which skips that run's deploy; the newer run deploys instead. |
 | `no space left on device` during the build | `docker system df` on the VM, then `docker builder prune` and `docker image prune -a` (the running bot's image is kept). |
 

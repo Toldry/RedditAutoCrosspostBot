@@ -122,13 +122,13 @@ uv run pytest -x -vv                      # stop at the first failure, verbose o
 > [!WARNING]
 > `uv run pytest -m integration` runs the **live** integration tests. They log in as all 4 real bot accounts
 > (credentials from `.env`) and post real submissions and comments in the private test subreddits
-> `r/racb_test_1` and `r/racb_test_2`. They delete what they create; leftovers can be removed with
-> `uv run python scripts/cleanup_test_history.py --dry-run` (preview) and then `--limit 0`.
+> `r/racb_test_1` and `r/racb_test_2`. They delete what they create and record it; whatever a killed run left
+> behind is removed with `uv run python scripts/delete_test_artifacts.py`. To sweep the bots' whole history
+> for test posts instead, run `uv run python scripts/cleanup_test_history.py --dry-run` (preview) and then `--limit 0`.
 
 CI runs the unit tests on Python 3.11 for every pull request and every push to `master`
 (see [`.github/workflows/tests.yml`](./.github/workflows/tests.yml)). When automatic deployment is on, pushes
-to `master` also run the live integration tests, deploy only if they pass, and sweep up leftover test posts
-alongside the deploy
+to `master` also run the live integration tests, delete the posts they created, and deploy only if both pass
 ([`docs/auto-deploy.md`](./docs/auto-deploy.md)).
 
 ### Versioning & Releases
