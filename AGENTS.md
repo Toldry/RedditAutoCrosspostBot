@@ -162,8 +162,9 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     subreddit: each catalog's `BAD_BOT_PHRASE` / `GOOD_BOT_PHRASE` (e.g. "Schlechter Bot", "Плохой бот", and
     "Bad human" for r/totallynotrobots), plus English `bad bot`, `delete this`, `no`, `good bot`. A bare
     negative phrase gets `RESPOND_TO_NEGATIVE_SENTIMENT`, which asks why; every such reply gets it. A "bad bot"
-    phrase followed by more words ("Bad bot, this sub bans memes", which the crosspost reply asks for) gets
-    `RESPOND_TO_EXPLAINED_NEGATIVE_SENTIMENT`, a thank-you, instead. Positive feedback (`good bot`)
+    phrase followed by more words ("Bad bot, this sub bans memes", which the crosspost reply asks for) gets no
+    answer: it is only logged and marked read, and `scripts/negative_feedback_report.py` finds it through the
+    inbox. Positive feedback (`good bot`)
     gets `RESPOND_TO_POSITIVE_SENTIMENT` ("Thank you (◕ᴗ◕✿)"), but only the oldest `good bot` reply under a
     given bot comment is thanked (`is_first_positive_reply`, which compares only the replies Reddit returns
     without "load more"). Both replies carry the usual footer, respect `DRY_RUN`, and a reply Reddit rejects
@@ -205,7 +206,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`docs/db-viewer.md`](./docs/db-viewer.md) | How to start the optional read-only `pgweb` database viewer on the VM and open it through an SSH tunnel. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 299 mocked unit tests (`@pytest.mark.unit`), one file per module. |
+| [`tests/unit/`](./tests/unit/) | 1001 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 700 combinations of locale, author, waiting period and image-scan outcome and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |

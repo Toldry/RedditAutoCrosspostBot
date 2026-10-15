@@ -69,8 +69,8 @@ def handle_comment_reply(comment, reddit_instance=None, bot_name=reddit.AUTO_CRO
             respond_to_positive_sentiment(comment, bot_name)
         elif sentiment == 'negative':
             respond_to_negative_sentiment(comment, bot_name)
-        elif sentiment == 'explained_negative':
-            respond_to_explained_negative_sentiment(comment, bot_name)
+        # An 'explained_negative' reply ("Bad bot, this sub bans memes") already says why, so it gets no
+        # answer; it is only logged and marked read. scripts/negative_feedback_report.py collects it.
 
         if sentiment is not None:
             reddit_instance.inbox.mark_read([comment])
@@ -160,8 +160,3 @@ def respond_to_positive_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NA
 
 def respond_to_negative_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
     return reply_to_feedback(comment, 'RESPOND_TO_NEGATIVE_SENTIMENT', bot_name)
-
-
-def respond_to_explained_negative_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
-    """Thanks a "bad bot" reply that already says why, instead of asking why."""
-    return reply_to_feedback(comment, 'RESPOND_TO_EXPLAINED_NEGATIVE_SENTIMENT', bot_name)

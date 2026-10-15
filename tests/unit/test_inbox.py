@@ -40,16 +40,14 @@ def test_check_sentiment_does_not_treat_other_replies_starting_with_no_as_feedba
 
 
 @pytest.mark.unit
-def test_explained_bad_bot_reply_is_thanked_instead_of_asked_why():
+def test_explained_bad_bot_reply_gets_no_answer_but_is_marked_read():
     mock_comment = MagicMock(spec=praw.models.Comment)
     mock_comment.body = 'Bad bot, r/pics does not allow crossposts'
     mock_reddit = MagicMock()
     with patch('racb.phases.inbox.get_reddit_instance', return_value=mock_reddit), \
-            patch('racb.phases.inbox.respond_to_explained_negative_sentiment') as thank, \
-            patch('racb.phases.inbox.respond_to_negative_sentiment') as ask_why:
+            patch('racb.phases.inbox.reply_to_feedback') as reply:
         inbox.handle_comment_reply(mock_comment)
-    thank.assert_called_once()
-    ask_why.assert_not_called()
+    reply.assert_not_called()
     mock_reddit.inbox.mark_read.assert_called_once_with([mock_comment])
 
 

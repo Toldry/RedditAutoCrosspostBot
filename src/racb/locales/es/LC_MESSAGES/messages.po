@@ -63,9 +63,6 @@ msgstr "Mal bot"
 msgid "GOOD_BOT_PHRASE"
 msgstr "Buen bot"
 
-msgid "RESPOND_TO_EXPLAINED_NEGATIVE_SENTIMENT"
-msgstr "Gracias por la explicación. El creador de este bot lee estos comentarios e intentará cambiar el código para que esto pase menos."
-
 msgid "THE_USER_WHO_COMMENTED"
 msgstr "el usuario que comentó"
 

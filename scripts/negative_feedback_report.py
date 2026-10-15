@@ -5,8 +5,8 @@ The bots answer "bad bot" style replies with a comment asking why the post or co
 RESPOND_TO_NEGATIVE_SENTIMENT text, sent by `respond_to_negative_sentiment` in `racb.phases.inbox`). Only
 /u/AutoCrosspostBot sent it from December 2019 until February 2023, when it was switched off; since it was
 switched back on, every bot sends it. A "bad bot" reply that already explains itself ("Bad bot, this sub
-bans memes") gets RESPOND_TO_EXPLAINED_NEGATIVE_SENTIMENT, a thank-you, instead; "bad bot" counts in every
-supported language.
+bans memes", which the crosspost reply asks for) gets no answer; it is found through the bot's inbox instead.
+"Bad bot" counts in every supported language.
 
 An exchange is reported only if it contains written feedback: a reply anywhere below the bot's question that
 says more than a bare "bad bot" / "good bot", or a "bad bot" comment that itself says more than that. The
@@ -61,8 +61,7 @@ REPORT_DATA_PATTERN = re.compile(
     rf'<script type="application/json" id="{REPORT_DATA_ELEMENT_ID}">(?P<data>.*?)</script>',
     re.DOTALL,
 )
-# The bots' answers to "bad bot": a question asking why, or thanks when the reply already said why
-MESSAGE_KEYS = ('RESPOND_TO_NEGATIVE_SENTIMENT', 'RESPOND_TO_EXPLAINED_NEGATIVE_SENTIMENT')
+MESSAGE_KEY = 'RESPOND_TO_NEGATIVE_SENTIMENT'
 # Earlier wordings of the message, which only ever went out in English. The first version (2019) said
 # "why this crosspost was inappropriate", later ones "why this post/comment was inappropriate".
 LEGACY_MESSAGE_PREFIXES = ('Thanks for the feedback, would you mind detailing why this',)
@@ -129,17 +128,16 @@ def normalize_text(text):
 
 
 def message_markers():
-    """Returns normalized text fragments that identify a bot's answer to "bad bot" (MESSAGE_KEYS) in any locale."""
+    """Returns normalized text fragments that identify a RESPOND_TO_NEGATIVE_SENTIMENT comment in any locale."""
     markers = {normalize_text(prefix) for prefix in LEGACY_MESSAGE_PREFIXES}
     for locale in i18n.available_locales():
-        for message_key in MESSAGE_KEYS:
-            try:
-                _, text = i18n.lookup_in_languages(message_key, [locale])
-            except KeyError:
-                continue
-            first_line = next((line for line in text.splitlines() if line.strip()), '')
-            if first_line:
-                markers.add(normalize_text(first_line))
+        try:
+            _, text = i18n.lookup_in_languages(MESSAGE_KEY, [locale])
+        except KeyError:
+            continue
+        first_line = next((line for line in text.splitlines() if line.strip()), '')
+        if first_line:
+            markers.add(normalize_text(first_line))
     return markers
 
 
@@ -209,6 +207,15 @@ def find_via_inbox(reddit_instance, bot_name, markers, limit=None):
     for parent in fetch_by_fullnames(reddit_instance, parent_fullnames).values():
         if is_by(parent, bot_name) and is_negative_sentiment_comment(getattr(parent, 'body', ''), markers):
             found[parent.id] = parent
+    return found
+
+
+def find_explained_bad_bot_replies(reddit_instance, limit=None):
+    """Finds "bad bot" replies that already explain themselves, which the bots do not answer, through the inbox."""
+    found = {}
+    for item in _iter_listing('inbox', reddit_instance.inbox.comment_replies(limit=limit)):
+        if check_sentiment(getattr(item, 'body', '') or '') == 'explained_negative':
+            found[item.id] = item
     return found
 
 
@@ -294,14 +301,21 @@ def mark_feedback(trigger, question_node, nodes, comments_by_id, covered_ids):
 
 
 def load_thread(reddit_instance, trigger, question, covered_ids):
-    """Builds the thread around one "bad bot" comment, or returns None if it has no new written feedback."""
+    """Builds the thread around one "bad bot" comment, or returns None if it has no new written feedback.
+
+    `question` is the bot's RESPOND_TO_NEGATIVE_SENTIMENT answer, or None for a "bad bot" that explained itself
+    and got no answer; then every reply below the "bad bot" comment counts.
+    """
     trigger.refresh()
     descendants = collect_subtree(trigger)
     trigger_node, nodes = build_tree(trigger, descendants)
-    question_node = nodes.get(question.id)
-    if question_node is None:
-        logger.warning(f'Could not find {reddit.full_url(question.permalink)} below the comment it answered')
-        return None
+    if question is None:
+        question_node = trigger_node
+    else:
+        question_node = nodes.get(question.id)
+        if question_node is None:
+            logger.warning(f'Could not find {reddit.full_url(question.permalink)} below the comment it answered')
+            return None
     comments_by_id = {comment.id: comment for comment in [trigger, *descendants]}
     mark_feedback(trigger, question_node, nodes, comments_by_id, covered_ids)
     if not any(node.is_new for node in trigger_node.walk()):
@@ -315,7 +329,7 @@ def load_thread(reddit_instance, trigger, question, covered_ids):
 
     submission = trigger.submission
     return FeedbackThread(
-        question_created_utc=question.created_utc,
+        question_created_utc=(question or trigger).created_utc,
         subreddit=submission.subreddit.display_name,
         submission_title=submission.title,
         submission_author=author_name(submission) or '[deleted]',
@@ -348,6 +362,20 @@ def gather_feedback(bot_name, covered_ids, limit=None):
             thread = load_thread(reddit_instance, trigger, question, covered_ids)
         except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
             logger.warning(f'Could not read the replies to {reddit.full_url(question.permalink)}: {e!r}')
+            continue
+        if thread is not None:
+            threads.append(thread)
+
+    explained = find_explained_bad_bot_replies(reddit_instance, limit=limit)
+    logger.info(f'/u/{bot_name}: found {len(explained)} "bad bot" replies that explain themselves')
+    for trigger in explained.values():
+        if trigger.id in seen_trigger_ids:
+            continue
+        seen_trigger_ids.add(trigger.id)
+        try:
+            thread = load_thread(reddit_instance, trigger, None, covered_ids)
+        except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+            logger.warning(f'Could not read the replies to {reddit.full_url(trigger.permalink)}: {e!r}')
             continue
         if thread is not None:
             threads.append(thread)
