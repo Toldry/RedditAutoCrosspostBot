@@ -164,8 +164,7 @@ def describe_media_scan(media_scan, source_comment, target_subreddit):
 
     scan_period = i18n.format_duration_in_days(max(time.time() - period_start, SECONDS_PER_DAY), target_subreddit)
     # Only the cut-short sentence has plural forms; "all 1 image posts" is too rare to be worth one
-    has_plural_forms = string_key.endswith('_PARTIAL')
-    _, text = i18n.lookup(string_key, target_subreddit, count=count if has_plural_forms else None)
+    _, text = i18n.lookup(string_key, target_subreddit)
     return text.format(
         post_count=count,
         target_subreddit=target_subreddit,

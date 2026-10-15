@@ -48,10 +48,7 @@ msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK"
 msgstr " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) все посты с картинками, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {post_count}). Совпадений не нашлось."
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
-msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"
-msgstr[0] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) самые новые посты с картинками в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
-msgstr[1] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) самые новые посты с картинками в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
-msgstr[2] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) самые новые посты с картинками в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
+msgstr " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) самые новые посты с картинками в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
 
 msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
 msgstr " За последние {scan_period} в r/{target_subreddit} не было постов с картинками, так что [сравнивать]({duplicate_detector_url}) было не с чем."
@@ -60,10 +57,7 @@ msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK"
 msgstr " Ещё я [сравнил с этим видео]({duplicate_detector_url}) все посты с видео, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {post_count}). Совпадений не нашлось."
 
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
-msgid_plural "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL_PLURAL"
-msgstr[0] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
-msgstr[1] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
-msgstr[2] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
+msgstr " Ещё я [сравнил с этим видео]({duplicate_detector_url}) самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
 
 msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
 msgstr " За последние {scan_period} в r/{target_subreddit} не было постов с видео, так что [сравнивать]({duplicate_detector_url}) было не с чем."
