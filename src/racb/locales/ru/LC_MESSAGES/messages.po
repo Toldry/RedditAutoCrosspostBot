@@ -59,9 +59,6 @@ msgstr " Ещё я [сравнил с этим видео]({duplicate_detector_u
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgstr " Ещё я [сравнил с этим видео]({duplicate_detector_url}) самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось."
 
-msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
-msgstr " За последние {scan_period} в r/{target_subreddit} не было постов с видео, так что [сравнивать]({duplicate_detector_url}) было не с чем."
-
 msgid "BAD_BOT_PHRASE"
 msgstr "Плохой бот"
 

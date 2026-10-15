@@ -150,7 +150,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     posts, adds one sentence from `phase3.describe_media_scan`: how many image (or video) posts were compared
     and over what period (`REPLY_TO_CROSSPOST_IMAGE_CHECK` / `..._VIDEO_CHECK`), the same for a scan cut short
     by Reddit's listing limit (`..._IMAGE_CHECK_PARTIAL` / `..._VIDEO_CHECK_PARTIAL`), or that there were none
-    (`..._NO_IMAGE_POSTS` / `..._NO_VIDEO_POSTS`). That sentence links to
+    (`..._NO_IMAGE_POSTS`; a video scan that found none adds no sentence). That sentence links to
     `duplicate_detector.py` on GitHub (`DUPLICATE_DETECTOR_SOURCE_URL`), so keep that file readable.
   - Handles Reddit API crosspost exceptions gracefully via modern `e.items` inspection (e.g., `NO_CROSSPOSTS`, `SUBREDDIT_NOTALLOWED`, `NO_IMAGES`, `SUBMIT_VALIDATION_*`).
   - Deletes the record from PostgreSQL. This happens **after** the crosspost, and Phase 3 keeps no

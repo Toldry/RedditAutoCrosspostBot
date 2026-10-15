@@ -60,9 +60,6 @@ msgstr " I also looked through all {post_count} video posts made in r/{target_su
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgstr " I also looked through the {post_count} newest video posts in r/{target_subreddit}, going back {scan_period}, and [checked for duplicates]({duplicate_detector_url}) of this video. None were found."
 
-msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
-msgstr " No video posts were made in r/{target_subreddit} in the last {scan_period}, so there was nothing to [check for duplicates]({duplicate_detector_url})."
-
 msgid "BAD_BOT_PHRASE"
 msgstr "Bad bot"
 

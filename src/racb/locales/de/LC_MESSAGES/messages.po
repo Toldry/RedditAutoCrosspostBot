@@ -59,9 +59,6 @@ msgstr " Außerdem habe ich alle Video-Beiträge der letzten {scan_period} in r/
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgstr " Außerdem habe ich die neuesten Video-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Videos geprüft. Es wurden keine gefunden."
 
-msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
-msgstr " In den letzten {scan_period} wurden in r/{target_subreddit} keine Video-Beiträge gepostet, also gab es nichts [auf Duplikate]({duplicate_detector_url}) zu prüfen."
-
 msgid "BAD_BOT_PHRASE"
 msgstr "Schlechter Bot"
 

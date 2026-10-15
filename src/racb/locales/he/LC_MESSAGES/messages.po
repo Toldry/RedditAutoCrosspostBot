@@ -59,9 +59,6 @@ msgstr " בנוסף, עברתי על כל הפוסטים של סרטונים ש�
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgstr " בנוסף, עברתי על הפוסטים האחרונים של סרטונים ב־ r/{target_subreddit} (בסך הכול {post_count}, עד {scan_period} אחורה) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות."
 
-msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
-msgstr " מאז שהקומענט נכתב לא פורסמו ב־ r/{target_subreddit} פוסטים של סרטונים, כך שלא היה מה [לבדוק]({duplicate_detector_url})."
-
 msgid "BAD_BOT_PHRASE"
 msgstr "בוט רע"
 

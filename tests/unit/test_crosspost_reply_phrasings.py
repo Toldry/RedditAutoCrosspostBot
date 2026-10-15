@@ -89,8 +89,12 @@ def render_crosspost_reply(target_subreddit, author_name, days, scan_name):
 
 
 def shows_media_sentence(scan_name):
-    _, settings = scan_settings(scan_name)
-    return settings is not None and (settings['complete'] or settings['posts_checked'] > 0)
+    media, settings = scan_settings(scan_name)
+    if settings is None:
+        return False
+    if settings['posts_checked'] > 0:
+        return True
+    return settings['complete'] and media == IMAGE  # "No video posts were made" is not worth a sentence
 
 
 @pytest.mark.unit

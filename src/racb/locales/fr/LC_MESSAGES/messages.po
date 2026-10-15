@@ -59,9 +59,6 @@ msgstr " J'ai aussi parcouru toutes les publications de vidéos faites dans r/{t
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgstr " J'ai aussi parcouru les publications de vidéos les plus récentes de r/{target_subreddit} (au total : {post_count}, jusqu'à il y a {scan_period}) et [cherché des doublons]({duplicate_detector_url}) de cette vidéo. Aucun n'a été trouvé."
 
-msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
-msgstr " Aucune vidéo n'a été publiée dans r/{target_subreddit} au cours des {scan_period} précédents, il n'y avait donc rien à [comparer]({duplicate_detector_url})."
-
 msgid "BAD_BOT_PHRASE"
 msgstr "Mauvais bot"
 
