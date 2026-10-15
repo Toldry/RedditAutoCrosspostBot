@@ -127,7 +127,8 @@ uv run pytest -x -vv                      # stop at the first failure, verbose o
 
 CI runs the unit tests on Python 3.11 for every pull request and every push to `master`
 (see [`.github/workflows/tests.yml`](./.github/workflows/tests.yml)). When automatic deployment is on, pushes
-to `master` also run the live integration tests and their cleanup, and deploy only if both pass
+to `master` also run the live integration tests, deploy only if they pass, and sweep up leftover test posts
+alongside the deploy
 ([`docs/auto-deploy.md`](./docs/auto-deploy.md)).
 
 ### Versioning & Releases

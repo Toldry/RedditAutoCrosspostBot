@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Faster Deploys:** The slow sweep of leftover test posts (`scripts/cleanup_test_history.py --strict`) moved out of the `integration-tests` CI job into its own `cleanup-test-history` job, which runs in parallel with `deploy` instead of before it. A failed sweep now turns that job red but no longer blocks the deploy. It still runs after failed or cancelled integration tests, and never while another run's tests are posting.
+
 ## [2.4.7] - 2026-10-15
 
 ### Fixed
