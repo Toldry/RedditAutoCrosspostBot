@@ -50,8 +50,8 @@ msgstr " I also looked through all {post_count} image posts made in r/{target_su
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"
-msgstr[0] " I also looked through the newest image post in r/{target_subreddit}, from {scan_period} ago, and [checked whether it duplicates]({duplicate_detector_url}) this image. It doesn't. Reddit doesn't list older posts."
-msgstr[1] " I also looked through the {post_count} newest image posts in r/{target_subreddit}, going back {scan_period}, and [checked for duplicates]({duplicate_detector_url}) of this image. None were found. Reddit doesn't list older posts, so I couldn't check further back."
+msgstr[0] " I also looked through the newest image post in r/{target_subreddit}, from {scan_period} ago, and [checked whether it duplicates]({duplicate_detector_url}) this image. It doesn't."
+msgstr[1] " I also looked through the {post_count} newest image posts in r/{target_subreddit}, going back {scan_period}, and [checked for duplicates]({duplicate_detector_url}) of this image. None were found."
 
 msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
 msgstr " No image posts were made in r/{target_subreddit} in the last {scan_period}, so there was nothing to [check for duplicates]({duplicate_detector_url})."
@@ -61,8 +61,8 @@ msgstr " I also looked through all {post_count} video posts made in r/{target_su
 
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL_PLURAL"
-msgstr[0] " I also looked through the newest video post in r/{target_subreddit}, from {scan_period} ago, and [checked whether it duplicates]({duplicate_detector_url}) this video. It doesn't. Reddit doesn't list older posts."
-msgstr[1] " I also looked through the {post_count} newest video posts in r/{target_subreddit}, going back {scan_period}, and [checked for duplicates]({duplicate_detector_url}) of this video. None were found. Reddit doesn't list older posts, so I couldn't check further back."
+msgstr[0] " I also looked through the newest video post in r/{target_subreddit}, from {scan_period} ago, and [checked whether it duplicates]({duplicate_detector_url}) this video. It doesn't."
+msgstr[1] " I also looked through the {post_count} newest video posts in r/{target_subreddit}, going back {scan_period}, and [checked for duplicates]({duplicate_detector_url}) of this video. None were found."
 
 msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
 msgstr " No video posts were made in r/{target_subreddit} in the last {scan_period}, so there was nothing to [check for duplicates]({duplicate_detector_url})."

@@ -49,8 +49,8 @@ msgstr " Außerdem habe ich alle Bild-Beiträge der letzten {scan_period} in r/{
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"
-msgstr[0] " Außerdem habe ich die neuesten Bild-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Bildes geprüft. Es wurden keine gefunden. Ältere Beiträge listet Reddit nicht auf."
-msgstr[1] " Außerdem habe ich die neuesten Bild-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Bildes geprüft. Es wurden keine gefunden. Ältere Beiträge listet Reddit nicht auf."
+msgstr[0] " Außerdem habe ich die neuesten Bild-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Bildes geprüft. Es wurden keine gefunden."
+msgstr[1] " Außerdem habe ich die neuesten Bild-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Bildes geprüft. Es wurden keine gefunden."
 
 msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
 msgstr " In den letzten {scan_period} wurden in r/{target_subreddit} keine Bild-Beiträge gepostet, also gab es nichts [auf Duplikate]({duplicate_detector_url}) zu prüfen."
@@ -60,8 +60,8 @@ msgstr " Außerdem habe ich alle Video-Beiträge der letzten {scan_period} in r/
 
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL_PLURAL"
-msgstr[0] " Außerdem habe ich die neuesten Video-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Videos geprüft. Es wurden keine gefunden. Ältere Beiträge listet Reddit nicht auf."
-msgstr[1] " Außerdem habe ich die neuesten Video-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Videos geprüft. Es wurden keine gefunden. Ältere Beiträge listet Reddit nicht auf."
+msgstr[0] " Außerdem habe ich die neuesten Video-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Videos geprüft. Es wurden keine gefunden."
+msgstr[1] " Außerdem habe ich die neuesten Video-Beiträge in r/{target_subreddit} (insgesamt {post_count}, bis zu {scan_period} zurück) [auf Duplikate]({duplicate_detector_url}) dieses Videos geprüft. Es wurden keine gefunden."
 
 msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
 msgstr " In den letzten {scan_period} wurden in r/{target_subreddit} keine Video-Beiträge gepostet, also gab es nichts [auf Duplikate]({duplicate_detector_url}) zu prüfen."

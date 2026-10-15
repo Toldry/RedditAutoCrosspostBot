@@ -49,8 +49,8 @@ msgstr " También revisé todas las publicaciones con imágenes de los últimos 
 
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"
-msgstr[0] " También revisé las publicaciones con imágenes más recientes de r/{target_subreddit} (en total, {post_count}, de hasta hace {scan_period}) y [busqué duplicados]({duplicate_detector_url}) de esta imagen. No se encontró ninguno. Reddit no muestra publicaciones más antiguas."
-msgstr[1] " También revisé las publicaciones con imágenes más recientes de r/{target_subreddit} (en total, {post_count}, de hasta hace {scan_period}) y [busqué duplicados]({duplicate_detector_url}) de esta imagen. No se encontró ninguno. Reddit no muestra publicaciones más antiguas."
+msgstr[0] " También revisé las publicaciones con imágenes más recientes de r/{target_subreddit} (en total, {post_count}, de hasta hace {scan_period}) y [busqué duplicados]({duplicate_detector_url}) de esta imagen. No se encontró ninguno."
+msgstr[1] " También revisé las publicaciones con imágenes más recientes de r/{target_subreddit} (en total, {post_count}, de hasta hace {scan_period}) y [busqué duplicados]({duplicate_detector_url}) de esta imagen. No se encontró ninguno."
 
 msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
 msgstr " En los últimos {scan_period} no se publicó ninguna imagen en r/{target_subreddit}, así que no había nada que [revisar en busca de duplicados]({duplicate_detector_url})."
@@ -60,8 +60,8 @@ msgstr " También revisé todas las publicaciones con vídeos de los últimos {s
 
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL_PLURAL"
-msgstr[0] " También revisé las publicaciones con vídeos más recientes de r/{target_subreddit} (en total, {post_count}, de hasta hace {scan_period}) y [busqué duplicados]({duplicate_detector_url}) de este vídeo. No se encontró ninguno. Reddit no muestra publicaciones más antiguas."
-msgstr[1] " También revisé las publicaciones con vídeos más recientes de r/{target_subreddit} (en total, {post_count}, de hasta hace {scan_period}) y [busqué duplicados]({duplicate_detector_url}) de este vídeo. No se encontró ninguno. Reddit no muestra publicaciones más antiguas."
+msgstr[0] " También revisé las publicaciones con vídeos más recientes de r/{target_subreddit} (en total, {post_count}, de hasta hace {scan_period}) y [busqué duplicados]({duplicate_detector_url}) de este vídeo. No se encontró ninguno."
+msgstr[1] " También revisé las publicaciones con vídeos más recientes de r/{target_subreddit} (en total, {post_count}, de hasta hace {scan_period}) y [busqué duplicados]({duplicate_detector_url}) de este vídeo. No se encontró ninguno."
 
 msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
 msgstr " En los últimos {scan_period} no se publicó ningún vídeo en r/{target_subreddit}, así que no había nada que [revisar en busca de duplicados]({duplicate_detector_url})."
