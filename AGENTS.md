@@ -138,9 +138,13 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     delete is logged and skipped; `DRY_RUN` only logs.
   - [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py): Evaluates feedback (`good bot` / `bad bot`).
     `process_unread_inboxes()` runs every 10 minutes and reads the unread inbox of **all 4** bots
-    (there is no continuous inbox stream any more). Feedback is logged at INFO and marked read.
-    `respond_to_positive_sentiment` and `respond_to_negative_sentiment` are still deliberate **no-ops**
-    (bodies commented out by the author), so the bots never reply to feedback.
+    (there is no continuous inbox stream any more). Feedback is logged at INFO, answered by the bot that
+    received it, and marked read. Negative feedback (`bad bot`, `delete this`, `no`) gets
+    `RESPOND_TO_NEGATIVE_SENTIMENT`, which asks why; every such reply gets it. Positive feedback (`good bot`)
+    gets `RESPOND_TO_POSITIVE_SENTIMENT` ("Thank you (◕ᴗ◕✿)"), but only the oldest `good bot` reply under a
+    given bot comment is thanked (`is_first_positive_reply`, which compares only the replies Reddit returns
+    without "load more"). Both replies carry the usual footer, respect `DRY_RUN`, and a reply Reddit rejects
+    (locked or archived thread) is logged and marked read.
 
 ---
 
@@ -174,6 +178,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`scripts/authorize_deploy_key.sh`](./scripts/authorize_deploy_key.sh) | Runs **on the VM** once: adds the CI deploy key to `~/.ssh/authorized_keys` as a forced command for `redeploy.sh` and prints the host key. |
 | [`scripts/setup_auto_deploy.sh`](./scripts/setup_auto_deploy.sh) | One-time setup of automatic deployment, run in Cloud Shell: service account, Workload Identity Federation, IAP firewall rule, deploy key, GitHub variables. See [`docs/auto-deploy.md`](./docs/auto-deploy.md). |
 | [`docs/auto-deploy.md`](./docs/auto-deploy.md) | How the CI `deploy` job works, its security model, setup, rollback and troubleshooting. |
+| [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase. Each qualifying exchange is shown with its post as a Reddit-style tree. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
 | [`tests/unit/`](./tests/unit/) | 124 mocked unit tests (`@pytest.mark.unit`), one file per module. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
@@ -528,7 +533,6 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 | Rotated reposts | Not detected as duplicates (see the image-matching note in section 5). |
 | Pre-v2.3 rows | Have `target_subreddit = NULL`, so the bait-and-switch check is skipped for them until they age out (at most one Phase 3 waiting period after upgrading). |
 | Already-consumed column slots | Deployments that ran the pre-v2.3 schema script keep the attribute numbers it used up (section 6). |
-| Inbox feedback replies | Intentionally disabled by the author; feedback is only logged. |
 
 ---
 
