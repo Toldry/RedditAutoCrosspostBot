@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Deleting Posts and Comments:** Every delete failed with `404 HTTP response`, because Reddit no longer routes PRAW's delete URL (`POST /api/del/`, with a trailing slash) and answers it with a plain-text "404 page not found". `racb.core.reddit` now points PRAW at `/api/del`, which works. This fixes `scripts/cleanup_test_history.py`, the scheduled removal of negative-score crossposts, and the integration tests' own cleanup.
+
 ## [2.4.3] - 2026-10-14
 
 ### Fixed
