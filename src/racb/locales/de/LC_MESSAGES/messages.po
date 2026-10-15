@@ -38,12 +38,15 @@ msgstr "Den Subreddit r/{target_subreddit} gibt es nicht."
 
 msgid "ALTERNATE_SUBS_SUGGESTION"
 msgstr ""
+"Meintest du vielleicht?:\n"
+"\n"
+"{alternate_subreddits_string}"
 
 msgid "MAYBE_TYPO"
-msgstr ""
+msgstr "Vielleicht ist da ein Tippfehler?"
 
 msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
-msgstr "Vielleicht [sollte man es erstellen](/subreddits/create?name={target_subreddit})."
+msgstr "Vielleicht [sollte man ihn erstellen](/subreddits/create?name={target_subreddit})."
 
 msgid "FOUND_POST_WITH_SAME_CONTENT"
 msgstr "Ich habe [diesen Post]({same_content_post_url}) in r/{target_subreddit} gefunden, der denselben Link enthält."

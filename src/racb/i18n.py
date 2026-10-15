@@ -81,6 +81,23 @@ def lookup_in_languages(string_key, languages, count=None):
     raise KeyError(f'No text for message {string_key!r} in {languages}')
 
 
+def language_with_all(string_keys, subreddit):
+    """Returns the subreddit's language if it translates every key, otherwise English.
+
+    Use this for a reply assembled from several messages, so one untranslated piece switches the whole
+    reply to English instead of leaving an English sentence in the middle of a translated one.
+    """
+    language = get_language(subreddit)
+    for string_key in string_keys:
+        try:
+            found_language, _ = lookup_in_languages(string_key, [language])
+        except KeyError:
+            return DEFAULT_LANGUAGE
+        if found_language != language:
+            return DEFAULT_LANGUAGE
+    return language
+
+
 def get_translated_string(string_key, subreddit, add_suffix=True, bot_name=None):
     language, translated_string = lookup(string_key, subreddit)
     if add_suffix:

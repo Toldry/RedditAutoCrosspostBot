@@ -163,7 +163,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
 | [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on **every new DB connection**, so every statement must be idempotent (see section 6). |
 | [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore (`SUB_BLACKLIST`). |
-| [`src/racb/i18n.py`](./src/racb/i18n.py) | Loads the gettext catalogs, picks the locale for a subreddit, and falls back to English for untranslated strings (body and footer always share one language). |
+| [`src/racb/i18n.py`](./src/racb/i18n.py) | Loads the gettext catalogs, picks the locale for a subreddit, and falls back to English for untranslated strings (body and footer always share one language; a reply built from several messages, like the nonexistent-subreddit reply, switches entirely to English if any piece is untranslated). |
 | [`src/racb/locales/`](./src/racb/locales/) | gettext catalogs: `<locale>/LC_MESSAGES/messages.po` (edited) and `messages.mo` (compiled, committed). Locales: `en` (source text), `es`, `de`, `fr`, `he`, and `en@totallynotrobots`, an English variant using the gettext `@modifier` syntax. |
 | [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
