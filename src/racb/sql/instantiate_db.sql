@@ -128,3 +128,64 @@ BEGIN
 END;
 $$
 LANGUAGE plpgsql;
+
+
+-- Subreddits the bot has seen comments in, so "did you mean" suggestions do not rely only on Reddit's
+-- search (which matches on topic, not name). Filled in batches from the r/all comment stream.
+CREATE TABLE IF NOT EXISTS known_subreddits (
+    name_lower VARCHAR (32) PRIMARY KEY,
+    display_name VARCHAR (32) NOT NULL,
+    last_seen TIMESTAMP NOT NULL
+);
+
+-- pg_trgm is a trusted extension (PostgreSQL 13+), so the database owner can create it. If it cannot be
+-- created, everything else still works and the suggestions fall back to Reddit's search alone.
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'pg_trgm is unavailable (%); known_subreddits similarity search is disabled', SQLERRM;
+END $$;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm') THEN
+        CREATE INDEX IF NOT EXISTS idx_known_subreddits_name_trgm
+        ON known_subreddits USING GIN (name_lower gin_trgm_ops);
+    END IF;
+END $$;
+
+DROP FUNCTION IF EXISTS record_known_subreddits(TEXT[]);
+CREATE OR REPLACE FUNCTION record_known_subreddits(names TEXT[])
+RETURNS
+    VOID
+AS
+$$
+BEGIN
+    INSERT INTO known_subreddits(name_lower, display_name, last_seen)
+    SELECT DISTINCT ON (lower(n)) lower(n), n, LOCALTIMESTAMP
+    FROM unnest(names) AS n
+    ORDER BY lower(n)
+    ON CONFLICT (name_lower) DO UPDATE
+    SET display_name = EXCLUDED.display_name, last_seen = EXCLUDED.last_seen;
+END;
+$$
+LANGUAGE plpgsql;
+
+-- Candidates for a misspelled subreddit name, most similar first. `%` keeps names whose trigram
+-- similarity is at least pg_trgm.similarity_threshold (default 0.3) and can use the GIN index.
+DROP FUNCTION IF EXISTS find_similar_subreddits(VARCHAR, INTEGER);
+CREATE OR REPLACE FUNCTION find_similar_subreddits(query VARCHAR, max_results INTEGER)
+RETURNS
+    TABLE(display_name VARCHAR, similarity REAL)
+AS
+$$
+BEGIN RETURN QUERY
+    SELECT ks.display_name, similarity(ks.name_lower, lower(query))
+    FROM known_subreddits AS ks
+    WHERE ks.name_lower % lower(query)
+    ORDER BY 2 DESC, ks.name_lower
+    LIMIT max_results;
+END;
+$$
+LANGUAGE plpgsql;

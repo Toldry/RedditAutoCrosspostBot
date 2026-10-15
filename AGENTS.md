@@ -30,7 +30,14 @@ from environment variables (section 4). Auxiliary replies are sent by re-fetchin
 auxiliary bot's PRAW instance (`get_comment_with_different_praw_instance`). All auxiliary bots act during Phase 1:
 1. **`sub_doesnt_exist_bot`** (`u/sub_doesnt_exist_bot`):
    - Trigger: Comment links to a non-existent subreddit (HTTP 404 / redirect).
-   - Behavior: Performs live community search via `reddit.subreddits.search()` to suggest close existing subreddits, or suggests creating the subreddit if the name length is 3–24 characters.
+   - Behavior: Suggests existing subreddits with similar names (`sub_search.get_matches()`), and suggests creating the subreddit if the name length is 3–24 characters.
+     Candidates come from the `known_subreddits` table (filled from the `r/all` stream, matched with
+     `pg_trgm`) and from `reddit.subreddits.search()`. That endpoint matches on topic (title and description),
+     not name, so every candidate must have a `difflib` name similarity of at least `MIN_NAME_SIMILARITY` (0.6);
+     the best 4 are kept, most similar first. Each suggestion is fetched once (`phase1.describe_subreddit`):
+     a private, quarantined, banned, restricted, archived or otherwise unavailable one is **still listed**,
+     with its state in bold, as Reddit names it (the 403/404 `reason`, or `subreddit_type`) and untranslated
+     (e.g. `* r/name (**private**)`).
 2. **`same_subreddit_bot`** (`u/same_subreddit_bot`):
    - Trigger: Comment links to the exact same subreddit where it was posted.
    - Behavior: Replies humorously (*"Yes, that's where we are."*).
@@ -158,7 +165,8 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_listen_only()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
 | [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check) and the bot-name constants. |
 | [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
-| [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Live Reddit community search using `reddit.subreddits.search()` for typo suggestions. |
+| [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Typo suggestions: merges candidates from `known_subreddits` and `reddit.subreddits.search()`, filtered and ranked by name similarity. |
+| [`src/racb/core/known_subreddits.py`](./src/racb/core/known_subreddits.py) | Buffers subreddit names seen in the comment stream (no I/O per comment) and writes them to `known_subreddits` in one batch every 5 minutes; also the trigram lookup. |
 | [`src/racb/core/duplicate_detector.py`](./src/racb/core/duplicate_detector.py) | Self-hosted perceptual image hashing (`imagehash` / `dhash`) for visual duplicate detection in target subreddits. |
 | [`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py) | Phase 1 comment matching, blacklisting, auxiliary bot dispatching, DB insertion. |
 | [`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py) | Phase 2 batch comment filtering via `reddit.info()` and DB cleanup. |
@@ -180,7 +188,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`docs/auto-deploy.md`](./docs/auto-deploy.md) | How the CI `deploy` job works, its security model, setup, rollback and troubleshooting. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 124 mocked unit tests (`@pytest.mark.unit`), one file per module. |
+| [`tests/unit/`](./tests/unit/) | 236 mocked unit tests (`@pytest.mark.unit`), one file per module. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -433,8 +441,15 @@ Defined in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql
 | `get_unchecked_comments_older_than(interval)` | The same with `phase2_checked = false` (Phase 2). |
 | `get_oldest_scraped_comment()` | The same columns for the row with the earliest `scraped_time`, regardless of age (`--process-one`). |
 | `set_comment_checked(int)` / `delete_scraped_comment(int)` | Mark checked / delete by `id`. |
+| `known_subreddits` | `name_lower VARCHAR(32) PK`, `display_name VARCHAR(32) NOT NULL`, `last_seen TIMESTAMP NOT NULL`. GIN trigram index `idx_known_subreddits_name_trgm` on `name_lower`. Every subreddit (except `u_` profiles) the stream has seen a comment in; rows are never deleted, so a later-banned subreddit stays (its suggestion line then says so). |
+| `record_known_subreddits(text[])` | Upserts a batch of names, refreshing `display_name` and `last_seen`. |
+| `find_similar_subreddits(varchar, int)` | `(display_name, similarity)` for names matching `name_lower % lower(query)` (trigram similarity ≥ `pg_trgm.similarity_threshold`, default 0.3), most similar first. |
 
 Behavior to be aware of:
+- The script runs `CREATE EXTENSION IF NOT EXISTS pg_trgm` inside a `DO` block that only warns on failure.
+  `pg_trgm` is a trusted extension (PostgreSQL 13+), so the database owner can create it without being a
+  superuser. Without it, the trigram index is skipped and `find_similar_subreddits` fails at call time;
+  `get_matches()` logs that and uses Reddit's search alone.
 - The script runs on **every new connection** (`db.get_connection()` reconnects whenever the cached
   connection is closed or `db.reset_connection()` was called), so it must stay idempotent. In particular,
   **never ADD then DROP a column**: PostgreSQL never reuses a dropped column's attribute number, and a table
@@ -462,6 +477,7 @@ Behavior to be aware of:
 | Phase 2 | 20 min | `phase2.filter_comments_from_db` |
 | Phase 3 (skipped if `LISTEN_ONLY`) | 6 min | `phase3.process_comment_entries` |
 | Inbox feedback (all 4 bots) | 10 min | `inbox.process_unread_inboxes` |
+| Write buffered known subreddits | 5 min | `known_subreddits.flush` |
 
 All jobs except the heartbeat are wrapped in `main.run_job_safely()`. It logs a failing job's exception
 instead of propagating it. This matters because `schedule` computes `next_run` only after a job returns

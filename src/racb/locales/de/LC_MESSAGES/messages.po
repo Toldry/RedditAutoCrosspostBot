@@ -63,3 +63,5 @@ msgid_plural "DURATION_IN_DAYS_PLURAL"
 msgstr[0] "{days} Tag"
 msgstr[1] "{days} Tage"
 
+msgid "SUGGESTION_SUBSCRIBERS"
+msgstr "Abonnenten: {subscribers}"

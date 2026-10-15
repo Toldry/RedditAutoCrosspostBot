@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Irrelevant Subreddit Suggestions:** `u/sub_doesnt_exist_bot` suggested unrelated subreddits (e.g. r/nocontext for r/wtfdidijustread) because Reddit's `/subreddits/search` matches on a subreddit's topic, not its name. `sub_search.get_matches()` now keeps only results whose name is at least 60% similar to the requested one (`difflib`), ranked most similar first, and looks at 25 results instead of 10. If none is similar enough, the reply falls back to the "maybe a typo" text.
+- **Unavailable Suggestions Dropped Silently:** a suggested subreddit that could not be fetched (private, banned, quarantined, ...) used to vanish from the list. It is now listed with its state in bold, as Reddit names it and untranslated, e.g. `* r/name (**private**)` or `(**banned**)`; restricted and archived subreddits are marked too. The "subscribers" label is now translated in every locale.
+
+### Added
+- **Known Subreddits Table:** every subreddit the `r/all` stream sees a comment in is recorded in a new `known_subreddits` table (buffered in memory, written in one batch every 5 minutes). "Did you mean" suggestions now also come from this table, matched with PostgreSQL's `pg_trgm` trigram similarity (GIN-indexed), so they no longer depend only on Reddit's search. The extension is created automatically; if it cannot be, suggestions fall back to Reddit's search alone.
+
 ## [2.7.0] - 2026-10-15
 
 ### Added

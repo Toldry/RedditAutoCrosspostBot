@@ -177,3 +177,19 @@ def instantiate_database(connection=None):
         cur.execute(sql)
         c.commit()
 
+
+
+def record_known_subreddits(subreddit_names):
+    """Inserts or refreshes (last_seen) the given subreddit names in known_subreddits."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.callproc('record_known_subreddits', (list(subreddit_names),))
+        conn.commit()
+
+
+def find_similar_subreddits(subreddit_name, max_results):
+    """Returns known subreddit display names whose names resemble `subreddit_name`, most similar first."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.callproc('find_similar_subreddits', (subreddit_name, max_results))
+        return [row[0] for row in cur.fetchall()]

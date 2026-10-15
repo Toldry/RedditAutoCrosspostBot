@@ -68,3 +68,5 @@ msgstr[0] "יום אחד"
 msgstr[1] "יומיים"
 msgstr[2] "{days} ימים"
 
+msgid "SUGGESTION_SUBSCRIBERS"
+msgstr "מנויים: {subscribers}"
