@@ -1,4 +1,4 @@
-"""Checks whether an image has already been posted in a subreddit, using perceptual image hashing.
+"""Checks whether an image or video has already been posted in a subreddit, using perceptual image hashing.
 
 How two images are compared
 ---------------------------
@@ -15,15 +15,20 @@ The whole-image hash alone cannot tell apart two memes made from the same templa
 different captions are a small part of the image; the grid can. The price is that rotated reposts
 (even by ~1.5 degrees) no longer match, since rotation moves the edges most.
 
+Videos are compared the same way, through the still preview image Reddit makes for every video post
+(Reddit-hosted, YouTube, ...). That catches re-uploads of the same clip, but a trimmed or re-edited copy
+usually gets a different preview frame and is missed. Decoding the videos themselves would catch more, but
+is far too heavy for the 1 GB VM the bot runs on.
+
 Which posts are compared
 ------------------------
-`scan_subreddit_for_image` walks the subreddit's "new" listing from the newest post backwards and
-compares the image with every image post it meets, stopping at the first post older than `posted_after`.
-Reddit's listings end after about REDDIT_LISTING_LIMIT posts, so in a busy subreddit the scan cannot reach
-that far back; the returned `ImageRepostScan` says whether it did (`complete`).
+`scan_subreddit_for_duplicates` walks the subreddit's "new" listing from the newest post backwards and
+compares the image (or video) with every image (or video) post it meets, stopping at the first post older
+than `posted_after`. Reddit's listings end after about REDDIT_LISTING_LIMIT posts, so in a busy subreddit the
+scan cannot reach that far back; the returned `RepostScan` says whether it did (`complete`).
 
-To keep a scan cheap on a small VM, images are compared through the small preview Reddit generates for
-every image post (`preview_image_url`), and several previews are downloaded at a time.
+To keep a scan cheap on a small VM, posts are compared through the small preview images Reddit generates
+(`preview_image_url`), and several previews are downloaded at a time.
 """
 
 import html
@@ -46,9 +51,12 @@ from racb.version import __version__
 
 logger = logging.getLogger(__name__)
 
-# --- What counts as an image post -------------------------------------------------------------------
+# --- What counts as an image or video post ---------------------------------------------------------
 IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.webp', '.bmp')
-IMAGE_DOMAINS = ('i.redd.it', 'i.imgur.com', 'preview.redd.it', 'imgur.com')
+IMAGE_DOMAINS = ('i.redd.it', 'i.imgur.com', 'preview.redd.it', 'external-preview.redd.it', 'imgur.com')
+VIDEO_DOMAINS = ('v.redd.it', 'youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'streamable.com')
+IMAGE = 'image'
+VIDEO = 'video'
 
 # --- When two fingerprints match --------------------------------------------------------------------
 DEFAULT_HASH_THRESHOLD = 5  # Maximum whole-image Hamming distance (out of 64 bits)
@@ -72,12 +80,13 @@ ImageFingerprint = namedtuple('ImageFingerprint', ['global_hash', 'region_hashes
 
 
 @dataclass
-class ImageRepostScan:
-    """The outcome of comparing one image with the image posts of a subreddit."""
+class RepostScan:
+    """The outcome of comparing one image or video post with the posts of the same kind in a subreddit."""
 
+    media: str = IMAGE  # IMAGE or VIDEO: which kind of post was compared
     duplicates: list = field(default_factory=list)  # {'post_id', 'post', 'subreddit', 'distance'} per match
-    image_posts_checked: int = 0
-    # True if every image post made since `posted_after` was compared. False if the listing ran out first.
+    posts_checked: int = 0
+    # True if every such post made since `posted_after` was compared. False if the listing ran out first.
     complete: bool = False
     # created_utc of the oldest post the scan read, or None if the subreddit had no posts
     oldest_post_utc: float | None = None
@@ -173,22 +182,32 @@ def fingerprints_match(fingerprint_a, fingerprint_b, hash_threshold=DEFAULT_HASH
 
 # --- Posts -------------------------------------------------------------------------------------------------
 
-def is_image_post(submission):
-    return is_image_url(getattr(submission, 'url', None))
+def media_kind(submission):
+    """Returns IMAGE or VIDEO for an image or video post, or None for anything else (links, text, galleries)."""
+    if getattr(submission, 'is_video', False) is True:
+        return VIDEO
+    url = getattr(submission, 'url', None)
+    if is_image_url(url):
+        return IMAGE
+    if url and urlparse(url.lower()).netloc in VIDEO_DOMAINS:
+        return VIDEO
+    return None
 
 
 def preview_image_url(submission):
-    """Returns the URL of the smallest preview of an image post that is at least PREVIEW_MIN_WIDTH wide.
+    """Returns the URL of the smallest preview of a post that is at least PREVIEW_MIN_WIDTH wide.
 
-    Falls back to the full image when Reddit has no preview (yet). Preview URLs come HTML-escaped.
+    For an image post, falls back to the full image when Reddit has no preview (yet). A video post without a
+    preview cannot be compared, so it returns None. Preview URLs come HTML-escaped.
     """
+    fallback = submission.url if media_kind(submission) == IMAGE else None
     try:
         resolutions = submission.preview['images'][0]['resolutions']
     except (AttributeError, KeyError, IndexError, TypeError):
-        return submission.url
+        return fallback
     wide_enough = [resolution for resolution in resolutions if resolution.get('width', 0) >= PREVIEW_MIN_WIDTH]
     if not wide_enough:
-        return submission.url
+        return fallback
     smallest = min(wide_enough, key=lambda resolution: resolution['width'])
     return html.unescape(smallest['url'])
 
@@ -220,25 +239,26 @@ def fingerprint_all(urls):
         return list(executor.map(compute_image_fingerprint, urls))
 
 
-def scan_subreddit_for_image(submission, subreddit_name, posted_after=None, limit=DEFAULT_SCAN_LIMIT,
+def scan_subreddit_for_duplicates(submission, subreddit_name, posted_after=None, limit=DEFAULT_SCAN_LIMIT,
                              hash_threshold=DEFAULT_HASH_THRESHOLD):
-    """Compares an image post with the newest image posts of a subreddit.
+    """Compares an image (or video) post with the newest image (or video) posts of a subreddit.
 
     Reads at most `limit` posts, newest first, and stops at the first one created before `posted_after`
-    (a Unix timestamp). Returns an ImageRepostScan, or None if `submission` is not an image post or its
-    image cannot be read, in which case nothing was compared.
+    (a Unix timestamp). Returns a RepostScan, or None if `submission` is neither an image nor a video post, or
+    its picture cannot be read, in which case nothing was compared.
     """
-    if not is_image_post(submission):
+    media = media_kind(submission)
+    if media is None:
         return None
     source_fingerprint = compute_image_fingerprint(preview_image_url(submission))
     if source_fingerprint is None:
         return None
 
-    scan = ImageRepostScan()
+    scan = RepostScan(media=media)
     try:
         posts = list_newest_posts(subreddit_name, limit)
     except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
-        logger.warning(f'Could not list the posts of r/{subreddit_name} to look for duplicate images: {e!r}')
+        logger.warning(f'Could not list the posts of r/{subreddit_name} to look for duplicate {media}s: {e!r}')
         return scan
 
     candidates = []
@@ -249,7 +269,7 @@ def scan_subreddit_for_image(submission, subreddit_name, posted_after=None, limi
             break
         if created_utc is not None:
             scan.oldest_post_utc = created_utc
-        if is_image_post(post):
+        if media_kind(post) == media:
             candidates.append(post)
     else:
         # The listing ended without reaching an older post: complete only if Reddit had no more to give
@@ -262,11 +282,11 @@ def scan_subreddit_for_image(submission, subreddit_name, posted_after=None, limi
         elif fingerprint is not None:
             is_match, distance = fingerprints_match(source_fingerprint, fingerprint, hash_threshold)
         else:
-            continue  # The image could not be read, so it does not count as checked
-        scan.image_posts_checked += 1
+            continue  # The picture could not be read, so the post does not count as checked
+        scan.posts_checked += 1
         if is_match:
             logger.info(
-                f'Duplicate image found in r/{subreddit_name}: {submission.url} vs {post.url} (distance={distance})'
+                f'Duplicate {media} found in r/{subreddit_name}: {submission.url} vs {post.url} (distance={distance})'
             )
             scan.duplicates.append({
                 'post_id': post.id,

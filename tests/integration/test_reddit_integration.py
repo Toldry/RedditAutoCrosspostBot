@@ -324,7 +324,7 @@ def test_live_duplicate_detector_query():
                 # Query duplicates with retry in case Reddit image processing index is slightly delayed
                 duplicates = []
                 for attempt in range(3):
-                    scan = duplicate_detector.scan_subreddit_for_image(
+                    scan = duplicate_detector.scan_subreddit_for_duplicates(
                         comment.submission, TEST_TARGET_SUBREDDIT, limit=15,
                     )
                     duplicates = scan.duplicates if scan else []

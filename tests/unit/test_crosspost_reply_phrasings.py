@@ -5,8 +5,9 @@ The wording depends on:
 * whether the source comment's author still exists (/u/name, or "the user who commented");
 * the waiting period, whose day count picks a plural form (1, 2, 5, 21 and 90 days cover every form of every
   locale, including the Hebrew dual and the Russian 1/21 vs 2-4 vs 5+ split);
-* the image duplicate scan (IMAGE_SCANS): none (not an image post), complete with 0, 1, 2, 5 or 21 image posts
-  checked, or cut short by Reddit's listing limit after 0, 1, 2 or 21.
+* the media duplicate scan: none (neither an image nor a video post), or, for an image post and for a video
+  post (MEDIA_KINDS), each of MEDIA_SCANS: complete with 0, 1, 2, 5 or 21 posts of that kind checked, or cut
+  short by Reddit's listing limit after 0, 1, 2 or 21.
 
 `render_crosspost_reply` is also handy for looking at the replies by hand.
 """
@@ -19,7 +20,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from racb import i18n
-from racb.core.duplicate_detector import ImageRepostScan
+from racb.core.duplicate_detector import IMAGE, VIDEO, RepostScan
 from racb.phases import phase3
 
 LOCALE_SUBREDDITS = {
@@ -33,30 +34,40 @@ LOCALE_SUBREDDITS = {
 }
 AUTHORS = ['someone', None]  # None: the comment's author deleted their account
 DAY_COUNTS = [1, 2, 5, 21, 90]
-IMAGE_SCANS = {
-    'not an image post': None,
-    'complete, 0 image posts': dict(image_posts_checked=0, complete=True),
-    'complete, 1 image post': dict(image_posts_checked=1, complete=True),
-    'complete, 2 image posts': dict(image_posts_checked=2, complete=True),
-    'complete, 5 image posts': dict(image_posts_checked=5, complete=True),
-    'complete, 21 image posts': dict(image_posts_checked=21, complete=True),
-    'cut short, 0 image posts': dict(image_posts_checked=0, complete=False, oldest_days_ago=3),
-    'cut short, 1 image post': dict(image_posts_checked=1, complete=False, oldest_days_ago=3),
-    'cut short, 2 image posts': dict(image_posts_checked=2, complete=False, oldest_days_ago=3),
-    'cut short, 21 image posts': dict(image_posts_checked=21, complete=False, oldest_days_ago=12),
+MEDIA_KINDS = [IMAGE, VIDEO]
+MEDIA_SCANS = {
+    'complete, 0 posts': dict(posts_checked=0, complete=True),
+    'complete, 1 post': dict(posts_checked=1, complete=True),
+    'complete, 2 posts': dict(posts_checked=2, complete=True),
+    'complete, 5 posts': dict(posts_checked=5, complete=True),
+    'complete, 21 posts': dict(posts_checked=21, complete=True),
+    'cut short, 0 posts': dict(posts_checked=0, complete=False, oldest_days_ago=3),
+    'cut short, 1 post': dict(posts_checked=1, complete=False, oldest_days_ago=3),
+    'cut short, 2 posts': dict(posts_checked=2, complete=False, oldest_days_ago=3),
+    'cut short, 21 posts': dict(posts_checked=21, complete=False, oldest_days_ago=12),
 }
+NO_SCAN = 'no media scan'  # neither an image nor a video post
+SCAN_NAMES = [NO_SCAN] + [f'{media}, {name}' for media in MEDIA_KINDS for name in MEDIA_SCANS]
 
-COMBINATIONS = list(itertools.product(LOCALE_SUBREDDITS.items(), AUTHORS, DAY_COUNTS, IMAGE_SCANS))
+COMBINATIONS = list(itertools.product(LOCALE_SUBREDDITS.items(), AUTHORS, DAY_COUNTS, SCAN_NAMES))
 
 
-def make_image_scan(scan_name, now):
-    settings = IMAGE_SCANS[scan_name]
+def scan_settings(scan_name):
+    """Returns (media kind, RepostScan settings) for a SCAN_NAMES entry, or (None, None) for NO_SCAN."""
+    if scan_name == NO_SCAN:
+        return None, None
+    media, name = scan_name.split(', ', 1)
+    return media, MEDIA_SCANS[name]
+
+
+def make_media_scan(scan_name, now):
+    media, settings = scan_settings(scan_name)
     if settings is None:
         return None
     settings = dict(settings)
     oldest_days_ago = settings.pop('oldest_days_ago', None)
     oldest_post_utc = now - oldest_days_ago * 86400 if oldest_days_ago is not None else None
-    return ImageRepostScan(oldest_post_utc=oldest_post_utc, **settings)
+    return RepostScan(media=media, oldest_post_utc=oldest_post_utc, **settings)
 
 
 def render_crosspost_reply(target_subreddit, author_name, days, scan_name):
@@ -73,13 +84,13 @@ def render_crosspost_reply(target_subreddit, author_name, days, scan_name):
     comment.created_utc = now - days * 86400
     cross_post = MagicMock()
     with patch.dict('os.environ', {'PHASE3_WAITING_PERIOD': f'{days} days'}):
-        phase3.reply_to_crosspost(comment, cross_post, target_subreddit, image_scan=make_image_scan(scan_name, now))
+        phase3.reply_to_crosspost(comment, cross_post, target_subreddit, media_scan=make_media_scan(scan_name, now))
     return cross_post.reply.call_args.args[0]
 
 
-def shows_image_sentence(scan_name):
-    settings = IMAGE_SCANS[scan_name]
-    return settings is not None and (settings['complete'] or settings['image_posts_checked'] > 0)
+def shows_media_sentence(scan_name):
+    _, settings = scan_settings(scan_name)
+    return settings is not None and (settings['complete'] or settings['posts_checked'] > 0)
 
 
 @pytest.mark.unit
@@ -123,11 +134,17 @@ def test_crosspost_reply_phrasing(locale_and_subreddit, author_name, days, scan_
     assert bad_bot_phrase.lower() in body.lower()
     assert 'downvote' not in reply.lower()
 
-    # The image sentence appears exactly when images were compared, links to the code, and gives the count
-    assert (phase3.DUPLICATE_DETECTOR_SOURCE_URL in body) == shows_image_sentence(scan_name)
-    count = (IMAGE_SCANS[scan_name] or {}).get('image_posts_checked', 0)
-    if shows_image_sentence(scan_name) and count >= 2:
+    # The media sentence appears exactly when posts were compared, links to the code, and gives the count
+    media, settings = scan_settings(scan_name)
+    assert (phase3.DUPLICATE_DETECTOR_SOURCE_URL in body) == shows_media_sentence(scan_name)
+    count = (settings or {}).get('posts_checked', 0)
+    if shows_media_sentence(scan_name) and count >= 2:
         assert re.search(rf'\b{count}\b', body)
+
+    # Image and video posts get their own sentence (checked on the English wording)
+    if shows_media_sentence(scan_name) and locale == 'en':
+        other_media = VIDEO if media == IMAGE else IMAGE
+        assert f'{media} post' in body and f'{other_media} post' not in body
 
     # Well-formed markdown: balanced links and superscripts, no stray spacing
     assert body.count('[') == body.count(']')

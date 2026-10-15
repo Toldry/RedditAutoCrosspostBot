@@ -42,7 +42,7 @@ def test_exec_crosspost_success(make_mock_comment):
         res = phase3.exec_crosspost(comment, 'target_sub', reply_to_crosspost_flag=True)
         assert res.success is True
         assert res.crosspost == mock_crosspost
-        mock_reply.assert_called_once_with(comment, mock_crosspost, 'target_sub', image_scan=None)
+        mock_reply.assert_called_once_with(comment, mock_crosspost, 'target_sub', media_scan=None)
 
 
 @pytest.mark.unit
@@ -104,9 +104,9 @@ def test_reply_to_crosspost_asks_for_bad_bot_feedback_in_its_language(make_mock_
         assert removed_footnote not in reply_text
 
 
-def make_image_scan(image_posts_checked=0, complete=True, oldest_post_utc=None):
-    return duplicate_detector.ImageRepostScan(
-        image_posts_checked=image_posts_checked, complete=complete, oldest_post_utc=oldest_post_utc,
+def make_media_scan(posts_checked=0, complete=True, oldest_post_utc=None):
+    return duplicate_detector.RepostScan(
+        posts_checked=posts_checked, complete=complete, oldest_post_utc=oldest_post_utc,
     )
 
 
@@ -114,7 +114,7 @@ def make_image_scan(image_posts_checked=0, complete=True, oldest_post_utc=None):
 def test_reply_to_crosspost_without_image_scan_has_no_image_sentence(make_mock_comment):
     comment = make_mock_comment(subreddit='test_source')
     cross_post = MagicMock()
-    phase3.reply_to_crosspost(comment, cross_post, 'pics', image_scan=None)
+    phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=None)
     reply_text = cross_post.reply.call_args.args[0]
     assert 'To prevent reposts, I looked through r/pics for posts with the same URL.\n' in reply_text
     assert 'duplicate_detector.py' not in reply_text
@@ -125,7 +125,7 @@ def test_reply_to_crosspost_reports_complete_image_scan(make_mock_comment):
     comment = make_mock_comment(subreddit='test_source')
     comment.created_utc = time.time() - 90 * 86400
     cross_post = MagicMock()
-    phase3.reply_to_crosspost(comment, cross_post, 'pics', image_scan=make_image_scan(412))
+    phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=make_media_scan(412))
     reply_text = cross_post.reply.call_args.args[0]
     assert (
         'I also looked through all 412 image posts made in r/pics in the last 90 days and '
@@ -137,9 +137,9 @@ def test_reply_to_crosspost_reports_complete_image_scan(make_mock_comment):
 def test_reply_to_crosspost_reports_partial_image_scan(make_mock_comment):
     comment = make_mock_comment(subreddit='test_source')
     comment.created_utc = time.time() - 90 * 86400
-    scan = make_image_scan(870, complete=False, oldest_post_utc=time.time() - 12 * 86400)
+    scan = make_media_scan(870, complete=False, oldest_post_utc=time.time() - 12 * 86400)
     cross_post = MagicMock()
-    phase3.reply_to_crosspost(comment, cross_post, 'pics', image_scan=scan)
+    phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=scan)
     reply_text = cross_post.reply.call_args.args[0]
     assert 'the 870 newest image posts in r/pics, going back 12 days' in reply_text
     assert "Reddit doesn't list older posts" in reply_text
@@ -150,7 +150,7 @@ def test_reply_to_crosspost_reports_that_there_were_no_image_posts(make_mock_com
     comment = make_mock_comment(subreddit='test_source')
     comment.created_utc = time.time() - 90 * 86400
     cross_post = MagicMock()
-    phase3.reply_to_crosspost(comment, cross_post, 'pics', image_scan=make_image_scan(0))
+    phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=make_media_scan(0))
     reply_text = cross_post.reply.call_args.args[0]
     assert 'No image posts were made in r/pics in the last 90 days' in reply_text
 
@@ -158,13 +158,13 @@ def test_reply_to_crosspost_reports_that_there_were_no_image_posts(make_mock_com
 @pytest.mark.unit
 @pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
 @pytest.mark.parametrize('scan', [
-    make_image_scan(1), make_image_scan(2), make_image_scan(5), make_image_scan(0),
-    make_image_scan(1, complete=False, oldest_post_utc=0), make_image_scan(21, complete=False, oldest_post_utc=0),
+    make_media_scan(1), make_media_scan(2), make_media_scan(5), make_media_scan(0),
+    make_media_scan(1, complete=False, oldest_post_utc=0), make_media_scan(21, complete=False, oldest_post_utc=0),
 ])
 def test_image_scan_sentence_formats_in_every_language(make_mock_comment, target_subreddit, scan):
     comment = make_mock_comment(subreddit='test_source')
     comment.created_utc = time.time() - 90 * 86400
-    sentence = phase3.describe_image_scan(scan, comment, target_subreddit)
+    sentence = phase3.describe_media_scan(scan, comment, target_subreddit)
     assert sentence.startswith(' ')
     assert phase3.DUPLICATE_DETECTOR_SOURCE_URL in sentence
     assert '{' not in sentence

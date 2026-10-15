@@ -218,7 +218,7 @@ ALL_TEMPLATE_KWARGS = {
     'days': 90,
     'subscribers': '1,234',
     'image_check': ' I also looked through all 3 image posts.',
-    'image_post_count': 3,
+    'post_count': 3,
     'scan_period': '90 days',
     'duplicate_detector_url': 'https://github.com/Toldry/RedditAutoCrosspostBot/blob/master/x.py',
 }

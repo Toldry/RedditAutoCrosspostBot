@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Video Repost Scan Before Crossposting:** video posts (Reddit-hosted, YouTube and Streamable) are now compared with the target subreddit's video posts since the source comment was written, the same way images are, by perceptual hashing of Reddit's preview frame. The crosspost reply gets a matching sentence in every language ("I also looked through all N video posts made in r/<target> in the last D days and checked for duplicates of this video by comparing their preview images. None were found."). A trimmed or re-edited copy usually has a different preview frame and is missed.
+
+### Changed
+- **Duplicate Detector Renames:** `scan_subreddit_for_image` is now `scan_subreddit_for_duplicates`, `ImageRepostScan` is now `RepostScan` (with a `media` field), and `phase2.run_filters(full_image_scan=...)` is now `full_media_scan`.
+
 ## [2.10.0] - 2026-10-15
 
 ### Changed
