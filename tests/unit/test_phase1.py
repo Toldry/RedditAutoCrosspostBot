@@ -1,6 +1,6 @@
 """Unit tests for racb.phases.phase1 module."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, PropertyMock
 import prawcore
 import pytest
 from racb import i18n
@@ -195,16 +195,94 @@ def test_partly_translated_nonexistent_subreddit_reply_falls_back_to_english_as_
 def test_nonexistent_subreddit_reply_uses_one_language(make_mock_comment, subreddit, has_matches):
     matches = []
     if has_matches:
-        matches = [MagicMock()]
-    with patch('racb.phases.phase1.get_subreddit_suggestion_list_line', return_value='* r/bilder'):
+        matches = ['bilder', 'bildr']
+    descriptions = {
+        'bilder': {'name': 'bilder', 'state': None, 'subscribers': 1234, 'over18': False},
+        'bildr': {'name': 'bildr', 'state': 'private', 'subscribers': None, 'over18': False},
+    }
+    with patch('racb.phases.phase1.describe_subreddit', side_effect=descriptions.get):
         reply_text = nonexistent_subreddit_reply(make_mock_comment, subreddit, matches)
-    english_pieces = ['does not exist', "Maybe there's a typo?", 'Did you mean?', 'creating a new subreddit']
+    english_pieces = ['does not exist', "Maybe there's a typo?", 'Did you mean?', 'creating a new subreddit',
+                      'subscribers:', '**private**']
     language = i18n.language_with_all(
         ['NONEXISTENT_SUBREDDIT', 'MAYBE_TYPO', 'ALTERNATE_SUBS_SUGGESTION',
-         'PROMPT_NONEXISTENT_SUBREDDIT_CREATION', i18n.SUFFIX_KEY],
+         'PROMPT_NONEXISTENT_SUBREDDIT_CREATION', 'SUGGESTION_SUBSCRIBERS', 'SUBREDDIT_STATE_PRIVATE',
+         i18n.SUFFIX_KEY],
         subreddit,
     )
+    if has_matches:
+        assert '* r/bilder (' in reply_text and '* r/bildr (**' in reply_text
     if language == 'en':
         assert reply_text.startswith('The subreddit r/bilze does not exist.')
     else:
         assert not any(piece in reply_text for piece in english_pieces), reply_text
+
+
+def make_prawcore_error(error_class, status_code, reason):
+    response = MagicMock(status_code=status_code)
+    response.json.return_value = {'reason': reason} if reason else {}
+    return error_class(response)
+
+
+def describe_with_fetch_error(error):
+    mock_reddit = MagicMock()
+    type(mock_reddit.subreddit.return_value).subscribers = PropertyMock(side_effect=error)
+    with patch('racb.phases.phase1.reddit.get_reddit_instance', return_value=mock_reddit):
+        return phase1.describe_subreddit('somesub')
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('error, expected_state', [
+    (make_prawcore_error(prawcore.exceptions.Forbidden, 403, 'private'), 'private'),
+    (make_prawcore_error(prawcore.exceptions.Forbidden, 403, 'quarantined'), 'quarantined'),
+    (make_prawcore_error(prawcore.exceptions.NotFound, 404, 'banned'), 'banned'),
+    (make_prawcore_error(prawcore.exceptions.NotFound, 404, None), 'unavailable'),
+])
+def test_describe_subreddit_keeps_unavailable_subreddits_with_their_state(error, expected_state):
+    info = describe_with_fetch_error(error)
+    assert info == {'name': 'somesub', 'state': expected_state, 'subscribers': None, 'over18': False}
+
+
+@pytest.mark.unit
+def test_describe_subreddit_lists_network_errors_without_a_state():
+    info = describe_with_fetch_error(prawcore.exceptions.ServerError(MagicMock()))
+    assert info['state'] is None and info['subscribers'] is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('subreddit_type, quarantine, expected_state', [
+    ('public', False, None),
+    ('restricted', False, 'restricted'),
+    ('archived', False, 'archived'),
+    ('public', True, 'quarantined'),
+])
+def test_describe_subreddit_reads_the_type_of_a_fetched_subreddit(subreddit_type, quarantine, expected_state):
+    mock_reddit = MagicMock()
+    mock_reddit.subreddit.return_value = MagicMock(
+        subscribers=50, over18=True, subreddit_type=subreddit_type, quarantine=quarantine
+    )
+    with patch('racb.phases.phase1.reddit.get_reddit_instance', return_value=mock_reddit):
+        info = phase1.describe_subreddit('somesub')
+    assert info == {'name': 'somesub', 'state': expected_state, 'subscribers': 50, 'over18': True}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('suggestion, expected_line', [
+    ({'name': 'pics', 'state': None, 'subscribers': 1234567, 'over18': False},
+     '* r/pics (subscribers: 1,234,567)'),
+    ({'name': 'nsfwsub', 'state': None, 'subscribers': 10, 'over18': True},
+     '* r/nsfwsub (**NSFW**, subscribers: 10)'),
+    ({'name': 'smallsub', 'state': 'restricted', 'subscribers': 50, 'over18': False},
+     '* r/smallsub (**restricted**, subscribers: 50)'),
+    ({'name': 'secret', 'state': 'private', 'subscribers': None, 'over18': False}, '* r/secret (**private**)'),
+    ({'name': 'gone', 'state': 'banned', 'subscribers': None, 'over18': False}, '* r/gone (**banned**)'),
+    ({'name': 'unknown', 'state': None, 'subscribers': None, 'over18': False}, '* r/unknown'),
+])
+def test_subreddit_suggestion_list_line(suggestion, expected_line):
+    assert phase1.get_subreddit_suggestion_list_line(suggestion, 'en') == expected_line
+
+
+@pytest.mark.unit
+def test_german_suggestion_line_is_german():
+    suggestion = {'name': 'geheim', 'state': 'private', 'subscribers': 7, 'over18': False}
+    assert phase1.get_subreddit_suggestion_list_line(suggestion, 'de') == '* r/geheim (**privat**, Abonnenten: 7)'

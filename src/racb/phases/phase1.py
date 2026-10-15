@@ -165,27 +165,30 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
     source_subreddit = source_comment.subreddit.display_name
 
     matches = sub_search.get_matches(target_subreddit)
-    suggestion_lines = [get_subreddit_suggestion_list_line(sub) for sub in matches]
-    formatted_matches = [line for line in suggestion_lines if line is not None]
+    suggestions = [describe_subreddit(sub) for sub in matches]
 
-    # (key, separator before it, format arguments) for each piece of the reply
-    parts = [('NONEXISTENT_SUBREDDIT', '', {'target_subreddit': target_subreddit})]
-    if len(formatted_matches) == 0:
-        parts.append(('MAYBE_TYPO', ' ', {}))
+    # (key, separator before it) for each piece of the reply
+    parts = [('NONEXISTENT_SUBREDDIT', '')]
+    if len(suggestions) == 0:
+        parts.append(('MAYBE_TYPO', ' '))
     else:
-        alternate_subreddits_string = '\n'.join(formatted_matches)
-        parts.append(
-            ('ALTERNATE_SUBS_SUGGESTION', '\n\n', {'alternate_subreddits_string': alternate_subreddits_string})
-        )
+        parts.append(('ALTERNATE_SUBS_SUGGESTION', '\n\n'))
     if is_subreddit_name_length_valid(target_subreddit):
-        parts.append(('PROMPT_NONEXISTENT_SUBREDDIT_CREATION', '\n\n', {'target_subreddit': target_subreddit}))
+        parts.append(('PROMPT_NONEXISTENT_SUBREDDIT_CREATION', '\n\n'))
 
-    # Every piece and the suffix use one language, so a partly translated locale gets an all-English reply
-    # rather than English sentences in the middle of a translated one
-    keys = [key for key, _, _ in parts] + [i18n.SUFFIX_KEY]
+    # Every piece, the suggestion details and the suffix use one language, so a partly translated locale
+    # gets an all-English reply rather than English sentences in the middle of a translated one
+    keys = [key for key, _ in parts] + suggestion_message_keys(suggestions) + [i18n.SUFFIX_KEY]
     language = i18n.language_with_all(keys, source_subreddit)
+    alternate_subreddits_string = '\n'.join(
+        get_subreddit_suggestion_list_line(suggestion, language) for suggestion in suggestions
+    )
+    format_kwargs = {
+        'target_subreddit': target_subreddit,
+        'alternate_subreddits_string': alternate_subreddits_string,
+    }
     text = ''
-    for key, separator, format_kwargs in parts:
+    for key, separator in parts:
         _, piece = i18n.lookup_in_languages(key, [language])
         text += separator + piece.format(**format_kwargs)
 
@@ -200,21 +203,82 @@ def is_subreddit_name_length_valid(subreddit_name):
     return NEW_SUBREDDIT_NAME_MINIMUM_LENGTH <= len(subreddit_name) <= NEW_SUBREDDIT_NAME_MAXIMUM_LENGTH
 
 
-def get_subreddit_suggestion_list_line(subreddit_name):
-    """Formats a suggestion bullet, or returns None if the subreddit is unavailable.
+# Message key for each subreddit state worth pointing out in a suggestion (None means nothing to add)
+SUBREDDIT_STATE_KEYS = {
+    'restricted': 'SUBREDDIT_STATE_RESTRICTED',
+    'archived': 'SUBREDDIT_STATE_ARCHIVED',
+    'private': 'SUBREDDIT_STATE_PRIVATE',
+    'quarantined': 'SUBREDDIT_STATE_QUARANTINED',
+    'banned': 'SUBREDDIT_STATE_BANNED',
+    'unavailable': 'SUBREDDIT_STATE_UNAVAILABLE',
+}
+SUBSCRIBERS_KEY = 'SUGGESTION_SUBSCRIBERS'
 
-    Fetches the subreddit once and uses it for both the availability check and the details.
+
+def _error_reason(exception):
+    """Returns the `reason` Reddit gives in a 403/404 body (e.g. 'private', 'banned'), or None."""
+    try:
+        return exception.response.json().get('reason')
+    except Exception:
+        return None
+
+
+def describe_subreddit(subreddit_name):
+    """Fetches a suggested subreddit once and returns what its suggestion line shows.
+
+    Returns a dict with `name`, `state` (a SUBREDDIT_STATE_KEYS key, or None if it is a normal public
+    subreddit), `subscribers` (None when unknown) and `over18`. A subreddit that cannot be fetched is
+    still described, so the reply can list it with its state instead of silently dropping it.
     """
-    ret_val = f'* r/{subreddit_name}'
+    info = {'name': subreddit_name, 'state': None, 'subscribers': None, 'over18': False}
     reddit_instance = reddit.get_reddit_instance()
     try:
         sub_obj = reddit_instance.subreddit(subreddit_name)
-        subscribers = sub_obj.subscribers
-        nsfw_str = '**NSFW**, ' if sub_obj.over18 else ''
-    except Exception:
-        return None
-    ret_val += f' ({nsfw_str}subscribers: {subscribers:,})'
-    return ret_val
+        info['subscribers'] = sub_obj.subscribers
+        info['over18'] = bool(sub_obj.over18)
+        subreddit_type = getattr(sub_obj, 'subreddit_type', 'public')
+        if getattr(sub_obj, 'quarantine', False):
+            info['state'] = 'quarantined'
+        elif subreddit_type in SUBREDDIT_STATE_KEYS:
+            info['state'] = subreddit_type
+    except prawcore.exceptions.Forbidden as e:
+        reason = _error_reason(e)
+        info['state'] = 'quarantined' if reason == 'quarantined' else 'private'
+    except prawcore.exceptions.NotFound as e:
+        info['state'] = 'banned' if _error_reason(e) == 'banned' else 'unavailable'
+    except prawcore.exceptions.Redirect:
+        # Reddit redirects a name that does not exist (any more) to its search page
+        info['state'] = 'unavailable'
+    except Exception as e:
+        # A network hiccup says nothing about the subreddit, so list it without details
+        logger.warning(f'Could not fetch suggested subreddit r/{subreddit_name}: {e!r}')
+    return info
+
+
+def suggestion_message_keys(suggestions):
+    """Returns the message keys the suggestion lines for `suggestions` will use."""
+    keys = []
+    if any(suggestion['subscribers'] is not None for suggestion in suggestions):
+        keys.append(SUBSCRIBERS_KEY)
+    keys += sorted({SUBREDDIT_STATE_KEYS[s['state']] for s in suggestions if s['state'] is not None})
+    return keys
+
+
+def get_subreddit_suggestion_list_line(suggestion, language):
+    """Formats a suggestion bullet such as `* r/name (**NSFW**, subscribers: 1,234)` in `language`."""
+    details = []
+    if suggestion['state'] is not None:
+        _, state_text = i18n.lookup_in_languages(SUBREDDIT_STATE_KEYS[suggestion['state']], [language])
+        details.append(f'**{state_text}**')
+    if suggestion['over18']:
+        details.append('**NSFW**')
+    if suggestion['subscribers'] is not None:
+        _, subscribers_text = i18n.lookup_in_languages(SUBSCRIBERS_KEY, [language])
+        details.append(subscribers_text.format(subscribers=f"{suggestion['subscribers']:,}"))
+    line = f"* r/{suggestion['name']}"
+    if details:
+        line += f" ({', '.join(details)})"
+    return line
 
 
 def reply_to_same_content_post_comment(source_comment, target_subreddit, post_with_same_content):

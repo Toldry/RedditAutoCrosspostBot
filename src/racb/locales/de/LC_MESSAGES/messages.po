@@ -56,3 +56,23 @@ msgid_plural "DURATION_IN_DAYS_PLURAL"
 msgstr[0] "{days} Tag"
 msgstr[1] "{days} Tage"
 
+msgid "SUGGESTION_SUBSCRIBERS"
+msgstr "Abonnenten: {subscribers}"
+
+msgid "SUBREDDIT_STATE_RESTRICTED"
+msgstr "eingeschränkt"
+
+msgid "SUBREDDIT_STATE_ARCHIVED"
+msgstr "archiviert"
+
+msgid "SUBREDDIT_STATE_PRIVATE"
+msgstr "privat"
+
+msgid "SUBREDDIT_STATE_QUARANTINED"
+msgstr "unter Quarantäne"
+
+msgid "SUBREDDIT_STATE_BANNED"
+msgstr "gesperrt"
+
+msgid "SUBREDDIT_STATE_UNAVAILABLE"
+msgstr "nicht verfügbar"

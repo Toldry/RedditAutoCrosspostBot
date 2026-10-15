@@ -21,7 +21,8 @@ def test_get_matches_filters_exact_match_and_limits():
     mock_reddit = MagicMock()
     mock_reddit.subreddits.search.return_value = mock_sub_search_results
 
-    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit):
+    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit), \
+         patch('racb.core.sub_search.known_subreddits.find_similar', return_value=[]):
         results = sub_search.get_matches('targetsub')
         assert len(results) == 4
         assert 'TargetSub_1' in results
@@ -48,7 +49,8 @@ def test_get_matches_drops_topic_only_matches_and_ranks_by_name_similarity():
     mock_reddit = MagicMock()
     mock_reddit.subreddits.search.return_value = mock_sub_search_results
 
-    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit):
+    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit), \
+         patch('racb.core.sub_search.known_subreddits.find_similar', return_value=[]):
         results = sub_search.get_matches('wtfdidijustread')
         assert results == ['wtfdidijustread76', 'DaFuqDidIJustRead']
 
@@ -58,7 +60,8 @@ def test_get_matches_returns_empty_when_nothing_is_similar():
     mock_reddit = MagicMock()
     mock_reddit.subreddits.search.return_value = [MagicMock(display_name='nocontext')]
 
-    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit):
+    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit), \
+         patch('racb.core.sub_search.known_subreddits.find_similar', return_value=[]):
         assert sub_search.get_matches('wtfdidijustread') == []
 
 
@@ -67,6 +70,35 @@ def test_get_matches_handles_exception():
     mock_reddit = MagicMock()
     mock_reddit.subreddits.search.side_effect = prawcore.exceptions.ServerError(MagicMock())
 
-    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit):
+    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit), \
+         patch('racb.core.sub_search.known_subreddits.find_similar', return_value=[]):
         results = sub_search.get_matches('nonexistent')
         assert results == []
+
+
+@pytest.mark.unit
+def test_get_matches_merges_known_subreddits_with_reddit_search():
+    mock_reddit = MagicMock()
+    mock_reddit.subreddits.search.return_value = [
+        MagicMock(display_name='DaFuqDidIJustRead'),
+        MagicMock(display_name='nocontext'),
+    ]
+    known = ['WTFdidIjustread_', 'dafuqdidijustread', 'wtfdidijustreadyikes']
+
+    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit), \
+         patch('racb.core.sub_search.known_subreddits.find_similar', return_value=known):
+        results = sub_search.get_matches('wtfdidijustread')
+    assert results == ['WTFdidIjustread_', 'wtfdidijustreadyikes', 'dafuqdidijustread']
+
+
+@pytest.mark.unit
+def test_get_matches_falls_back_to_reddit_search_when_the_database_fails():
+    import psycopg2
+    mock_reddit = MagicMock()
+    mock_reddit.subreddits.search.return_value = [MagicMock(display_name='DaFuqDidIJustRead')]
+
+    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit), \
+         patch('racb.core.sub_search.known_subreddits.find_similar', side_effect=psycopg2.OperationalError()), \
+         patch('racb.core.sub_search.db.reset_connection') as mock_reset:
+        assert sub_search.get_matches('wtfdidijustread') == ['DaFuqDidIJustRead']
+    mock_reset.assert_called_once()

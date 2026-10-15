@@ -61,3 +61,23 @@ msgstr[0] "יום אחד"
 msgstr[1] "יומיים"
 msgstr[2] "{days} ימים"
 
+msgid "SUGGESTION_SUBSCRIBERS"
+msgstr "מנויים: {subscribers}"
+
+msgid "SUBREDDIT_STATE_RESTRICTED"
+msgstr "מוגבל"
+
+msgid "SUBREDDIT_STATE_ARCHIVED"
+msgstr "בארכיון"
+
+msgid "SUBREDDIT_STATE_PRIVATE"
+msgstr "פרטי"
+
+msgid "SUBREDDIT_STATE_QUARANTINED"
+msgstr "בהסגר"
+
+msgid "SUBREDDIT_STATE_BANNED"
+msgstr "חסום"
+
+msgid "SUBREDDIT_STATE_UNAVAILABLE"
+msgstr "לא זמין"

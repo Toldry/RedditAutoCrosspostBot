@@ -16,7 +16,7 @@ import schedule
 from racb.version import __version__
 from racb import config
 from racb.config import env_bool
-from racb.core import db, reddit
+from racb.core import db, known_subreddits, reddit
 from racb.phases import phase1, phase2, phase3, inbox, cleanup
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,7 @@ def set_schedule():
     schedule.every(10).minutes.do(metrics.log_heartbeat)
     schedule.every(10).minutes.do(run_job_safely, inbox.process_unread_inboxes)
     schedule.every(20).minutes.do(run_job_safely, phase2.filter_comments_from_db)
+    schedule.every(5).minutes.do(run_job_safely, known_subreddits.flush)
     listen_only = env_bool('LISTEN_ONLY', False)
     if not listen_only:
         schedule.every(6).minutes.do(run_job_safely, phase3.process_comment_entries)
@@ -256,6 +257,8 @@ def handle_comment_safely(comment):
     Network-level errors still propagate so the outer loop can back off.
     """
     try:
+        # Seeing a comment in a subreddit proves it exists; this only buffers the name (no I/O)
+        known_subreddits.record(comment.subreddit.display_name)
         phase1.handle_incoming_comment(comment, metrics=metrics)
     except TRANSIENT_NETWORK_ERRORS:
         raise

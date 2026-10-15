@@ -162,6 +162,7 @@ ALL_TEMPLATE_KWARGS = {
     'same_content_post_url': '/r/dst/comments/2/t/',
     'alternate_subreddits_string': '* r/x',
     'days': 90,
+    'subscribers': '1,234',
 }
 
 

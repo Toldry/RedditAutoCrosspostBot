@@ -53,3 +53,23 @@ msgid_plural "DURATION_IN_DAYS_PLURAL"
 msgstr[0] "{days} día"
 msgstr[1] "{days} días"
 
+msgid "SUGGESTION_SUBSCRIBERS"
+msgstr ""
+
+msgid "SUBREDDIT_STATE_RESTRICTED"
+msgstr ""
+
+msgid "SUBREDDIT_STATE_ARCHIVED"
+msgstr ""
+
+msgid "SUBREDDIT_STATE_PRIVATE"
+msgstr ""
+
+msgid "SUBREDDIT_STATE_QUARANTINED"
+msgstr ""
+
+msgid "SUBREDDIT_STATE_BANNED"
+msgstr ""
+
+msgid "SUBREDDIT_STATE_UNAVAILABLE"
+msgstr ""
