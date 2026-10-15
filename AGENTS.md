@@ -138,9 +138,13 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     delete is logged and skipped; `DRY_RUN` only logs.
   - [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py): Evaluates feedback (`good bot` / `bad bot`).
     `process_unread_inboxes()` runs every 10 minutes and reads the unread inbox of **all 4** bots
-    (there is no continuous inbox stream any more). Feedback is logged at INFO and marked read.
-    `respond_to_positive_sentiment` and `respond_to_negative_sentiment` are still deliberate **no-ops**
-    (bodies commented out by the author), so the bots never reply to feedback.
+    (there is no continuous inbox stream any more). Feedback is logged at INFO, answered by the bot that
+    received it, and marked read. Negative feedback (`bad bot`, `delete this`, `no`) gets
+    `RESPOND_TO_NEGATIVE_SENTIMENT`, which asks why; every such reply gets it. Positive feedback (`good bot`)
+    gets `RESPOND_TO_POSITIVE_SENTIMENT` ("Thank you (◕ᴗ◕✿)"), but only the oldest `good bot` reply under a
+    given bot comment is thanked (`is_first_positive_reply`, which compares only the replies Reddit returns
+    without "load more"). Both replies carry the usual footer, respect `DRY_RUN`, and a reply Reddit rejects
+    (locked or archived thread) is logged and marked read.
 
 ---
 
@@ -510,7 +514,6 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 | Rotated reposts | Not detected as duplicates (see the image-matching note in section 5). |
 | Pre-v2.3 rows | Have `target_subreddit = NULL`, so the bait-and-switch check is skipped for them until they age out (at most one Phase 3 waiting period after upgrading). |
 | Already-consumed column slots | Deployments that ran the pre-v2.3 schema script keep the attribute numbers it used up (section 6). |
-| Inbox feedback replies | Intentionally disabled by the author; feedback is only logged. |
 
 ---
 
