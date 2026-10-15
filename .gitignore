@@ -13,4 +13,5 @@ db.json
 *.pyc
 __pycache__/
 /venv/
-*.csv
+*.csv# Local output of scripts/negative_feedback_report.py
+/reports/

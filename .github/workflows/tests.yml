@@ -34,6 +34,8 @@ jobs:
     concurrency:
       group: release
       cancel-in-progress: false
+    outputs:
+      deploy-sha: ${{ steps.head.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,3 +58,118 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           uv run bump-my-version bump ${{ steps.level.outputs.level }}
           git push --follow-tags origin HEAD:master
+      # What deploy may ship: only the commit this run tested, or the release commit made right on top
+      # of it. If master moved on meanwhile, the newer push's own run tests and deploys it instead.
+      - id: head
+        run: |
+          head_sha="$(git rev-parse HEAD)"
+          if [ "$head_sha" = "$GITHUB_SHA" ] || {
+            [ "$(git rev-parse HEAD^)" = "$GITHUB_SHA" ] &&
+            [ "$(git log -1 --format=%ae HEAD)" = '41898282+github-actions[bot]@users.noreply.github.com' ]
+          }; then
+            echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::master moved past $GITHUB_SHA; the run for the newer push deploys it"
+          fi
+
+  # Live tests against Reddit as the 4 real bot accounts, in the private test subreddits r/racb_test_1 and
+  # r/racb_test_2. They must pass before deploy runs, so they only run when auto-deploy is on. The
+  # credentials are the bots' .env values, stored as repository secrets. Each test deletes what it posts
+  # and records it, and the last step deletes any recorded item that is still there.
+  integration-tests:
+    needs: unit-tests
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/master'
+      && vars.AUTO_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # Two runs posting in the same test subreddits at once could see each other's posts, so a newer push
+    # cancels the older run's integration tests (the newer commit replaces it anyway). The cancelled run
+    # still deletes what its own tests created, in the always() step below.
+    concurrency:
+      group: reddit-integration-tests
+      cancel-in-progress: true
+    env:
+      PASSWORD: ${{ secrets.PASSWORD }}
+      APP_CLIENT_SECRET: ${{ secrets.APP_CLIENT_SECRET }}
+      PASSWORD__SUB_DOESNT_EXIST: ${{ secrets.PASSWORD__SUB_DOESNT_EXIST }}
+      APP_CLIENT_SECRET__SUB_DOESNT_EXIST: ${{ secrets.APP_CLIENT_SECRET__SUB_DOESNT_EXIST }}
+      PASSWORD__SAME_SUBREDDIT: ${{ secrets.PASSWORD__SAME_SUBREDDIT }}
+      APP_CLIENT_SECRET__SAME_SUBREDDIT: ${{ secrets.APP_CLIENT_SECRET__SAME_SUBREDDIT }}
+      PASSWORD__SAME_POST: ${{ secrets.PASSWORD__SAME_POST }}
+      APP_CLIENT_SECRET__SAME_POST: ${{ secrets.APP_CLIENT_SECRET__SAME_POST }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          # Keep in sync with the Dockerfile
+          version: '0.11.32'
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Live integration tests
+        run: uv run pytest -m integration
+      # Deletes only what these tests recorded, so it is quick and never touches another run's posts. It also
+      # runs after failed or cancelled tests, which may have been killed before their own cleanup. --strict
+      # fails the job, and so blocks the deploy, if a recorded item could not be deleted.
+      - name: Delete the posts and comments the tests created
+        if: always()
+        run: uv run python scripts/delete_test_artifacts.py --strict
+
+  # Rebuilds and restarts the bot on the VM at the commit the release job ended on, once the unit tests and
+  # the live integration tests passed. Setup and security model:
+  # docs/auto-deploy.md. Off until the AUTO_DEPLOY variable is 'true'.
+  deploy:
+    needs: [release, integration-tests]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/master'
+      && vars.AUTO_DEPLOY == 'true' && needs.release.outputs.deploy-sha != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # Lets google-github-actions/auth get a GitHub OIDC token, which replaces a stored GCP key
+      id-token: write
+    # One deploy at a time; a newer push waits for the running deploy instead of cancelling it mid-build
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      # SSH reaches the VM through an IAP tunnel, so port 22 never has to be open to the internet.
+      # The key may only run scripts/redeploy.sh (forced command), and the host key is pinned.
+      - name: Configure SSH
+        env:
+          VM_DEPLOY_SSH_KEY: ${{ secrets.VM_DEPLOY_SSH_KEY }}
+          VM_SSH_HOST_KEY: ${{ vars.VM_SSH_HOST_KEY }}
+          VM_NAME: ${{ vars.VM_NAME }}
+          VM_USER: ${{ vars.VM_USER }}
+          GCP_ZONE: ${{ vars.GCP_ZONE }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          install -d -m 700 ~/.ssh
+          (umask 077 && printf '%s\n' "$VM_DEPLOY_SSH_KEY" > ~/.ssh/deploy_key)
+          printf 'racb-vm %s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host racb-vm
+            HostName $VM_NAME
+            User $VM_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            HostKeyAlias racb-vm
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+            ProxyCommand gcloud compute start-iap-tunnel %h 22 --listen-on-stdin --zone=$GCP_ZONE --project=$GCP_PROJECT_ID --verbosity=warning
+          EOF
+      # The forced command receives the SHA as SSH_ORIGINAL_COMMAND
+      - name: Deploy
+        env:
+          DEPLOY_SHA: ${{ needs.release.outputs.deploy-sha }}
+        run: |
+          # shellcheck disable=SC2029 # expanding the SHA on this side is the point
+          ssh racb-vm "$DEPLOY_SHA"

@@ -159,17 +159,24 @@ def diagnose_not_found(reddit_instance, thing, bot_name: str, account_status_cac
     return False
 
 
-def purge_bot_history(bot_name: str, limit: int = None, dry_run: bool = False):
-    """Purges test submissions and comments for a given bot account."""
+def purge_bot_history(bot_name: str, limit: int = None, dry_run: bool = False, errors: list = None):
+    """Purges test submissions and comments for a given bot account.
+
+    Every failure that may leave test artifacts behind is also appended to `errors`, when given.
+    """
+    if errors is None:
+        errors = []
     logger.info(f'=== Checking history for /u/{bot_name} ===')
     try:
         r = reddit.get_reddit_instance(bot_name)
         me = r.user.me()
         if me is None:
             logger.warning(f'Could not authenticate as /u/{bot_name}, skipping.')
+            errors.append(f'could not authenticate as /u/{bot_name}')
             return 0, 0
     except (prawcore.exceptions.OAuthException, Exception) as e:
         logger.warning(f'Failed to authenticate /u/{bot_name}: {e}, skipping.')
+        errors.append(f'failed to authenticate /u/{bot_name}: {e}')
         return 0, 0
 
     deleted_submissions = 0
@@ -194,10 +201,14 @@ def purge_bot_history(bot_name: str, limit: int = None, dry_run: bool = False):
                         logger.error(f'Failed to delete submission {submission.id}: {e}')
                         if diagnose_not_found(r, submission, bot_name, account_status_cache):
                             deleted_submissions += 1
+                        else:
+                            errors.append(f'could not delete submission {submission.id}: {e}')
                     except Exception as e:
                         logger.error(f'Failed to delete submission {submission.id}: {e}')
+                        errors.append(f'could not delete submission {submission.id}: {e}')
     except Exception as e:
         logger.error(f'Error fetching submissions for /u/{bot_name}: {e}')
+        errors.append(f'could not list the submissions of /u/{bot_name}: {e}')
 
     # 2. Clean up Comments
     try:
@@ -216,17 +227,21 @@ def purge_bot_history(bot_name: str, limit: int = None, dry_run: bool = False):
                         logger.error(f'Failed to delete comment {comment.id}: {e}')
                         if diagnose_not_found(r, comment, bot_name, account_status_cache):
                             deleted_comments += 1
+                        else:
+                            errors.append(f'could not delete comment {comment.id}: {e}')
                     except Exception as e:
                         logger.error(f'Failed to delete comment {comment.id}: {e}')
+                        errors.append(f'could not delete comment {comment.id}: {e}')
     except Exception as e:
         logger.error(f'Error fetching comments for /u/{bot_name}: {e}')
+        errors.append(f'could not list the comments of /u/{bot_name}: {e}')
 
     logger.info(f'Finished /u/{bot_name}: {deleted_submissions} submissions, {deleted_comments} comments {"identified" if dry_run else "deleted"}.\n')
     return deleted_submissions, deleted_comments
 
 
-def purge_all_bots(limit: int = None, dry_run: bool = False):
-    """Purges test artifacts across all 4 bots."""
+def purge_all_bots(limit: int = None, dry_run: bool = False) -> list:
+    """Purges test artifacts across all 4 bots and returns the failures that may have left some behind."""
     bot_names = [
         reddit.AUTO_CROSSPOST_BOT_NAME,
         reddit.SUB_DOESNT_EXIST_BOT_NAME,
@@ -236,24 +251,33 @@ def purge_all_bots(limit: int = None, dry_run: bool = False):
 
     total_submissions = 0
     total_comments = 0
+    errors = []
 
     for bot_name in bot_names:
-        subs, comms = purge_bot_history(bot_name, limit=limit, dry_run=dry_run)
+        subs, comms = purge_bot_history(bot_name, limit=limit, dry_run=dry_run, errors=errors)
         total_submissions += subs
         total_comments += comms
 
     action = 'Would delete' if dry_run else 'Successfully deleted'
     logger.info(f'=== Summary: {action} {total_submissions} test submissions and {total_comments} test comments across all bots ===')
+    return errors
 
 
 def main():
     parser = argparse.ArgumentParser(description='Delete test submissions and comments from all 4 Reddit bots.')
     parser.add_argument('--limit', type=int, default=100, help='Maximum number of items to inspect per category (default: 100, 0 or negative for all).')
     parser.add_argument('--dry-run', action='store_true', help='Preview items that would be deleted without actually deleting them.')
+    parser.add_argument('--strict', action='store_true', help='Exit with code 1 if any bot could not be checked or any test item could not be deleted (used by CI before deploying).')
     args = parser.parse_args()
 
     limit = None if args.limit <= 0 else args.limit
-    purge_all_bots(limit=limit, dry_run=args.dry_run)
+    errors = purge_all_bots(limit=limit, dry_run=args.dry_run)
+    if errors:
+        logger.error(f'{len(errors)} problem(s) may have left test artifacts behind:')
+        for error in errors:
+            logger.error(f'  - {error}')
+        if args.strict:
+            sys.exit(1)
 
 
 if __name__ == '__main__':

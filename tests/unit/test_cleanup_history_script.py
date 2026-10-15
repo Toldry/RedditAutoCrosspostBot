@@ -11,6 +11,7 @@ from scripts.cleanup_test_history import (
     purge_bot_history,
     purge_all_bots,
     diagnose_not_found,
+    main,
 )
 
 
@@ -194,9 +195,38 @@ def test_purge_bot_history_diagnoses_404_and_checks_account_once():
     mock_me.submissions.new.return_value = submissions
     mock_me.comments.new.return_value = []
 
+    errors = []
     with patch('scripts.cleanup_test_history.reddit.get_reddit_instance', return_value=mock_reddit):
-        del_subs, del_comms = purge_bot_history('AutoCrosspostBot')
+        del_subs, del_comms = purge_bot_history('AutoCrosspostBot', errors=errors)
 
     assert (del_subs, del_comms) == (0, 0)
+    assert errors == ['could not delete submission sub_0: received 404 HTTP response',
+                      'could not delete submission sub_1: received 404 HTTP response']
     assert mock_reddit.info.call_count == 2
     mock_reddit.redditor.assert_called_once_with('AutoCrosspostBot')
+
+
+@pytest.mark.unit
+def test_purge_bot_history_records_failed_authentication():
+    errors = []
+    with patch('scripts.cleanup_test_history.reddit.get_reddit_instance', side_effect=RuntimeError('bad password')):
+        assert purge_bot_history('AutoCrosspostBot', errors=errors) == (0, 0)
+
+    assert errors == ['failed to authenticate /u/AutoCrosspostBot: bad password']
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('extra_args, errors, expected_exit_code', [
+    (['--strict'], ['could not delete comment c_1: boom'], 1),
+    (['--strict'], [], None),
+    ([], ['could not delete comment c_1: boom'], None),
+])
+def test_main_strict_exits_nonzero_only_on_errors(monkeypatch, extra_args, errors, expected_exit_code):
+    monkeypatch.setattr('sys.argv', ['cleanup_test_history.py', *extra_args])
+    with patch('scripts.cleanup_test_history.purge_all_bots', return_value=errors):
+        if expected_exit_code is None:
+            main()
+        else:
+            with pytest.raises(SystemExit) as exit_info:
+                main()
+            assert exit_info.value.code == expected_exit_code

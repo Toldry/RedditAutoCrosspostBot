@@ -26,6 +26,9 @@ msgstr ""
 "\n"
 "היוצר של הבוט יקרא את התגובות וינסה לשנות את הקוד כדי לצמצם מקרים כאלה."
 
+msgid "RESPOND_TO_POSITIVE_SENTIMENT"
+msgstr "תודה (◕ᴗ◕✿)"
+
 msgid "REPLY_TO_CROSSPOST"
 msgstr ""
 "\n"

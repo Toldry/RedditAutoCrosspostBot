@@ -26,6 +26,9 @@ msgstr ""
 "\n"
 "El creador de este bot revisará las respuestas e intentará cambiar el código para reducir casos como este."
 
+msgid "RESPOND_TO_POSITIVE_SENTIMENT"
+msgstr "Gracias (◕ᴗ◕✿)"
+
 msgid "REPLY_TO_CROSSPOST"
 msgstr ""
 "\n"

@@ -26,6 +26,9 @@ msgstr ""
 "\n"
 "Создатель бота прочитает ответы и постарается изменить код, чтобы такое случалось реже."
 
+msgid "RESPOND_TO_POSITIVE_SENTIMENT"
+msgstr "Спасибо (◕ᴗ◕✿)"
+
 msgid "REPLY_TO_CROSSPOST"
 msgstr ""
 "\n"
