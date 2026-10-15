@@ -63,7 +63,8 @@ MESSAGE_KEY = 'RESPOND_TO_NEGATIVE_SENTIMENT'
 # Earlier wordings of the message, which only ever went out in English. The first version (2019) said
 # "why this crosspost was inappropriate", later ones "why this post/comment was inappropriate".
 LEGACY_MESSAGE_PREFIXES = ('Thanks for the feedback, would you mind detailing why this',)
-DELETED_BODIES = {'[deleted]', '[removed]'}
+# Bodies Reddit shows in place of deleted, removed or otherwise hidden comments (compared lowercased)
+DELETED_BODIES = {'[deleted]', '[removed]', '[unavailable]'}
 INFO_BATCH_SIZE = 100
 # Upper bound on "load more" requests per thread, so one huge thread cannot stall the run
 MAX_MORE_COMMENTS_REQUESTS = 50
@@ -215,7 +216,7 @@ def is_bot_account(thing):
 def is_written_feedback(comment):
     """Checks that a comment says more than a bare "bad bot" / "good bot" and is not by a bot or deleted."""
     body = (getattr(comment, 'body', '') or '').strip()
-    if not body or body in DELETED_BODIES or is_bot_account(comment):
+    if not body or body.lower() in DELETED_BODIES or is_bot_account(comment):
         return False
     return check_sentiment(body) is None
 
@@ -384,37 +385,48 @@ def _link(url, text):
     return f'<a href="{html.escape(url, quote=True)}">{html.escape(text)}</a>'
 
 
-def render_node(node):
+def render_comment(node, show_badges=True):
     classes = ' '.join(['comment'] + [name for name, flag in (
         ('bot', node.is_bot), ('feedback', node.is_feedback), ('new', node.is_new)) if flag])
     badges = ''
-    if node.is_bot:
-        badges += ' <span class="badge">bot</span>'
-    if node.is_new:
-        badges += ' <span class="badge new">new feedback</span>'
-    elif node.is_feedback:
-        badges += ' <span class="badge">earlier feedback</span>'
-    children = ''
-    if node.children:
-        children = '<ul class="tree">' + ''.join(f'<li>{render_node(child)}</li>' for child in node.children) + '</ul>'
+    if show_badges:
+        if node.is_bot:
+            badges += ' <span class="badge">bot</span>'
+        if node.is_new:
+            badges += ' <span class="badge new">new feedback</span>'
+        elif node.is_feedback:
+            badges += ' <span class="badge">earlier feedback</span>'
     return f'''<div class="{classes}">
   <p class="meta">{_link(node.permalink, f"u/{node.author}")}{badges} &middot; {format_utc(node.created_utc)} &middot; score {node.score}</p>
   <div class="body">{html.escape(node.body)}</div>
-</div>{children}'''
+</div>'''
+
+
+def render_node(node):
+    children = ''
+    if node.children:
+        children = '<ul class="tree">' + ''.join(f'<li>{render_node(child)}</li>' for child in node.children) + '</ul>'
+    return render_comment(node) + children
 
 
 def render_thread(thread):
+    """Shows the thread's new feedback, with the post and the whole conversation collapsed below it."""
     post_body = ''
     if thread.submission_text:
         post_body = f'<div class="body">{html.escape(thread.submission_text)}</div>'
     elif thread.submission_url:
         post_body = f'<p class="meta">{_link(thread.submission_url, thread.submission_url)}</p>'
+    new_feedback = ''.join(render_comment(node, show_badges=False) for node in thread.tree.walk() if node.is_new)
     return f'''
     <article>
       <h2>{_link(thread.submission_permalink, thread.submission_title)}</h2>
       <p class="meta">r/{html.escape(thread.subreddit)} &middot; posted by u/{html.escape(thread.submission_author)}</p>
-      {post_body}
-      <ul class="tree root"><li>{render_node(thread.tree)}</li></ul>
+      <div class="new-feedback">{new_feedback}</div>
+      <details class="context">
+        <summary>Show full conversation</summary>
+        {post_body}
+        <ul class="tree root"><li>{render_node(thread.tree)}</li></ul>
+      </details>
     </article>'''
 
 
@@ -484,6 +496,16 @@ def render_report(threads, previous_reports, generated_at, bot_names):
     padding: 0 0.25rem;
   }}
   .badge.new {{ border-color: var(--accent); color: var(--accent); }}
+  .new-feedback .comment + .comment {{ margin-top: 0.5rem; }}
+  details.context {{ margin-top: 0.75rem; }}
+  details.context > summary {{
+    display: inline-block; cursor: pointer; list-style: none; color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 0.375rem; padding: 0.125rem 0.625rem; font-size: 0.875rem;
+  }}
+  details.context > summary::-webkit-details-marker {{ display: none; }}
+  details.context > summary::before {{ content: "\\25B8  "; }}
+  details.context[open] > summary::before {{ content: "\\25BE  "; }}
+  details.context[open] > summary {{ margin-bottom: 0.5rem; }}
 </style>
 </head>
 <body>

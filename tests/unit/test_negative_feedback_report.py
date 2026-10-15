@@ -138,6 +138,8 @@ def test_written_feedback_needs_more_than_a_sentiment_phrase():
     assert not is_written_feedback(_comment('a', 'Bad bot!', author='user'))
     assert not is_written_feedback(_comment('b', 'good bot', author='user'))
     assert not is_written_feedback(_comment('c', '[deleted]', author=None))
+    assert not is_written_feedback(_comment('c2', '[unavailable]', author='user'))
+    assert not is_written_feedback(_comment('c3', '[Removed]', author='user'))
     assert not is_written_feedback(_comment('d', 'I am explaining things', author='same_post_bot'))
     assert is_written_feedback(_comment('e', 'bad bot, this is a repost of a repost', author='user'))
 
@@ -320,3 +322,17 @@ def test_report_marks_new_feedback_and_includes_the_whole_exchange():
     assert 'u/AutoCrosspostBot' in report_html
     assert 'I crossposted this' in report_html
     assert report_html.count('class="tree') == 4  # post > bot comment > bad bot > question > feedback
+
+
+@pytest.mark.unit
+def test_report_shows_only_new_feedback_until_the_context_is_expanded():
+    report_html = render_report([_thread(['r1'])], [], '2026-10-15 10:00 UTC', [BOT_NAME])
+    visible, collapsed = report_html.split('<details class="context">', 1)
+    article = visible[visible.index('<article>'):]
+
+    assert 'reply r1 &lt;/script&gt;' in article
+    assert 'title/r1/' in article
+    assert 'I crossposted this' not in article
+    assert 'I crossposted this' in collapsed
+    assert '<summary>Show full conversation</summary>' in collapsed
+    assert 'class="tree' not in article
