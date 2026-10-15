@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-10-15
+
 ### Fixed
 - **Live Duplicate-Detector Test:** `test_live_duplicate_detector_query` failed since 2.10.0 for the resized image. Its target post was the mostly transparent test asset, while the variations dropped the alpha channel and so showed the colours hidden under the transparency. That only matched while both sides were compared as full images; now that Reddit's preview images are compared, it cannot. The test now posts an opaque copy of the asset as the target.
 - **Failed Image Downloads Were Cached:** a preview or image that could not be downloaded (a timeout, or a preview Reddit had not made yet) was remembered as unreadable until it fell out of the fingerprint cache. Only successful fingerprints are cached now, so a later check downloads it again.
