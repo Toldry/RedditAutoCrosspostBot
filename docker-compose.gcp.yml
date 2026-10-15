@@ -1,0 +1,9 @@
+# Sends the bot's output to Google Cloud Logging, for the GCP VM only (it fails anywhere else).
+# Turn it on by adding this line to the VM's .env, which `docker compose` reads:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.gcp.yml
+# The bot will not start if the VM cannot write to Cloud Logging, so check that first; see docs/logs.md.
+services:
+  bot:
+    # Docker also keeps a local copy, so `docker compose logs bot` still works
+    logging:
+      driver: gcplogs
