@@ -286,8 +286,19 @@ def test_live_duplicate_detector_query():
     source_sub = r.subreddit(TEST_SOURCE_SUBREDDIT)
     target_sub = r.subreddit(TEST_TARGET_SUBREDDIT)
 
-    base_image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'test_sample.png')
-    assert os.path.exists(base_image_path), f"Asset missing at {base_image_path}"
+    from PIL import Image
+
+    asset_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'test_sample.png')
+    assert os.path.exists(asset_path), f"Asset missing at {asset_path}"
+
+    # The asset is an RGBA PNG whose pixels are almost all (partly) transparent. The variations drop the alpha
+    # channel, which reveals the colours hidden under the transparency, so they look nothing like the asset as
+    # Reddit shows it (and as its preview images, which the detector compares, are rendered). Post an opaque
+    # copy as the target, so that every variation really is a variation of it.
+    opaque_dir = tempfile.TemporaryDirectory()
+    base_image_path = os.path.join(opaque_dir.name, 'base.png')
+    with Image.open(asset_path) as asset:
+        asset.convert('RGB').save(base_image_path)
 
     target_submission = track(target_sub.submit(
         title=f'[Test Target Base Image] {uuid.uuid4().hex[:8]}',
@@ -341,6 +352,7 @@ def test_live_duplicate_detector_query():
                 assert matched['subreddit'].lower() == TEST_TARGET_SUBREDDIT.lower()
 
     finally:
+        opaque_dir.cleanup()
         cleanup_reddit_objects(created_comments, created_source_submissions, target_submission)
 
 

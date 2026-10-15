@@ -13,9 +13,9 @@ from racb.core import duplicate_detector
 @pytest.fixture(autouse=True)
 def clear_fingerprint_cache():
     """Fingerprints are cached per URL; tests reuse URLs with different image content."""
-    duplicate_detector.compute_image_fingerprint.cache_clear()
+    duplicate_detector.fingerprint_image_at.cache_clear()
     yield
-    duplicate_detector.compute_image_fingerprint.cache_clear()
+    duplicate_detector.fingerprint_image_at.cache_clear()
 
 
 def make_http_response(content, status_code=200, headers=None):
@@ -409,3 +409,14 @@ def test_scan_reads_no_top_posts_by_default():
     old_famous = make_post('famous', 'https://i.redd.it/famous.png', created_utc=5)
     scan, _ = scan_listing([], top_posts=[old_famous], top_limit=0)
     assert scan.posts_checked == 0
+
+
+@pytest.mark.unit
+def test_failed_downloads_are_retried_instead_of_cached():
+    url = 'https://i.redd.it/not_ready_yet.png'
+    responses = [make_http_response(b'', status_code=404), make_http_response(create_test_image_bytes())]
+    with patch('requests.get', side_effect=responses) as mock_get:
+        assert duplicate_detector.compute_image_fingerprint(url) is None
+        assert duplicate_detector.compute_image_fingerprint(url) is not None
+        assert duplicate_detector.compute_image_fingerprint(url) is not None
+    assert mock_get.call_count == 2  # The failure was retried; the success was cached
