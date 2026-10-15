@@ -6,7 +6,7 @@ import string
 
 import pytest
 from babel.messages.catalog import Catalog
-from babel.messages.mofile import read_mo, write_mo
+from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
 
 from racb import i18n
@@ -41,34 +41,36 @@ def message_key(message):
 
 
 @pytest.mark.unit
-def test_every_locale_has_a_compiled_catalog():
+def test_every_locale_has_a_catalog():
     assert i18n.available_locales() == EXPECTED_LOCALES
     assert sorted(locale_of(path) for path in PO_PATHS) == EXPECTED_LOCALES
 
 
-def as_hashable(value):
-    return tuple(value) if isinstance(value, (list, tuple)) else value
+@pytest.mark.unit
+def test_every_catalog_is_compiled():
+    # tests/conftest.py compiles them; the bot calls this at startup
+    i18n.check_catalogs_compiled()
 
 
-def translated_messages(catalog):
-    """Returns {id: string} for the messages a compiled catalog contains."""
-    return {
-        as_hashable(message.id): as_hashable(message.string)
-        for message in catalog
-        if message.id and not message.fuzzy and message_strings(message)
-    }
+@pytest.fixture
+def locales_dir_without_mo(tmp_path, monkeypatch):
+    """Points i18n at a copy of one locale's .po with no compiled .mo next to it."""
+    po_path = tmp_path / 'de' / 'LC_MESSAGES' / f'{i18n.DOMAIN}.po'
+    po_path.parent.mkdir(parents=True)
+    po_path.write_bytes((i18n.LOCALES_DIR / 'de' / 'LC_MESSAGES' / f'{i18n.DOMAIN}.po').read_bytes())
+    monkeypatch.setattr(i18n, 'LOCALES_DIR', tmp_path)
+    i18n.get_catalog.cache_clear()
+    yield
+    i18n.get_catalog.cache_clear()
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize('po_path', PO_PATHS, ids=locale_of)
-def test_compiled_catalog_is_up_to_date(po_path):
-    mo_path = po_path.with_suffix('.mo')
-    with open(mo_path, 'rb') as mo_file:
-        compiled = read_mo(mo_file)
-    assert translated_messages(compiled) == translated_messages(read_catalog(po_path)), (
-        f'{mo_path} is stale; run `uv run pybabel compile -d src/racb/locales`'
-    )
-    assert compiled.plural_forms == read_catalog(po_path).plural_forms
+def test_missing_compiled_catalog_raises_instead_of_posting_raw_keys(locales_dir_without_mo):
+    assert i18n.available_locales() == ['de']
+    with pytest.raises(i18n.CatalogNotCompiledError, match='pybabel compile'):
+        i18n.get_catalog('de')
+    with pytest.raises(i18n.CatalogNotCompiledError):
+        i18n.check_catalogs_compiled()
 
 
 @pytest.mark.unit

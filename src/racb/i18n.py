@@ -1,7 +1,8 @@
 """Translates strings according to the target subreddit
 
 Translations are gettext catalogs in ``locales/<locale>/LC_MESSAGES/messages.po``, compiled to
-``messages.mo`` with ``uv run pybabel compile -d src/racb/locales``. Message ids are symbolic keys
+``messages.mo`` with ``uv run pybabel compile -d src/racb/locales``. The ``.mo`` files are not committed:
+the Dockerfile and ``tests/conftest.py`` compile them. Message ids are symbolic keys
 (e.g. ``REPLY_TO_CROSSPOST``); the ``en`` catalog holds the English source text, and every other
 locale falls back to it for strings it leaves untranslated. Which subreddit gets which locale is
 configured in ``locales/subreddits.toml``.
@@ -40,18 +41,35 @@ def load_subreddit_language_map(path=LOCALES_DIR / 'subreddits.toml'):
 subreddit_language_map = load_subreddit_language_map()
 
 
+class CatalogNotCompiledError(FileNotFoundError):
+    """A locale has a .po catalog but no compiled .mo next to it."""
+
+
 @functools.cache
 def get_catalog(locale):
-    """Loads one compiled catalog, without fallbacks, so a miss can be told apart from a hit."""
+    """Loads one compiled catalog, without fallbacks, so a miss can be told apart from a hit.
+
+    Raises CatalogNotCompiledError instead of returning an empty catalog, which would make the bot post
+    raw message keys such as ``POST_SUFFIX_TEXT``.
+    """
     mo_path = LOCALES_DIR / locale / 'LC_MESSAGES' / f'{DOMAIN}.mo'
     if not mo_path.is_file():
-        return gettext.NullTranslations()
+        raise CatalogNotCompiledError(
+            f'{mo_path} is missing; run `uv run pybabel compile -d src/racb/locales`'
+        )
     with open(mo_path, 'rb') as mo_file:
         return gettext.GNUTranslations(mo_file)
 
 
 def available_locales():
-    return sorted(path.parent.parent.name for path in LOCALES_DIR.glob(f'*/LC_MESSAGES/{DOMAIN}.mo'))
+    """Returns every locale that has a .po catalog, compiled or not."""
+    return sorted(path.parent.parent.name for path in LOCALES_DIR.glob(f'*/LC_MESSAGES/{DOMAIN}.po'))
+
+
+def check_catalogs_compiled():
+    """Loads every catalog, so a missing .mo stops the bot at startup instead of at its first reply."""
+    for locale in available_locales():
+        get_catalog(locale)
 
 
 def get_language(subreddit):

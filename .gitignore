@@ -15,3 +15,5 @@ __pycache__/
 /venv/
 *.csv# Local output of scripts/negative_feedback_report.py
 /reports/
+# Compiled gettext catalogs: built from the .po files by the Dockerfile and by tests/conftest.py
+*.mo
