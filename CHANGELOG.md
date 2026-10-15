@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.10] - 2026-10-15
+
 ### Changed
 - **Newer Pushes Cancel Stale Test Runs:** A push to `master` that reaches the `integration-tests` CI job now cancels the previous run's `cleanup-test-history` sweep, or its still-running integration tests, instead of waiting for them. The newer run's own sweep removes the leftovers. A sweep no longer runs after cancelled integration tests.
 
