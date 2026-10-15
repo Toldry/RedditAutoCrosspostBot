@@ -377,6 +377,11 @@ Mechanics worth knowing:
   Precisely: request-rate limiting (the per-minute OAuth quota) is handled by prawcore. `ratelimit_seconds`
   only controls how long PRAW will **sleep** on a `RATELIMIT` API error ("you are doing that too much")
   before retrying. Up to 300 s of that sleep happens on the single main thread, so the stream stalls meanwhile.
+- **PRAW delete endpoint patch:**
+  [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) sets `praw.endpoints.API_PATH['del'] = 'api/del'` at import.
+  Reddit answers PRAW's default `POST /api/del/` (trailing slash) with a plain-text `404 page not found`,
+  so `Submission.delete()` and `Comment.delete()` always failed. Keep the patch until PRAW changes its path.
+  A plain-text `404 page not found` body on any other endpoint suggests the same trailing-slash problem.
 - **PostgreSQL Stored Procedures:**
   Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `get_oldest_scraped_comment`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](./src/racb/core/db.py).
 - **Batch Comment Processing in Phase 2:**
