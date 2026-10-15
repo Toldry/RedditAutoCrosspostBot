@@ -54,10 +54,14 @@ sequenceDiagram
 
    In parallel with `deploy`, the `cleanup-test-history` job runs `scripts/cleanup_test_history.py --strict`,
    which sweeps up any test posts and comments the tests left behind. It walks the recent history of all 4
-   bots, which is slow, so it does not hold up the deploy. It also runs when the tests failed or were
-   cancelled, so a failed run leaves no litter. `--strict` turns the job red if any bot could not be checked
+   bots, which is slow, so it does not hold up the deploy. It also runs when the tests failed, so a failed run
+   leaves no litter. `--strict` turns the job red if any bot could not be checked
    or any test item could not be deleted, but that does not undo or block the deploy. It shares a
    concurrency group with `integration-tests`, so it never sweeps while another run's tests are posting.
+   When a newer push reaches `integration-tests`, it cancels the older run's sweep (or, if the older run is
+   still testing, its integration tests) instead of waiting. Nothing is lost: the newer run's own sweep
+   picks up the leftovers, and the newer commit is the one that gets deployed. If the newer commit fails
+   its tests, though, the older one is not deployed either; the next passing push deploys.
 2. It deploys the commit `release` ended on: the `chore(release)` commit when a version was bumped, so the
    version in the bot's User-Agent is right, or the tested commit itself when nothing was released. If
    someone pushed to `master` while the run was going, `release` sees the newer, not yet tested commit;
@@ -287,7 +291,7 @@ To test the deploy path without waiting for a push, re-run only the `deploy` job
 | `permission denied while trying to connect to the Docker daemon socket` | `VM_USER` is not in the `docker` group: `sudo usermod -aG docker <user>`, then log out and in. |
 | `integration-tests` fails at `Live integration tests` | A real failure, or Reddit being unavailable. The pytest output names the test. Integration tests that fail on login usually mean a bot credential secret is missing or out of date; update it to match the VM's `.env`. |
 | `cleanup-test-history` fails | The script lists the problems at the end of its log (`could not delete ...`, `failed to authenticate ...`). A 404 on delete comes with a diagnosis (subreddit private or banned, account shadowbanned). Leftovers can be removed later with `uv run python scripts/cleanup_test_history.py --limit 0`. |
-| `deploy` is skipped | `AUTO_DEPLOY` is not exactly `true`, the push was not to `master`, `integration-tests` or `release` failed (for example its push lost a race with another merge), or `master` moved on during the run (the newer push's run deploys it; look for the `master moved past` notice in `release`). Also: `integration-tests` and `cleanup-test-history` share one concurrency group, and GitHub keeps only one job waiting per group, so when merges land in quick succession an older waiting job is cancelled. Re-run it, or let the next push deploy. |
+| `deploy` is skipped | `AUTO_DEPLOY` is not exactly `true`, the push was not to `master`, `integration-tests` or `release` failed (for example its push lost a race with another merge), or `master` moved on during the run (the newer push's run deploys it; look for the `master moved past` notice in `release`). Also: a newer push cancels an older run's `integration-tests` that is still running, which skips that run's deploy; the newer run deploys instead. |
 | `no space left on device` during the build | `docker system df` on the VM, then `docker builder prune` and `docker image prune -a` (the running bot's image is kept). |
 
 ## Removing it
