@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-10-15
+
 ### Added
 - **Database Web Viewer:** an optional `pgweb` service (Docker Compose profile `viewer`) shows the database in a browser. It is read-only, asks for the password set in `PGWEB_AUTH_PASS` (and refuses to start without one), and listens on the VM's `127.0.0.1:8081` only, so it is reached through an SSH tunnel over IAP. Automatic deploys neither start nor stop it. See `docs/db-viewer.md`.
 
