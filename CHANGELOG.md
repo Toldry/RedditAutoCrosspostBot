@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Negative Feedback Report:** `uv run python scripts/negative_feedback_report.py` finds the bot's old comments asking why a post was inappropriate (the `RESPOND_TO_NEGATIVE_SENTIMENT` message, sent until February 2023) and writes an HTML report of the replies to them, with the "bad bot" comment each one answered. A report covers only replies that no earlier report in `reports/negative_feedback/` covered, and links to those earlier reports.
+- **Negative Feedback Report:** `uv run python scripts/negative_feedback_report.py` finds the bots' comments asking why a post was inappropriate (the `RESPOND_TO_NEGATIVE_SENTIMENT` message) and writes an HTML report of the replies to them, with the "bad bot" comment each one answered. A report covers only replies that no earlier report in `reports/negative_feedback/` covered, and links to those earlier reports.
 
 ## [2.4.5] - 2026-10-15
 

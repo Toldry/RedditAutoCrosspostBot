@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Writes an HTML report of the replies people left under the bot's RESPOND_TO_NEGATIVE_SENTIMENT comments.
 
-From December 2019 until February 2023, the bot answered "bad bot" style replies with a comment asking why the
-post or comment was inappropriate (the RESPOND_TO_NEGATIVE_SENTIMENT text). The answers to that question are
-the feedback this report collects. The bot no longer sends that comment (`respond_to_negative_sentiment` in
-`racb.phases.inbox` is a no-op), so new feedback only appears if someone replies to one of the old comments.
+The bots answer "bad bot" style replies with a comment asking why the post or comment was inappropriate (the
+RESPOND_TO_NEGATIVE_SENTIMENT text, sent by `respond_to_negative_sentiment` in `racb.phases.inbox`). The answers
+to that question are the feedback this report collects. Only /u/AutoCrosspostBot sent it from December 2019
+until February 2023, when it was switched off; since it was switched back on, every bot sends it.
 
 Each report covers only replies that no earlier report in the reports directory covered: every report embeds
 the ids of the replies it shows, and the next run reads them back. Each report also links to the earlier ones.
@@ -427,12 +427,17 @@ def report_file_url(path):
 def main():
     parser = argparse.ArgumentParser(description='Write an HTML report of new replies to the bot\'s requests for feedback.')
     parser.add_argument('--reports-dir', default=DEFAULT_REPORTS_DIR, help=f'Where reports are read and written (default: {DEFAULT_REPORTS_DIR}).')
-    parser.add_argument('--bot', action='append', dest='bot_names', help=f'Bot account to scan; repeatable (default: {reddit.AUTO_CROSSPOST_BOT_NAME}, the only one that ever sent the message).')
+    parser.add_argument('--bot', action='append', dest='bot_names', help='Bot account to scan; repeatable (default: all 4 bots).')
     parser.add_argument('--limit', type=int, default=0, help='Maximum items to read per listing (default: 0, meaning as many as Reddit returns).')
     parser.add_argument('--write-empty', action='store_true', help='Write a report even when there are no new responses.')
     args = parser.parse_args()
 
-    bot_names = args.bot_names or [reddit.AUTO_CROSSPOST_BOT_NAME]
+    bot_names = args.bot_names or [
+        reddit.AUTO_CROSSPOST_BOT_NAME,
+        reddit.SUB_DOESNT_EXIST_BOT_NAME,
+        reddit.SAME_SUBREDDIT_BOT_NAME,
+        reddit.SAME_POST_BOT_NAME,
+    ]
     limit = None if args.limit <= 0 else args.limit
     previous_reports = read_previous_reports(args.reports_dir)
     covered_reply_ids = {reply_id for report in previous_reports for reply_id in report.reply_ids}
