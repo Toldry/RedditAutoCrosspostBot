@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Quick Test Cleanup:** The integration tests now record every post and comment they create, and the `integration-tests` CI job ends with the new `scripts/delete_test_artifacts.py --strict`, which deletes only those recorded items that are still on Reddit. It replaces the `cleanup-test-history` job, whose sweep of all 4 bots' history took minutes. It runs even after failed or cancelled tests, never touches another run's posts, and blocks the deploy if a recorded item could not be deleted. `scripts/cleanup_test_history.py` stays for manual use.
+
 ## [2.4.10] - 2026-10-15
 
 ### Changed
