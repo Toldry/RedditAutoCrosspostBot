@@ -302,3 +302,93 @@ def test_quick_duplicate_check_reads_newest_and_all_time_top_posts(make_mock_com
 
     assert mock_scan.call_args.kwargs['limit'] == 100
     assert mock_scan.call_args.kwargs['top_limit'] == 100
+
+
+@pytest.mark.unit
+def test_handle_incoming_comment_ignores_blocked_target(make_mock_comment):
+    comment = make_mock_comment(body='r/NotDisneyVacation', subreddit='test_source')
+    with patch('racb.phases.phase1.get_posts_with_same_content') as mock_search, \
+            patch('racb.core.db.add_comment') as mock_db_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    mock_search.assert_not_called()
+    mock_db_add.assert_not_called()
+
+
+def search_for_same_content(comment, title_results=(), **kwargs):
+    """Runs get_posts_with_same_content with an empty URL search; the title search returns `title_results`."""
+    mock_reddit = MagicMock()
+    mock_reddit.subreddit.return_value.search.side_effect = lambda query, **_: (
+        list(title_results) if query.startswith('title:') else []
+    )
+    with patch('racb.core.reddit.get_reddit_instance', return_value=mock_reddit), \
+            patch('racb.core.duplicate_detector.scan_subreddit_for_duplicates', return_value=None) as mock_scan:
+        result = phase1.get_posts_with_same_content(comment, 'target_sub', **kwargs)
+    return result, mock_reddit, mock_scan
+
+
+def make_post_in(subreddit, post_id='other', title='Another title'):
+    post = MagicMock(id=post_id, title=title)
+    post.subreddit.display_name = subreddit
+    return post
+
+
+@pytest.mark.unit
+def test_other_discussion_in_the_target_counts_as_same_content(make_mock_comment, make_mock_submission):
+    crosspost = make_post_in('Target_Sub')
+    submission = make_mock_submission(duplicates=[make_post_in('elsewhere', 'x'), crosspost])
+    comment = make_mock_comment(body='r/target_sub', submission=submission)
+    result, _, mock_scan = search_for_same_content(comment)
+    assert result.posts_found is True
+    assert result.posts == [crosspost]
+    mock_scan.assert_not_called()
+
+
+@pytest.mark.unit
+def test_other_discussions_elsewhere_do_not_count(make_mock_comment, make_mock_submission):
+    submission = make_mock_submission(duplicates=[make_post_in('elsewhere')])
+    comment = make_mock_comment(body='r/target_sub', submission=submission)
+    result, _, mock_scan = search_for_same_content(comment)
+    assert result.posts_found is False
+    mock_scan.assert_called_once()
+
+
+@pytest.mark.unit
+def test_failed_other_discussions_call_does_not_stop_the_check(make_mock_comment, make_mock_submission):
+    submission = make_mock_submission()
+    submission.duplicates.side_effect = prawcore.exceptions.ServerError(MagicMock(status_code=500))
+    comment = make_mock_comment(body='r/target_sub', submission=submission)
+    result, _, mock_scan = search_for_same_content(comment)
+    assert result.posts_found is False
+    mock_scan.assert_called_once()
+
+
+TITLE = 'Doom on a pregnancy tester'
+
+
+@pytest.mark.unit
+def test_title_search_finds_a_post_with_the_same_title(make_mock_comment, make_mock_submission):
+    comment = make_mock_comment(body='r/target_sub', submission=make_mock_submission(title=TITLE))
+    repost = make_post_in('target_sub', 'repost', title='doom on a pregnancy tester!')
+    unrelated = make_post_in('target_sub', 'unrelated', title='Doom on a pregnancy tester, part 2')
+    result, mock_reddit, _ = search_for_same_content(comment, title_results=[unrelated, repost], search_titles=True)
+    assert result.posts == [repost]
+    queries = [call.kwargs['query'] for call in mock_reddit.subreddit.return_value.search.call_args_list]
+    assert f'title:"{TITLE}"' in queries
+
+
+@pytest.mark.unit
+def test_title_search_is_off_by_default(make_mock_comment, make_mock_submission):
+    comment = make_mock_comment(body='r/target_sub', submission=make_mock_submission(title=TITLE))
+    repost = make_post_in('target_sub', 'repost', title=TITLE)
+    result, _, _ = search_for_same_content(comment, title_results=[repost])
+    assert result.posts_found is False
+
+
+@pytest.mark.unit
+def test_short_titles_are_not_searched(make_mock_comment, make_mock_submission):
+    comment = make_mock_comment(body='r/target_sub', submission=make_mock_submission(title='My cat'))
+    repost = make_post_in('target_sub', 'repost', title='My cat')
+    result, mock_reddit, _ = search_for_same_content(comment, title_results=[repost], search_titles=True)
+    assert result.posts_found is False
+    queries = [call.kwargs['query'] for call in mock_reddit.subreddit.return_value.search.call_args_list]
+    assert not any(query.startswith('title:') for query in queries)

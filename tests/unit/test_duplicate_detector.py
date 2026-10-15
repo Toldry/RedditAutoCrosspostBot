@@ -252,12 +252,16 @@ def make_post(post_id, url, created_utc, preview_resolutions=None, is_video=Fals
 
 
 def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None, source=None, top_posts=None,
-                 top_limit=0):
+                 top_limit=0, top_posts_by_period=None, top_time_filters=('all',)):
     """Runs scan_subreddit_for_duplicates over a fake "new" listing; every image is plain green unless given."""
     source = source or make_post('source', 'https://i.redd.it/source.png', created_utc=0)
     mock_reddit = MagicMock()
     mock_reddit.subreddit.return_value.new.return_value = posts[:limit]
     mock_reddit.subreddit.return_value.top.return_value = (top_posts or [])[:top_limit]
+    if top_posts_by_period is not None:
+        mock_reddit.subreddit.return_value.top.side_effect = (
+            lambda time_filter, limit: top_posts_by_period.get(time_filter, [])[:limit]
+        )
     image_bytes_by_url = image_bytes_by_url or {}
     downloaded_urls = []
 
@@ -269,6 +273,7 @@ def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None, 
             patch('requests.get', side_effect=mock_requests_get):
         scan = duplicate_detector.scan_subreddit_for_duplicates(
             source, 'target_sub', posted_after=posted_after, limit=limit, top_limit=top_limit,
+            top_time_filters=top_time_filters,
         )
     return scan, downloaded_urls
 
@@ -409,3 +414,20 @@ def test_scan_reads_no_top_posts_by_default():
     old_famous = make_post('famous', 'https://i.redd.it/famous.png', created_utc=5)
     scan, _ = scan_listing([], top_posts=[old_famous], top_limit=0)
     assert scan.posts_checked == 0
+
+
+@pytest.mark.unit
+def test_scan_compares_the_top_posts_of_each_period_once():
+    newest = [make_post('new0', 'https://i.redd.it/new0.png', created_utc=1000)]
+    all_time = make_post('all_time', 'https://i.redd.it/all_time.png', created_utc=5)
+    this_year = make_post('this_year', 'https://i.redd.it/this_year.png', created_utc=500)
+    scan, downloaded_urls = scan_listing(
+        newest, limit=1000, top_limit=100, top_time_filters=('all', 'year'),
+        top_posts_by_period={'all': [all_time, newest[0]], 'year': [this_year, all_time]},
+        image_bytes_by_url={'https://i.redd.it/source.png': png_bytes(load_sample_image()),
+                            'https://i.redd.it/this_year.png': png_bytes(load_sample_image())},
+    )
+    assert scan.posts_checked == 3
+    assert scan.top_posts_checked == 2  # new0 came from the newest posts, so it is not counted as a top post
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['this_year']
+    assert downloaded_urls.count('https://i.redd.it/all_time.png') == 1

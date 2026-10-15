@@ -5,6 +5,7 @@ import praw
 import prawcore
 
 from racb import config
+from racb.constants import is_crosspost_blocked
 from racb.core import db, reddit, duplicate_detector
 from racb.phases import phase1
 
@@ -75,7 +76,8 @@ def run_filters(comment_entry, comment=None, full_media_scan=False):
 
     With `full_media_scan`, an image (or video) post is compared with every image (or video) post the target
     subreddit got since the comment was written (as far back as Reddit lists), instead of with the newest few
-    only. Phase 3 uses it, since its reply tells readers how many posts were checked.
+    only, and with the target's top posts of all time and of the past year. Phase 3 uses it, since its reply
+    tells readers how many posts were checked.
     """
     class Result:
         passes_filter = False
@@ -121,16 +123,29 @@ def run_filters(comment_entry, comment=None, full_media_scan=False):
         result.reason = 'TARGET_SUBREDDIT_CHANGED'
         return result
 
+    # Rows scraped before a subreddit or pair was blocked must not be crossposted either
+    if is_crosspost_blocked(comment.subreddit.display_name, target_subreddit):
+        result.reason = 'CROSSPOST_BLOCKED'
+        return result
+
+    source_problem = get_source_submission_problem(comment.submission)
+    if source_problem:
+        result.reason = source_problem
+        return result
+
     if full_media_scan:
         gpwsc_result = phase1.get_posts_with_same_content(
             comment,
             target_subreddit,
             media_scan_since=getattr(comment, 'created_utc', None),
             media_scan_limit=duplicate_detector.REDDIT_LISTING_LIMIT,
-            media_scan_top_limit=0,  # The reply counts posts from the comment's date onwards only
+            # The reply leaves the top posts out of its count (RepostScan.top_posts_checked)
+            media_scan_top_limit=duplicate_detector.QUICK_SCAN_TOP_LIMIT,
+            media_scan_top_time_filters=('all', 'year'),
+            search_titles=True,
         )
     else:
-        gpwsc_result = phase1.get_posts_with_same_content(comment, target_subreddit)
+        gpwsc_result = phase1.get_posts_with_same_content(comment, target_subreddit, search_titles=True)
     result.media_scan = gpwsc_result.media_scan
     if gpwsc_result.posts_found:
         result.reason = 'POST_WITH_SAME_CONTENT_FOUND'
@@ -143,6 +158,27 @@ def run_filters(comment_entry, comment=None, full_media_scan=False):
 
     result.passes_filter = True
     return result
+
+
+def get_source_submission_problem(submission):
+    """Returns why the post a comment is under should not be crossposted any more, or None if it still can be.
+
+    A deleted or removed post would be crossposted empty, and a locked or archived one can no longer be
+    discussed where it was posted.
+    """
+    try:
+        if isinstance(getattr(submission, 'removed_by_category', None), str):
+            return 'SOURCE_DELETED_OR_REMOVED'
+        if getattr(submission, 'selftext', None) in ('[deleted]', '[removed]'):
+            return 'SOURCE_DELETED_OR_REMOVED'
+        if getattr(submission, 'locked', False) is True:
+            return 'SOURCE_LOCKED'
+        if getattr(submission, 'archived', False) is True:
+            return 'SOURCE_ARCHIVED'
+    except (praw.exceptions.PRAWException, prawcore.exceptions.PrawcoreException) as e:
+        logger.info(f'Source post unavailable ({permalink_safe(submission)}): {e!r}')
+        return 'SOURCE_UNAVAILABLE'
+    return None
 
 
 def get_full_comment_from_reddit(permalink_without_prefix):

@@ -61,6 +61,11 @@ class MockSubmission:
         score=10,
         author='submission_author',
         over_18=False,
+        selftext='',
+        removed_by_category=None,
+        locked=False,
+        archived=False,
+        duplicates=(),
     ):
         self.id = submission_id
         self.title = title
@@ -70,6 +75,11 @@ class MockSubmission:
         self.score = score
         self.author = MockRedditor(author) if isinstance(author, str) else author
         self.over_18 = over_18
+        self.selftext = selftext
+        self.removed_by_category = removed_by_category
+        self.locked = locked
+        self.archived = archived
+        self.duplicates = MagicMock(return_value=list(duplicates))  # Reddit's "other discussions"
         self.crosspost = MagicMock()
         self.delete = MagicMock()
 

@@ -29,7 +29,8 @@ scan cannot reach that far back; the returned `RepostScan` says whether it did (
 
 The quick check that runs when a comment is first seen (and answers through u/same_post_bot) reads only the
 QUICK_SCAN_NEWEST_LIMIT newest posts, plus the QUICK_SCAN_TOP_LIMIT top posts of all time (`top_limit`),
-because reposts of a subreddit's most famous posts are common and those are often years old.
+because reposts of a subreddit's most famous posts are common and those are often years old. The full scan
+made just before crossposting also reads the top posts of the past year (`top_time_filters`).
 
 To keep a scan cheap on a small VM, posts are compared through the small preview images Reddit generates
 (`preview_image_url`), and several previews are downloaded at a time.
@@ -96,6 +97,8 @@ class RepostScan:
     complete: bool = False
     # created_utc of the oldest post the scan read, or None if the subreddit had no posts
     oldest_post_utc: float | None = None
+    # How many of the posts_checked came only from the top listings, not from the newest posts
+    top_posts_checked: int = 0
 
 
 # --- Fingerprints ---------------------------------------------------------------------------------------
@@ -239,9 +242,9 @@ def list_newest_posts(subreddit_name, limit):
     return posts
 
 
-def list_top_posts(subreddit_name, limit):
-    """Returns up to `limit` of the subreddit's top posts of all time, best first."""
-    return list(get_reddit_instance().subreddit(subreddit_name).top(time_filter='all', limit=limit))
+def list_top_posts(subreddit_name, limit, time_filter='all'):
+    """Returns up to `limit` of the subreddit's top posts of `time_filter` ('all', 'year', ...), best first."""
+    return list(get_reddit_instance().subreddit(subreddit_name).top(time_filter=time_filter, limit=limit))
 
 
 def fingerprint_all(urls):
@@ -251,12 +254,13 @@ def fingerprint_all(urls):
 
 
 def scan_subreddit_for_duplicates(submission, subreddit_name, posted_after=None, limit=DEFAULT_SCAN_LIMIT,
-                                  top_limit=0, hash_threshold=DEFAULT_HASH_THRESHOLD):
+                                  top_limit=0, top_time_filters=('all',), hash_threshold=DEFAULT_HASH_THRESHOLD):
     """Compares an image (or video) post with the newest image (or video) posts of a subreddit.
 
     Reads at most `limit` posts, newest first, and stops at the first one created before `posted_after`
-    (a Unix timestamp). With `top_limit`, also compares the subreddit's `top_limit` top posts of all time;
-    they do not change `complete` or `oldest_post_utc`, which describe the newest posts only. Returns a RepostScan, or None if `submission` is neither an image nor a video post, or
+    (a Unix timestamp). With `top_limit`, also compares the subreddit's `top_limit` top posts of each period in
+    `top_time_filters` (all time by default); they do not change `complete` or `oldest_post_utc`, which describe
+    the newest posts only, and are also counted in `top_posts_checked`. Returns a RepostScan, or None if `submission` is neither an image nor a video post, or
     its picture cannot be read, in which case nothing was compared.
     """
     media = media_kind(submission)
@@ -287,14 +291,20 @@ def scan_subreddit_for_duplicates(submission, subreddit_name, posted_after=None,
         # The listing ended without reaching an older post: complete only if Reddit had no more to give
         scan.complete = len(posts) < limit
 
+    top_only_ids = set()
     if top_limit:
-        try:
-            top_posts = list_top_posts(subreddit_name, top_limit)
-        except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
-            logger.warning(f'Could not list the top posts of r/{subreddit_name}: {e!r}')
-            top_posts = []
         seen_ids = {post.id for post in candidates}
-        candidates += [post for post in top_posts if media_kind(post) == media and post.id not in seen_ids]
+        for time_filter in top_time_filters:
+            try:
+                top_posts = list_top_posts(subreddit_name, top_limit, time_filter)
+            except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+                logger.warning(f'Could not list the top posts ({time_filter}) of r/{subreddit_name}: {e!r}')
+                continue
+            for post in top_posts:
+                if media_kind(post) == media and post.id not in seen_ids:
+                    seen_ids.add(post.id)
+                    top_only_ids.add(post.id)
+                    candidates.append(post)
 
     fingerprints = fingerprint_all([preview_image_url(post) for post in candidates])
     for post, fingerprint in zip(candidates, fingerprints):
@@ -305,6 +315,8 @@ def scan_subreddit_for_duplicates(submission, subreddit_name, posted_after=None,
         else:
             continue  # The picture could not be read, so the post does not count as checked
         scan.posts_checked += 1
+        if post.id in top_only_ids:
+            scan.top_posts_checked += 1
         if is_match:
             logger.info(
                 f'Duplicate {media} found in r/{subreddit_name}: {submission.url} vs {post.url} (distance={distance})'
