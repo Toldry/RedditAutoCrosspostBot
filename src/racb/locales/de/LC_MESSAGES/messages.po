@@ -21,6 +21,10 @@ msgstr ""
 
 msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
 msgstr ""
+"\n"
+"Danke für das Feedback! Magst du erklären, warum dieser Beitrag/Kommentar unangebracht war?\n"
+"\n"
+"Der Ersteller dieses Bots liest die Antworten und versucht, den Code so zu ändern, dass so etwas seltener passiert."
 
 msgid "RESPOND_TO_POSITIVE_SENTIMENT"
 msgstr "Danke (◕ᴗ◕✿)"

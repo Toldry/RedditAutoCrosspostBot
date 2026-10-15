@@ -21,6 +21,10 @@ msgstr ""
 
 msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
 msgstr ""
+"\n"
+"Merci pour le retour, pourrais-tu expliquer en quoi cette publication/ce commentaire était inapproprié ?\n"
+"\n"
+"Le créateur de ce bot lira les réponses et essaiera de modifier le code pour réduire ce genre d'incidents."
 
 msgid "RESPOND_TO_POSITIVE_SENTIMENT"
 msgstr "Merci (◕ᴗ◕✿)"
@@ -31,25 +35,28 @@ msgstr ""
 "J'ai crossposté ceci de r/{source_subreddit} vers r/{target_subreddit} après avoir vu [ce commentaire **écrit par un humain** et plutôt bien noté]({source_comment_permalink}) (score={source_comment_score}), qui semble suggérer que cette publication aurait aussi sa place ici.\n"
 
 msgid "THE_USER_WHO_COMMENTED"
-msgstr ""
+msgstr "l'utilisateur qui a commenté"
 
 msgid "THATS_WHERE_WE_ARE"
-msgstr ""
+msgstr "Oui, c'est là qu'on est."
 
 msgid "NONEXISTENT_SUBREDDIT"
-msgstr ""
+msgstr "Le subreddit r/{target_subreddit} n'existe pas."
 
 msgid "ALTERNATE_SUBS_SUGGESTION"
 msgstr ""
+"Tu voulais dire :\n"
+"\n"
+"{alternate_subreddits_string}"
 
 msgid "MAYBE_TYPO"
-msgstr ""
+msgstr "Peut-être une faute de frappe ?"
 
 msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
-msgstr ""
+msgstr "Tu pourrais [**créer un nouveau subreddit** r/{target_subreddit}](/subreddits/create?name={target_subreddit})."
 
 msgid "FOUND_POST_WITH_SAME_CONTENT"
-msgstr ""
+msgstr "J'ai trouvé [cette publication]({same_content_post_url}) dans r/{target_subreddit} avec le même contenu que la publication actuelle."
 
 msgid "DURATION_IN_DAYS"
 msgid_plural "DURATION_IN_DAYS_PLURAL"
@@ -57,4 +64,4 @@ msgstr[0] "{days} jour"
 msgstr[1] "{days} jours"
 
 msgid "SUGGESTION_SUBSCRIBERS"
-msgstr ""
+msgstr "abonnés : {subscribers}"

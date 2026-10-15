@@ -190,7 +190,7 @@ def test_partly_translated_nonexistent_subreddit_reply_falls_back_to_english_as_
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize('subreddit', ['pics', 'ich_iel', 'yo_elvr', 'moi_dlvv', 'ani_bm', 'totallynotrobots'])
+@pytest.mark.parametrize('subreddit', ['pics', 'ich_iel', 'yo_elvr', 'moi_dlvv', 'ani_bm', 'pikabu', 'totallynotrobots'])
 @pytest.mark.parametrize('has_matches', [False, True])
 def test_nonexistent_subreddit_reply_uses_one_language(make_mock_comment, subreddit, has_matches):
     matches = []
