@@ -7,13 +7,14 @@ import praw
 import pytest
 
 from scripts.negative_feedback_report import (
-    FeedbackReply,
+    CommentNode,
     FeedbackThread,
-    collect_new_replies,
+    collect_subtree,
     find_in_comment_history,
     find_via_inbox,
     is_negative_sentiment_comment,
-    iter_direct_replies,
+    is_written_feedback,
+    load_thread,
     message_markers,
     read_previous_reports,
     render_report,
@@ -29,8 +30,8 @@ CURRENT_TEXT = (
 FIRST_VERSION_TEXT = 'Thanks for the feedback, would you mind detailing why this crosspost was inappropriate? \n'
 
 
-def _comment(comment_id, body, author=BOT_NAME, parent_id='t1_parent', created_utc=1_600_000_000.0):
-    comment = MagicMock()
+def _comment(comment_id, body, author=BOT_NAME, parent_id='t1_parent', created_utc=1_600_000_000.0, replies=()):
+    comment = MagicMock(spec=praw.models.Comment)
     comment.id = comment_id
     comment.fullname = f't1_{comment_id}'
     comment.body = body
@@ -39,25 +40,41 @@ def _comment(comment_id, body, author=BOT_NAME, parent_id='t1_parent', created_u
     comment.score = 3
     comment.created_utc = created_utc
     comment.permalink = f'/r/pics/comments/abc/title/{comment_id}/'
+    comment.replies = list(replies)
     return comment
 
 
-def _thread(reply_ids, trigger_body='bad bot'):
+def _node(comment_id, body, author='someone', is_bot=False, is_feedback=False, is_new=False, children=()):
+    return CommentNode(
+        comment_id=comment_id,
+        author=author,
+        body=body,
+        score=2,
+        created_utc=1_600_000_100.0,
+        permalink=f'https://reddit.com/r/pics/comments/abc/title/{comment_id}/',
+        is_bot=is_bot,
+        is_feedback=is_feedback,
+        is_new=is_new,
+        children=list(children),
+    )
+
+
+def _thread(feedback_ids, new=True):
+    feedback = [
+        _node(comment_id, f'reply {comment_id} </script> <i>x</i>', is_feedback=True, is_new=new)
+        for comment_id in feedback_ids
+    ]
+    question = _node('q1', CURRENT_TEXT, author=BOT_NAME, is_bot=True, children=feedback)
+    trigger = _node('trig', 'bad bot', children=[question])
     return FeedbackThread(
-        bot_comment_id='bot1',
-        bot_comment_permalink='https://reddit.com/r/pics/comments/abc/title/bot1/',
-        bot_comment_created_utc=1_600_000_000.0,
+        question_created_utc=1_600_000_000.0,
         subreddit='pics',
         submission_title='A <b>title</b>',
+        submission_author='poster',
         submission_permalink='https://reddit.com/r/pics/comments/abc/title/',
-        trigger_author='someone',
-        trigger_body=trigger_body,
-        trigger_permalink='https://reddit.com/r/pics/comments/abc/title/trig/',
-        replies=[
-            FeedbackReply(reply_id, 'replier', f'reply {reply_id} </script> <i>x</i>', 2, 1_600_000_100.0,
-                          f'https://reddit.com/r/pics/comments/abc/title/{reply_id}/')
-            for reply_id in reply_ids
-        ],
+        submission_text='',
+        submission_url='https://i.redd.it/x.png',
+        tree=_node('orig', 'I crossposted this', author=BOT_NAME, is_bot=True, children=[trigger]),
     )
 
 
@@ -110,51 +127,98 @@ def test_inbox_parent_by_someone_else_is_ignored():
     assert find_via_inbox(reddit_instance, BOT_NAME, message_markers()) == {}
 
 
-@pytest.mark.unit
-def test_collect_new_replies_skips_covered_deleted_and_bot_replies():
-    bot_comment = _comment('bot1', CURRENT_TEXT)
-    bot_comment.replies = [
-        _comment('new2', 'later', author='b', parent_id='t1_bot1', created_utc=200.0),
-        _comment('new1', 'it was a repost', author='a', parent_id='t1_bot1', created_utc=100.0),
-        _comment('old', 'seen already', author='c', parent_id='t1_bot1'),
-        _comment('gone', '[deleted]', author=None, parent_id='t1_bot1'),
-        _comment('self', 'bot talking', author=BOT_NAME, parent_id='t1_bot1'),
-    ]
-
-    replies = collect_new_replies(bot_comment, BOT_NAME, covered_reply_ids={'old'})
-
-    assert [reply.reply_id for reply in replies] == ['new1', 'new2']
-    assert replies[0].permalink == 'https://reddit.com/r/pics/comments/abc/title/new1/'
-    bot_comment.refresh.assert_called_once_with()
-
-
-def _more_comments(parent_id, loaded):
+def _more_comments(loaded):
     more = MagicMock(spec=praw.models.MoreComments)
-    more.parent_id = parent_id
     more.comments.return_value = loaded
     return more
 
 
 @pytest.mark.unit
-def test_direct_replies_behind_load_more_are_loaded_without_touching_the_tree():
-    bot_comment = _comment('bot1', CURRENT_TEXT)
-    nested_more = _more_comments('t1_r1', [])
-    more = _more_comments('t1_bot1', [
-        _comment('r2', 'hidden reply', author='a', parent_id='t1_bot1'),
-        _comment('deep', 'reply to a reply', author='b', parent_id='t1_r1'),
-        _comment('r1', 'duplicate of a loaded reply', author='a', parent_id='t1_bot1'),
+def test_written_feedback_needs_more_than_a_sentiment_phrase():
+    assert not is_written_feedback(_comment('a', 'Bad bot!', author='user'))
+    assert not is_written_feedback(_comment('b', 'good bot', author='user'))
+    assert not is_written_feedback(_comment('c', '[deleted]', author=None))
+    assert not is_written_feedback(_comment('d', 'I am explaining things', author='same_post_bot'))
+    assert is_written_feedback(_comment('e', 'bad bot, this is a repost of a repost', author='user'))
+
+
+@pytest.mark.unit
+def test_subtree_loads_load_more_without_touching_the_tree_and_drops_duplicates():
+    r1 = _comment('r1', 'loaded reply', author='a', parent_id='t1_q1')
+    question = _comment('q1', CURRENT_TEXT, parent_id='t1_trig', replies=[r1])
+    more = _more_comments([
+        _comment('r2', 'hidden reply', author='b', parent_id='t1_q1'),
+        _comment('r1', 'duplicate', author='a', parent_id='t1_q1'),
     ])
-    bot_comment.replies = [
-        _comment('r1', 'loaded reply', author='a', parent_id='t1_bot1'),
-        nested_more,
-        more,
-    ]
+    trigger = _comment('trig', 'bad bot', author='user', replies=[question, more])
 
-    replies = list(iter_direct_replies(bot_comment))
+    comments = collect_subtree(trigger)
 
-    assert [reply.id for reply in replies] == ['r1', 'r2']
+    assert sorted(comment.id for comment in comments) == ['q1', 'r1', 'r2']
     more.comments.assert_called_once_with(update=False)
-    nested_more.comments.assert_not_called()
+
+
+def _exchange(question_replies):
+    question = _comment('q1', CURRENT_TEXT, parent_id='t1_trig', created_utc=110.0, replies=question_replies)
+    sibling = _comment('s1', 'lol', author='lurker', parent_id='t1_trig', created_utc=105.0)
+    trigger = _comment('trig', 'bad bot', author='user_a', parent_id='t1_orig', created_utc=100.0,
+                       replies=[question, sibling])
+    trigger.submission.subreddit.display_name = 'pics'
+    trigger.submission.title = 'A post'
+    trigger.submission.author = 'poster'
+    trigger.submission.permalink = '/r/pics/comments/abc/a_post/'
+    trigger.submission.is_self = True
+    trigger.submission.selftext = 'post text'
+    reddit_instance = MagicMock()
+    reddit_instance.comment.return_value = _comment('orig', 'I crossposted this', parent_id='t3_abc', created_utc=50.0)
+    return reddit_instance, trigger, question
+
+
+@pytest.mark.unit
+def test_thread_with_written_feedback_is_shown_as_a_full_tree():
+    reply_b = _comment('b1', 'It was a repost', author='user_b', parent_id='t1_q1', created_utc=200.0)
+    reply_c = _comment('c1', 'Wrong sub entirely', author='user_c', parent_id='t1_q1', created_utc=300.0)
+    bare = _comment('d1', 'bad bot', author='user_d', parent_id='t1_q1', created_utc=150.0)
+    reddit_instance, trigger, question = _exchange([reply_c, bare, reply_b])
+
+    thread = load_thread(reddit_instance, trigger, question, covered_ids={'c1'})
+
+    trigger.refresh.assert_called_once_with()
+    reddit_instance.comment.assert_called_once_with('orig')
+    assert thread.tree.comment_id == 'orig'
+    trigger_node = thread.tree.children[0]
+    assert [child.comment_id for child in trigger_node.children] == ['s1', 'q1']
+    question_node = trigger_node.children[1]
+    assert [child.comment_id for child in question_node.children] == ['d1', 'b1', 'c1']
+    assert sorted(thread.feedback_ids()) == ['b1', 'c1']
+    assert thread.new_feedback_ids() == ['b1']
+    assert thread.submission_text == 'post text'
+
+
+@pytest.mark.unit
+def test_thread_with_only_bare_sentiment_replies_is_skipped():
+    bare = _comment('d1', 'Bad bot.', author='user_d', parent_id='t1_q1')
+    reddit_instance, trigger, question = _exchange([bare])
+
+    assert load_thread(reddit_instance, trigger, question, covered_ids=set()) is None
+
+
+@pytest.mark.unit
+def test_thread_whose_feedback_was_all_reported_is_skipped():
+    reply_b = _comment('b1', 'It was a repost', author='user_b', parent_id='t1_q1')
+    reddit_instance, trigger, question = _exchange([reply_b])
+
+    assert load_thread(reddit_instance, trigger, question, covered_ids={'b1'}) is None
+
+
+@pytest.mark.unit
+def test_detailed_trigger_counts_as_feedback():
+    reddit_instance, trigger, question = _exchange([])
+    trigger.body = 'bad bot, the target sub bans crossposts'
+
+    thread = load_thread(reddit_instance, trigger, question, covered_ids=set())
+
+    assert thread.new_feedback_ids() == ['trig']
 
 
 @pytest.mark.unit
@@ -169,12 +233,12 @@ def test_report_round_trip_records_covered_ids_and_links_earlier_reports(tmp_pat
     previous = read_previous_reports(reports_dir)
 
     assert [report.file_name for report in previous] == ['negative-feedback-20261001-100000.html']
-    assert previous[0].reply_ids == ['r1', 'r2']
+    assert previous[0].feedback_ids == ['r1', 'r2']
     assert previous[0].generated_at == '2026-10-01 10:00 UTC'
 
     second_html = render_report([_thread(['r3'])], previous, '2026-10-15 10:00 UTC', [BOT_NAME])
     assert 'href="negative-feedback-20261001-100000.html"' in second_html
-    assert '2 responses' in second_html
+    assert '2 feedback comments' in second_html
 
 
 @pytest.mark.unit
@@ -191,7 +255,7 @@ def test_report_escapes_reddit_text():
 def test_empty_report_says_so_and_mentions_first_report():
     report_html = render_report([], [], '2026-10-15 10:00 UTC', [BOT_NAME])
 
-    assert 'No new responses' in report_html
+    assert 'No new written feedback' in report_html
     assert 'This is the first report.' in report_html
 
 
@@ -236,3 +300,22 @@ def test_report_file_url_is_an_absolute_file_url(tmp_path):
 
     assert url.startswith('file:///')
     assert url.endswith('/negative-feedback-20261015-083005.html')
+
+
+@pytest.mark.unit
+def test_reports_from_before_the_tree_layout_still_count_as_covered(tmp_path):
+    old_report = '<script type="application/json" id="racb-report-data">{"generated_at": "x", "reply_ids": ["r1"]}</script>'
+    with open(tmp_path / 'negative-feedback-20261001-100000.html', 'w', encoding='utf-8') as f:
+        f.write(old_report)
+
+    assert read_previous_reports(str(tmp_path))[0].feedback_ids == ['r1']
+
+
+@pytest.mark.unit
+def test_report_marks_new_feedback_and_includes_the_whole_exchange():
+    report_html = render_report([_thread(['r1'])], [], '2026-10-15 10:00 UTC', [BOT_NAME])
+
+    assert 'new feedback' in report_html
+    assert 'u/AutoCrosspostBot' in report_html
+    assert 'I crossposted this' in report_html
+    assert report_html.count('class="tree') == 4  # post > bot comment > bad bot > question > feedback
