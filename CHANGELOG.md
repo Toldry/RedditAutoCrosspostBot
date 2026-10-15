@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Database Web Viewer:** an optional `pgweb` service (Docker Compose profile `viewer`) shows the database in a browser. It is read-only, asks for the password set in `PGWEB_AUTH_PASS` (and refuses to start without one), and listens on the VM's `127.0.0.1:8081` only, so it is reached through an SSH tunnel over IAP. Automatic deploys neither start nor stop it. See `docs/db-viewer.md`.
+
 ### Changed
 - **Compiled Catalogs Are No Longer Committed:** the gettext `.mo` files are git-ignored and built from the `.po` sources instead: the Dockerfile compiles them with Babel in a throwaway environment (Babel moves to a new `i18n` dependency group and stays out of the image), and `tests/conftest.py` compiles them before every test run. Editing a `.po` file can no longer leave a stale `.mo` behind, which is what turned master red after the "github -> GitHub" footer change.
 - **Missing Catalogs Fail Loudly:** a locale without a compiled `.mo` used to fall back silently to an empty catalog, so the bot would have posted raw message keys such as `POST_SUFFIX_TEXT`. Loading it now raises `CatalogNotCompiledError`, and the bot checks every catalog at startup and exits if one is missing.

@@ -63,6 +63,11 @@ docker compose logs -f bot
 docker compose down
 ```
 
+### 5. Browse the Database (Optional)
+A password-protected, read-only web viewer ([pgweb](https://github.com/sosedoff/pgweb)) can run next to the bot.
+It is never exposed to the internet; you open it through an SSH tunnel. See
+[`docs/db-viewer.md`](./docs/db-viewer.md).
+
 ---
 
 ## Local Development (Without Docker)

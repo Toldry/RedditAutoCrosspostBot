@@ -186,6 +186,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`scripts/authorize_deploy_key.sh`](./scripts/authorize_deploy_key.sh) | Runs **on the VM** once: adds the CI deploy key to `~/.ssh/authorized_keys` as a forced command for `redeploy.sh` and prints the host key. |
 | [`scripts/setup_auto_deploy.sh`](./scripts/setup_auto_deploy.sh) | One-time setup of automatic deployment, run in Cloud Shell: service account, Workload Identity Federation, IAP firewall rule, deploy key, GitHub variables. See [`docs/auto-deploy.md`](./docs/auto-deploy.md). |
 | [`docs/auto-deploy.md`](./docs/auto-deploy.md) | How the CI `deploy` job works, its security model, setup, rollback and troubleshooting. |
+| [`docs/db-viewer.md`](./docs/db-viewer.md) | How to start the optional read-only `pgweb` database viewer on the VM and open it through an SSH tunnel. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
 | [`tests/unit/`](./tests/unit/) | 236 mocked unit tests (`@pytest.mark.unit`), one file per module. |
@@ -198,7 +199,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
 | [`deploy/instance-flags.yaml`](./deploy/instance-flags.yaml) | Declarative Google Cloud CLI flags file for provisioning the Always Free e2-micro instance. |
 | [`Dockerfile`](./Dockerfile) | Lightweight Python 3.11 container image definition. |
-| [`docker-compose.yml`](./docker-compose.yml) | Multi-container stack definition (PostgreSQL 15 + Python bot worker). |
+| [`docker-compose.yml`](./docker-compose.yml) | Multi-container stack definition (PostgreSQL 15 + Python bot worker, plus the optional `pgweb` viewer in the `viewer` profile, bound to `127.0.0.1:8081`). |
 | [`.bumpversion.toml`](./.bumpversion.toml) | Configuration for `bump-my-version`, which the CI `release` job runs. |
 | [`.gitignore`](./.gitignore) | Ignores **all dotfiles** (`.*`) except an explicit allowlist. See section 8. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Release history following Keep a Changelog. |
@@ -290,6 +291,8 @@ cleanup job **still deletes** submissions. Use `DRY_RUN=True` for a fully read-o
    ```bash
    docker compose exec db psql -U racb_user -d racb -c "SELECT * FROM v_scraped_comments ORDER BY scraped_time DESC LIMIT 20;"
    ```
+   For a read-only view in the browser, start `pgweb` (`docker compose --profile viewer up -d pgweb`, needs
+   `PGWEB_AUTH_PASS` in `.env`) and tunnel to port 8081; see [`docs/db-viewer.md`](./docs/db-viewer.md).
 
 ### Setup & Local Execution (Without Docker)
 1. **Install Dependencies** (needs [uv](https://docs.astral.sh/uv/getting-started/installation/)):
