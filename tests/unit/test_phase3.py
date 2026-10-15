@@ -88,13 +88,15 @@ def test_reply_to_crosspost_formats_waiting_period(make_mock_comment):
 
 @pytest.mark.unit
 @pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
-def test_reply_to_crosspost_omits_waiting_and_downvote_notes(make_mock_comment, target_subreddit):
+def test_reply_to_crosspost_asks_for_bad_bot_feedback_instead_of_downvotes(make_mock_comment, target_subreddit):
     comment = make_mock_comment(subreddit='test_source')
     cross_post = MagicMock()
     phase3.reply_to_crosspost(comment, cross_post, target_subreddit)
-    reply_text = cross_post.reply.call_args.args[0].lower()
-    for removed_phrase in ['waited', 'arbitrar', 'downvote', 'gewartet', 'esperé', 'attendu', 'חיכיתי', 'באקראי']:
-        assert removed_phrase not in reply_text
+    reply_text = cross_post.reply.call_args.args[0]
+    assert 'downvote' not in reply_text.lower()
+    assert 'bad bot' in reply_text.lower()  # the inbox only recognizes the English phrase
+    assert '^3' in reply_text
+    assert '^(3 - ' in reply_text
 
 
 @pytest.mark.unit

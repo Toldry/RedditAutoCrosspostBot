@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Crosspost Reply Notes:** the crosspost reply again says the bot waited (the Phase 3 waiting period)^3 before crossposting, with the footnote "This value was chosen arbitrarily", and now asks readers who think the crosspost is a mistake to reply "Bad bot" with an explanation. The phrase stays English in every locale because the inbox only recognizes the English one.
+
 ## [2.9.1] - 2026-10-15
 
 ### Fixed
