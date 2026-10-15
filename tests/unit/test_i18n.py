@@ -230,3 +230,11 @@ def test_format_duration_in_days_uses_plural_forms():
     # Hebrew has a dual form for two
     assert i18n.format_duration_in_days(86400, 'ani_bm') == 'יום אחד'
     assert i18n.format_duration_in_days(2 * 86400, 'ani_bm') == 'יומיים'
+
+
+@pytest.mark.unit
+def test_language_with_all_needs_every_key_translated():
+    assert i18n.language_with_all(['NONEXISTENT_SUBREDDIT', 'MAYBE_TYPO'], 'ich_iel') == 'de'
+    # THATS_WHERE_WE_ARE has no Spanish translation, so the whole set falls back to English
+    assert i18n.language_with_all(['POST_SUFFIX_TEXT', 'THATS_WHERE_WE_ARE'], 'yo_elvr') == 'en'
+    assert i18n.language_with_all(['NONEXISTENT_SUBREDDIT'], 'pics') == 'en'

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Mixed-language "subreddit doesn't exist" replies:** German subreddits got "Den Subreddit r/… gibt es nicht. Maybe there's a typo?" because `MAYBE_TYPO` and `ALTERNATE_SUBS_SUGGESTION` had no German translation and each sentence fell back to English on its own. Both are now translated, the German creation prompt says "ihn" (der Subreddit) instead of "es", and the reply now picks one language for all of its sentences and its footer, switching entirely to English when any piece is untranslated.
+
 ## [2.4.4] - 2026-10-15
 
 ### Fixed

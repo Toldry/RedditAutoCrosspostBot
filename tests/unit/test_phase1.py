@@ -3,6 +3,7 @@
 from unittest.mock import patch, MagicMock
 import prawcore
 import pytest
+from racb import i18n
 from racb.phases import phase1
 
 
@@ -152,3 +153,58 @@ def test_nonexistent_subreddit_reply_suffix_uses_source_language(make_mock_comme
     reply_text = mock_reply.call_args.args[1]
     assert 'Dieser Kommentar wurde von einem Bot geschrieben' in reply_text
     assert 'THIS COMMENT WAS WRITTEN BY A BOT' not in reply_text
+
+
+def nonexistent_subreddit_reply(make_mock_comment, subreddit, matches=()):
+    comment = make_mock_comment(body='r/bilze', subreddit=subreddit)
+    with patch('racb.phases.phase1.sub_search.get_matches', return_value=list(matches)):
+        with patch('racb.phases.phase1.reply_as_bot') as mock_reply:
+            phase1.reply_to_nonexistent_target_subreddit_comment(comment, 'bilze')
+    return mock_reply.call_args.args[1]
+
+
+@pytest.mark.unit
+def test_german_nonexistent_subreddit_reply_is_all_german(make_mock_comment):
+    # Regression: the German reply used to contain the English "Maybe there's a typo?"
+    reply_text = nonexistent_subreddit_reply(make_mock_comment, 'ich_iel')
+    assert reply_text.startswith('Den Subreddit r/bilze gibt es nicht. Vielleicht ist da ein Tippfehler?')
+    assert 'typo' not in reply_text
+
+
+@pytest.mark.unit
+def test_partly_translated_nonexistent_subreddit_reply_falls_back_to_english_as_a_whole(make_mock_comment):
+    real_lookup = i18n.lookup_in_languages
+
+    def lookup_without_german_typo(string_key, languages, count=None):
+        if string_key == 'MAYBE_TYPO':
+            languages = [language for language in languages if language != 'de']
+            if not languages:
+                raise KeyError(string_key)
+        return real_lookup(string_key, languages, count)
+
+    with patch('racb.i18n.lookup_in_languages', side_effect=lookup_without_german_typo):
+        reply_text = nonexistent_subreddit_reply(make_mock_comment, 'ich_iel')
+    assert reply_text.startswith("The subreddit r/bilze does not exist. Maybe there's a typo?")
+    assert 'gibt es nicht' not in reply_text
+    assert 'von einem Bot geschrieben' not in reply_text
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('subreddit', ['pics', 'ich_iel', 'yo_elvr', 'moi_dlvv', 'ani_bm', 'totallynotrobots'])
+@pytest.mark.parametrize('has_matches', [False, True])
+def test_nonexistent_subreddit_reply_uses_one_language(make_mock_comment, subreddit, has_matches):
+    matches = []
+    if has_matches:
+        matches = [MagicMock()]
+    with patch('racb.phases.phase1.get_subreddit_suggestion_list_line', return_value='* r/bilder'):
+        reply_text = nonexistent_subreddit_reply(make_mock_comment, subreddit, matches)
+    english_pieces = ['does not exist', "Maybe there's a typo?", 'Did you mean?', 'creating a new subreddit']
+    language = i18n.language_with_all(
+        ['NONEXISTENT_SUBREDDIT', 'MAYBE_TYPO', 'ALTERNATE_SUBS_SUGGESTION',
+         'PROMPT_NONEXISTENT_SUBREDDIT_CREATION', i18n.SUFFIX_KEY],
+        subreddit,
+    )
+    if language == 'en':
+        assert reply_text.startswith('The subreddit r/bilze does not exist.')
+    else:
+        assert not any(piece in reply_text for piece in english_pieces), reply_text
