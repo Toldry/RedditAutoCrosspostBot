@@ -43,6 +43,14 @@ main() {
     || die "the checkout in $repo_dir must be on branch master"
   [[ -z "$(git status --porcelain --untracked-files=no)" ]] \
     || die "tracked files were edited on the VM; commit or discard them first (see git status)"
+  # git reset replaces a file by deleting and recreating it, which needs write access to its directory.
+  # Check up front, so a directory owned by someone else (e.g. after a `sudo git pull`) cannot leave
+  # the checkout half-updated.
+  local unwritable_dir
+  unwritable_dir="$(find . -type d ! -writable -print -quit)"
+  [[ -z $unwritable_dir ]] \
+    || die "$(id -un) cannot write to $repo_dir/${unwritable_dir#./}; fix the ownership with:" \
+      "sudo chown -R $(id -un): $repo_dir"
 
   git fetch --quiet origin master
   git merge-base --is-ancestor HEAD origin/master \

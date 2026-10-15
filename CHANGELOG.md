@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Half-Applied Deploys:** `scripts/redeploy.sh` now checks that it can write to every directory of the checkout before resetting it, and stops with the `chown` command to run if not. A directory owned by another user (for example after a `sudo git pull`) used to make `git reset --hard` fail partway, leaving the checkout half-updated.
+
 ## [2.4.8] - 2026-10-15
 
 ### Changed
