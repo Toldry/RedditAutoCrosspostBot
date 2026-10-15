@@ -251,11 +251,13 @@ def make_post(post_id, url, created_utc, preview_resolutions=None, is_video=Fals
     return post
 
 
-def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None, source=None):
+def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None, source=None, top_posts=None,
+                 top_limit=0):
     """Runs scan_subreddit_for_duplicates over a fake "new" listing; every image is plain green unless given."""
     source = source or make_post('source', 'https://i.redd.it/source.png', created_utc=0)
     mock_reddit = MagicMock()
     mock_reddit.subreddit.return_value.new.return_value = posts[:limit]
+    mock_reddit.subreddit.return_value.top.return_value = (top_posts or [])[:top_limit]
     image_bytes_by_url = image_bytes_by_url or {}
     downloaded_urls = []
 
@@ -265,7 +267,9 @@ def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None, 
 
     with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit), \
             patch('requests.get', side_effect=mock_requests_get):
-        scan = duplicate_detector.scan_subreddit_for_duplicates(source, 'target_sub', posted_after=posted_after, limit=limit)
+        scan = duplicate_detector.scan_subreddit_for_duplicates(
+            source, 'target_sub', posted_after=posted_after, limit=limit, top_limit=top_limit,
+        )
     return scan, downloaded_urls
 
 
@@ -380,3 +384,28 @@ def test_video_scan_compares_preview_frames_of_videos_only():
     assert scan.posts_checked == 2
     assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['copy']
     assert 'https://i.redd.it/image.png' not in downloaded_urls
+
+
+@pytest.mark.unit
+def test_scan_also_compares_the_top_posts_of_all_time():
+    newest = [make_post(f'new{i}', f'https://i.redd.it/new{i}.png', created_utc=1000 - i) for i in range(3)]
+    old_famous = make_post('famous', 'https://i.redd.it/famous.png', created_utc=5)
+    top_posts = [old_famous, newest[0]]  # The newest post is also a top post; it must be compared once
+    scan, downloaded_urls = scan_listing(
+        newest, limit=3, top_posts=top_posts, top_limit=100,
+        image_bytes_by_url={'https://i.redd.it/source.png': png_bytes(load_sample_image()),
+                            'https://i.redd.it/famous.png': png_bytes(load_sample_image())},
+    )
+    assert scan.posts_checked == 4
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['famous']
+    assert downloaded_urls.count('https://i.redd.it/new0.png') == 1
+    # The top posts say nothing about how far back the newest posts reach
+    assert scan.complete is False
+    assert scan.oldest_post_utc == 998
+
+
+@pytest.mark.unit
+def test_scan_reads_no_top_posts_by_default():
+    old_famous = make_post('famous', 'https://i.redd.it/famous.png', created_utc=5)
+    scan, _ = scan_listing([], top_posts=[old_famous], top_limit=0)
+    assert scan.posts_checked == 0

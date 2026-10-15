@@ -96,11 +96,12 @@ def check_pattern(comment):
 
 
 def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
-                                media_scan_limit=duplicate_detector.DEFAULT_SCAN_LIMIT):
+                                media_scan_limit=duplicate_detector.QUICK_SCAN_NEWEST_LIMIT,
+                                media_scan_top_limit=duplicate_detector.QUICK_SCAN_TOP_LIMIT):
     """Looks for posts in `subreddit` that link to the same URL or, for an image or video post, look the same.
 
     The picture comparison reads at most `media_scan_limit` of the newest posts, stopping at the first one older
-    than `media_scan_since` (a Unix timestamp). Its outcome is kept in `media_scan` (None if nothing was
+    than `media_scan_since` (a Unix timestamp), plus the `media_scan_top_limit` top posts of all time. Its outcome is kept in `media_scan` (None if nothing was
     compared).
     """
     class Result:
@@ -153,6 +154,7 @@ def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
 
     result.media_scan = duplicate_detector.scan_subreddit_for_duplicates(
         comment.submission, subreddit, posted_after=media_scan_since, limit=media_scan_limit,
+        top_limit=media_scan_top_limit,
     )
     if result.media_scan and result.media_scan.duplicates:
         result.posts_found = True

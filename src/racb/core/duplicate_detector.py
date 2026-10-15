@@ -27,6 +27,10 @@ compares the image (or video) with every image (or video) post it meets, stoppin
 than `posted_after`. Reddit's listings end after about REDDIT_LISTING_LIMIT posts, so in a busy subreddit the
 scan cannot reach that far back; the returned `RepostScan` says whether it did (`complete`).
 
+The quick check that runs when a comment is first seen (and answers through u/same_post_bot) reads only the
+QUICK_SCAN_NEWEST_LIMIT newest posts, plus the QUICK_SCAN_TOP_LIMIT top posts of all time (`top_limit`),
+because reposts of a subreddit's most famous posts are common and those are often years old.
+
 To keep a scan cheap on a small VM, posts are compared through the small preview images Reddit generates
 (`preview_image_url`), and several previews are downloaded at a time.
 """
@@ -65,7 +69,9 @@ REGION_PIXELS = 32
 DEFAULT_REGION_HASH_THRESHOLD = 10  # Maximum Hamming distance of any single grid cell
 
 # --- Which posts are compared -----------------------------------------------------------------------
-DEFAULT_SCAN_LIMIT = 50  # Posts read by the quick check made when a comment is first seen
+QUICK_SCAN_NEWEST_LIMIT = 100  # Newest posts read by the quick check made when a comment is first seen
+QUICK_SCAN_TOP_LIMIT = 100  # Top posts of all time the quick check also reads
+DEFAULT_SCAN_LIMIT = QUICK_SCAN_NEWEST_LIMIT
 REDDIT_LISTING_LIMIT = 1000  # Reddit stops listing a subreddit's posts after about this many
 
 # --- Downloading --------------------------------------------------------------------------------------
@@ -233,6 +239,11 @@ def list_newest_posts(subreddit_name, limit):
     return posts
 
 
+def list_top_posts(subreddit_name, limit):
+    """Returns up to `limit` of the subreddit's top posts of all time, best first."""
+    return list(get_reddit_instance().subreddit(subreddit_name).top(time_filter='all', limit=limit))
+
+
 def fingerprint_all(urls):
     """Fingerprints several images, downloading up to MAX_PARALLEL_DOWNLOADS at a time."""
     with ThreadPoolExecutor(max_workers=MAX_PARALLEL_DOWNLOADS) as executor:
@@ -240,11 +251,12 @@ def fingerprint_all(urls):
 
 
 def scan_subreddit_for_duplicates(submission, subreddit_name, posted_after=None, limit=DEFAULT_SCAN_LIMIT,
-                             hash_threshold=DEFAULT_HASH_THRESHOLD):
+                                  top_limit=0, hash_threshold=DEFAULT_HASH_THRESHOLD):
     """Compares an image (or video) post with the newest image (or video) posts of a subreddit.
 
     Reads at most `limit` posts, newest first, and stops at the first one created before `posted_after`
-    (a Unix timestamp). Returns a RepostScan, or None if `submission` is neither an image nor a video post, or
+    (a Unix timestamp). With `top_limit`, also compares the subreddit's `top_limit` top posts of all time;
+    they do not change `complete` or `oldest_post_utc`, which describe the newest posts only. Returns a RepostScan, or None if `submission` is neither an image nor a video post, or
     its picture cannot be read, in which case nothing was compared.
     """
     media = media_kind(submission)
@@ -274,6 +286,15 @@ def scan_subreddit_for_duplicates(submission, subreddit_name, posted_after=None,
     else:
         # The listing ended without reaching an older post: complete only if Reddit had no more to give
         scan.complete = len(posts) < limit
+
+    if top_limit:
+        try:
+            top_posts = list_top_posts(subreddit_name, top_limit)
+        except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+            logger.warning(f'Could not list the top posts of r/{subreddit_name}: {e!r}')
+            top_posts = []
+        seen_ids = {post.id for post in candidates}
+        candidates += [post for post in top_posts if media_kind(post) == media and post.id not in seen_ids]
 
     fingerprints = fingerprint_all([preview_image_url(post) for post in candidates])
     for post, fingerprint in zip(candidates, fingerprints):

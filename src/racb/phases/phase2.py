@@ -127,6 +127,7 @@ def run_filters(comment_entry, comment=None, full_media_scan=False):
             target_subreddit,
             media_scan_since=getattr(comment, 'created_utc', None),
             media_scan_limit=duplicate_detector.REDDIT_LISTING_LIMIT,
+            media_scan_top_limit=0,  # The reply counts posts from the comment's date onwards only
         )
     else:
         gpwsc_result = phase1.get_posts_with_same_content(comment, target_subreddit)

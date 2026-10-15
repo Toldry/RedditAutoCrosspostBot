@@ -91,7 +91,7 @@ flowchart TD
     BL -->|Yes| X4["ignore"]
     BL -->|No| SS{"target == source\n(case-insensitive)?"}
     SS -->|Yes| A1["same_subreddit_bot reply"]
-    SS -->|No| DUP["get_posts_with_same_content()\n1 search call + up to 50-post\nimage-hash scan"]
+    SS -->|No| DUP["get_posts_with_same_content()\n1 search call + image/video-hash scan\nof 100 newest + 100 all-time top posts"]
     DUP -->|posts_found| A2["same_post_bot reply"]
     DUP -->|SUBREDDIT_DOES_NOT_EXIST| A3["sub_doesnt_exist_bot reply"]
     DUP -->|otherwise| TL{"Top-level comment?"}
@@ -123,7 +123,9 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     - Target subreddit availability and duplicate check.
   - *Accuracy note:* only the **comment fetch** is batched. The duplicate check
     (`phase1.get_posts_with_same_content`) still costs one search request per row, plus a lazy submission
-    fetch and a scan of up to 50 target posts for image submissions. The real saving is therefore well
+    fetch and, for image and video submissions, a scan of the target's 100 newest and 100 all-time top posts
+    (`QUICK_SCAN_NEWEST_LIMIT`, `QUICK_SCAN_TOP_LIMIT`; fingerprints are cached, so the rarely changing top posts
+    are mostly downloaded once). The real saving is therefore well
     under 99%.
   - If the batch `info()` call throws, it falls back to fetching each comment individually (`run_filters(ce, comment=None)`).
   - Prunes failing entries from DB to conserve PostgreSQL table storage.
@@ -133,7 +135,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     function does **not** filter on `phase2_checked`, so Phase 3 depends on Phase 2 having pruned rows first.
   - Re-runs validation checks (`phase2.run_filters(..., full_media_scan=True)`, which fetches each comment
     individually). For an image or video post, the full scan compares it with **every post of the same kind
-    the target got since the source comment was written**, not just the 50 newest: `duplicate_detector.scan_subreddit_for_duplicates`
+    the target got since the source comment was written**, not just the 100 newest (it skips the all-time top posts, because the reply counts posts by date): `duplicate_detector.scan_subreddit_for_duplicates`
     walks the target's "new" listing back to the comment's `created_utc`, or until Reddit's listing ends
     (about 1000 posts, `REDDIT_LISTING_LIMIT`). It compares Reddit's small preview images (`PREVIEW_MIN_WIDTH`,
     320 px), 8 downloads at a time, so even a full scan stays cheap, but it still runs on the stream loop.
@@ -210,7 +212,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`docs/db-viewer.md`](./docs/db-viewer.md) | How to start the optional read-only `pgweb` database viewer on the VM and open it through an SSH tunnel. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1641 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, waiting period and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/unit/`](./tests/unit/) | 1645 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, waiting period and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -569,7 +571,7 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 | :--- | :--- |
 | Duplicate crossposts | Before every crosspost, Phase 3 re-runs `get_posts_with_same_content()`. That is a Reddit search for the submission URL in the target (subject to search-index lag of minutes) plus a scan of every image (or video) post the target got since the source comment was written (a live listing, so it catches a crosspost made seconds earlier, but only for **image and video** posts, videos only by preview frame, and in busy subreddits only as far back as Reddit's ~1000-post listing reaches). The remaining gap is link and text posts, when two rows for the same submission and target are handled in one Phase 3 run, or after a crash between `crosspost()` and the row delete. The owner considers this acceptable, and Reddit may also reject duplicates server-side (unverified). An `ALREADY_SUB`-style rejection is not in `familiar_error_types`, so it would be logged as unexpected. If the reply fails after a successful crosspost, the crosspost is reported as failed. |
 | Negative-score cleanup | Deletes `AutoCrosspostBot` submissions with `score < 0`. The owner reports that submission scores can go negative; this was not independently confirmed. |
-| Single-threaded Phase 1 | The duplicate search, up to 50 image downloads (6 s timeout each) and the subreddit suggestions all run on the stream loop. A slow call delays reading `r/all`. The heartbeat's "scanned" count is the throughput signal. Phase 3's full image or video scan (up to ~1000 preview downloads, 8 at a time) also runs on that loop, once per image crosspost. |
+| Single-threaded Phase 1 | The duplicate search, up to 200 preview downloads (100 newest and 100 all-time top posts, 8 at a time, 6 s timeout each, cached) and the subreddit suggestions all run on the stream loop. A slow call delays reading `r/all`. The heartbeat's "scanned" count is the throughput signal. Phase 3's full image or video scan (up to ~1000 preview downloads, 8 at a time) also runs on that loop, once per image crosspost. |
 | Rotated reposts | Not detected as duplicates (see the image-matching note in section 5). |
 | Edited video reposts | Videos are compared by their preview frame only. A trimmed, re-cut or re-encoded copy usually has a different preview frame and is missed. |
 | Pre-v2.3 rows | Have `target_subreddit = NULL`, so the bait-and-switch check is skipped for them until they age out (at most one Phase 3 waiting period after upgrading). |
