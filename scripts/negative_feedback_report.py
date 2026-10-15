@@ -179,12 +179,34 @@ def find_via_inbox(reddit_instance, bot_name, markers, limit=None):
     return found
 
 
+def iter_direct_replies(bot_comment):
+    """Yields every direct reply to `bot_comment`, loading the ones hidden behind "load more" links.
+
+    `CommentForest.replace_more()` is avoided on purpose: on a refreshed comment it raises
+    `DuplicateReplaceException` when a "load more" link returns comments the tree already holds. Only the
+    "load more" links among the direct replies are expanded here, without writing into the tree.
+    """
+    seen_ids = set()
+    pending = list(bot_comment.replies)
+    while pending:
+        item = pending.pop(0)
+        if item.parent_id != bot_comment.fullname:
+            continue
+        if isinstance(item, praw.models.MoreComments):
+            try:
+                pending.extend(item.comments(update=False))
+            except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+                logger.warning(f'Could not load more replies to {reddit.full_url(bot_comment.permalink)}: {e!r}')
+        elif item.id not in seen_ids:
+            seen_ids.add(item.id)
+            yield item
+
+
 def collect_new_replies(bot_comment, bot_name, covered_reply_ids):
     """Returns the direct replies to `bot_comment` that are not by the bot and not covered yet."""
     bot_comment.refresh()
-    bot_comment.replies.replace_more(limit=None)
     replies = []
-    for reply in bot_comment.replies:
+    for reply in iter_direct_replies(bot_comment):
         if reply.id in covered_reply_ids or is_by(reply, bot_name):
             continue
         if (reply.body or '').strip() in DELETED_BODIES:

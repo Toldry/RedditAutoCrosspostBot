@@ -3,6 +3,7 @@
 import os
 from unittest.mock import MagicMock
 
+import praw
 import pytest
 
 from scripts.negative_feedback_report import (
@@ -12,6 +13,7 @@ from scripts.negative_feedback_report import (
     find_in_comment_history,
     find_via_inbox,
     is_negative_sentiment_comment,
+    iter_direct_replies,
     message_markers,
     read_previous_reports,
     render_report,
@@ -110,20 +112,48 @@ def test_inbox_parent_by_someone_else_is_ignored():
 @pytest.mark.unit
 def test_collect_new_replies_skips_covered_deleted_and_bot_replies():
     bot_comment = _comment('bot1', CURRENT_TEXT)
-    bot_comment.replies = MagicMock()
-    bot_comment.replies.__iter__.return_value = iter([
-        _comment('new2', 'later', author='b', created_utc=200.0),
-        _comment('new1', 'it was a repost', author='a', created_utc=100.0),
-        _comment('old', 'seen already', author='c'),
-        _comment('gone', '[deleted]', author=None),
-        _comment('self', 'bot talking', author=BOT_NAME),
-    ])
+    bot_comment.replies = [
+        _comment('new2', 'later', author='b', parent_id='t1_bot1', created_utc=200.0),
+        _comment('new1', 'it was a repost', author='a', parent_id='t1_bot1', created_utc=100.0),
+        _comment('old', 'seen already', author='c', parent_id='t1_bot1'),
+        _comment('gone', '[deleted]', author=None, parent_id='t1_bot1'),
+        _comment('self', 'bot talking', author=BOT_NAME, parent_id='t1_bot1'),
+    ]
 
     replies = collect_new_replies(bot_comment, BOT_NAME, covered_reply_ids={'old'})
 
     assert [reply.reply_id for reply in replies] == ['new1', 'new2']
     assert replies[0].permalink == 'https://reddit.com/r/pics/comments/abc/title/new1/'
-    bot_comment.replies.replace_more.assert_called_once_with(limit=None)
+    bot_comment.refresh.assert_called_once_with()
+
+
+def _more_comments(parent_id, loaded):
+    more = MagicMock(spec=praw.models.MoreComments)
+    more.parent_id = parent_id
+    more.comments.return_value = loaded
+    return more
+
+
+@pytest.mark.unit
+def test_direct_replies_behind_load_more_are_loaded_without_touching_the_tree():
+    bot_comment = _comment('bot1', CURRENT_TEXT)
+    nested_more = _more_comments('t1_r1', [])
+    more = _more_comments('t1_bot1', [
+        _comment('r2', 'hidden reply', author='a', parent_id='t1_bot1'),
+        _comment('deep', 'reply to a reply', author='b', parent_id='t1_r1'),
+        _comment('r1', 'duplicate of a loaded reply', author='a', parent_id='t1_bot1'),
+    ])
+    bot_comment.replies = [
+        _comment('r1', 'loaded reply', author='a', parent_id='t1_bot1'),
+        nested_more,
+        more,
+    ]
+
+    replies = list(iter_direct_replies(bot_comment))
+
+    assert [reply.id for reply in replies] == ['r1', 'r2']
+    more.comments.assert_called_once_with(update=False)
+    nested_more.comments.assert_not_called()
 
 
 @pytest.mark.unit
