@@ -1,8 +1,17 @@
+# Docker's default json-file log never rotates, so cap what each container keeps on the VM's disk.
+# docker-compose.gcp.yml switches the bot to Cloud Logging instead; see docs/logs.md.
+x-logging: &local-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   db:
     image: postgres:15-alpine
     container_name: racb_db
     restart: unless-stopped
+    logging: *local-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-racb}
       POSTGRES_USER: ${POSTGRES_USER:-racb_user}
@@ -27,6 +36,7 @@ services:
       dockerfile: Dockerfile
     container_name: racb
     restart: unless-stopped
+    logging: *local-logging
     depends_on:
       db:
         condition: service_healthy

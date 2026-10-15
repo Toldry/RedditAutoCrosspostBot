@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cloud Logging:** `docker-compose.gcp.yml` sends the bot's logs to Google Cloud Logging, so they can be read and searched in the Cloud Console without SSH. Off until `COMPOSE_FILE=docker-compose.yml:docker-compose.gcp.yml` is added to the VM's `.env`; see `docs/logs.md`.
+
+### Changed
+- **Container Log Rotation:** the bot and database containers keep at most 3 Docker log files of 10 MB each. Docker's default never rotated them, so they grew until the VM's disk filled.
+
 ## [2.11.1] - 2026-10-15
 
 ### Fixed
