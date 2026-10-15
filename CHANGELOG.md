@@ -8,14 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Blocked Targets And Opposite Pairs:** `TARGET_SUB_BLACKLIST` in `constants.py` lists subreddits that are never crossposted to because they drew repeated complaints (r/MapsWithoutNZ, r/notdisneyvacation, r/DiWHY, r/itrunsdoom, r/LeopardsAteMyFace and others); posts from them are still crossposted elsewhere. `OPPOSITE_SUB_PAIRS` blocks pairs that are opposites by design (r/disneyvacation and r/notdisneyvacation, r/bertstrips and r/WholesomeBertstrips) in both directions. Phases 2 and 3 now also apply all blocklists, so rows scraped before a subreddit was blocked are dropped (`CROSSPOST_BLOCKED`).
 - **"Other Discussions" Check:** the duplicate check now also asks Reddit for the source post's "other discussions" (`submission.duplicates()`, one call) and treats any of them in the target subreddit, such as an earlier crosspost of the same post, as a duplicate. This runs in all three phases.
 - **Title Search:** Phases 2 and 3 search the target for a post with the same title (`title:"..."`, compared ignoring case and punctuation), which catches reposts of videos and text posts that keep the title. Titles shorter than 4 words are not searched.
 - **Top Posts Before Crossposting:** Phase 3's full scan now also compares an image or video with the target's 100 top posts of all time and 100 top posts of the past year. The crosspost reply still counts only the posts made since the source comment (`RepostScan.top_posts_checked`).
 - **Dead Source Posts Are Skipped:** Phases 2 and 3 drop a row whose source post was deleted or removed (`SOURCE_DELETED_OR_REMOVED`), locked (`SOURCE_LOCKED`), archived (`SOURCE_ARCHIVED`) or cannot be read (`SOURCE_UNAVAILABLE`).
 
 ### Fixed
-- **Case-Insensitive Blacklist:** `SUB_BLACKLIST` entries with capital letters (`ReviewsByRetards`) never matched, because only the subreddit names were lowercased. All blocklists are now compared case-insensitively through `constants.is_crosspost_blocked`.
+- **Case-Insensitive Blacklist:** `SUB_BLACKLIST` entries with capital letters (`ReviewsByRetards`) never matched, because only the subreddit names were lowercased. It is now compared case-insensitively through `constants.is_crosspost_blocked`, and Phases 2 and 3 apply it too, so rows scraped before a subreddit was blacklisted are dropped (`CROSSPOST_BLOCKED`).
 
 ## [2.11.1] - 2026-10-15
 

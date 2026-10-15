@@ -217,7 +217,8 @@ def find_posts_with_same_title(submission, subreddit):
     title = normalize_title(submission.title)
     if len(title.split()) < MIN_TITLE_SEARCH_WORDS:
         return []
-    query = 'title:"' + submission.title.replace('"', ' ') + '"'
+    title_without_quotes = submission.title.replace('"', ' ')
+    query = f'title:"{title_without_quotes}"'
     try:
         results = list(reddit.get_reddit_instance().subreddit(subreddit).search(
             query=query, sort='relevance', time_filter='all', limit=TITLE_SEARCH_LIMIT,

@@ -305,8 +305,8 @@ def test_quick_duplicate_check_reads_newest_and_all_time_top_posts(make_mock_com
 
 
 @pytest.mark.unit
-def test_handle_incoming_comment_ignores_blocked_target(make_mock_comment):
-    comment = make_mock_comment(body='r/NotDisneyVacation', subreddit='test_source')
+def test_handle_incoming_comment_ignores_blacklisted_target(make_mock_comment):
+    comment = make_mock_comment(body='r/reviewsbyretards', subreddit='test_source')
     with patch('racb.phases.phase1.get_posts_with_same_content') as mock_search, \
             patch('racb.core.db.add_comment') as mock_db_add:
         assert phase1.handle_incoming_comment(comment) is None

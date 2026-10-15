@@ -87,7 +87,7 @@ flowchart TD
     M -->|Yes| X2["ignore"]
     M -->|No| T{"Submission title contains\nsub/subs/subreddit/subreddits?"}
     T -->|Yes| X3["ignore"]
-    T -->|No| BL{"is_crosspost_blocked(source, target)?\nSUB_BLACKLIST, TARGET_SUB_BLACKLIST,\nOPPOSITE_SUB_PAIRS"}
+    T -->|No| BL{"Source or target in\nSUB_BLACKLIST?\n(case-insensitive)"}
     BL -->|Yes| X4["ignore"]
     BL -->|No| SS{"target == source\n(case-insensitive)?"}
     SS -->|Yes| A1["same_subreddit_bot reply"]
@@ -104,7 +104,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 ### Phase Details
 - **Phase 1 ([`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py)):**
   - Continuous streaming from `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)`.
-  - Filters: Discards moderator comments, submissions with meta-phrases (`sub`, `subreddit`), and blocked subreddits ([`src/racb/constants.py`](./src/racb/constants.py): `SUB_BLACKLIST` is never crossposted from or to, `TARGET_SUB_BLACKLIST` never to, `OPPOSITE_SUB_PAIRS` never between each other in either direction; all compared case-insensitively by `is_crosspost_blocked`). A blocked comment gets no auxiliary reply either. Non-top-level comments (`comment.parent_id != comment.link_id`) are discarded only **after** auxiliary-bot dispatch (see the warning in section 1).
+  - Filters: Discards moderator comments, submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`src/racb/constants.py`](./src/racb/constants.py), compared case-insensitively by `is_crosspost_blocked`). Non-top-level comments (`comment.parent_id != comment.link_id`) are discarded only **after** auxiliary-bot dispatch (see the warning in section 1).
   - Qualified suggestions are stored via stored procedure `insert_scraped_comment(permalink, target_subreddit)`.
   - Phases 2 and 3 re-parse the target from the live comment body and reject the row
     (`TARGET_SUBREDDIT_CHANGED`) if it no longer equals the stored target, case-insensitively. This blocks
@@ -120,8 +120,8 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     - Comment availability (not deleted / removed).
     - Score >= `COMMENT_SCORE_THRESHOLD`.
     - Regex pattern still holds (user didn't edit comment), and still names the stored target subreddit.
-    - The source/target pair is not blocked (`CROSSPOST_BLOCKED`), so subreddits blocked after a row was scraped
-      are honored.
+    - Neither the source nor the target is in `SUB_BLACKLIST` (`CROSSPOST_BLOCKED`), so subreddits blacklisted
+      after a row was scraped are honored.
     - The source post is not deleted or removed (`removed_by_category`, `[deleted]` / `[removed]` self text),
       locked or archived (`get_source_submission_problem`).
     - Target subreddit availability and duplicate check. Besides the URL search and picture scan, a post in the
@@ -206,7 +206,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py) | Evaluates feedback sent to the bot's inbox. |
 | [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
 | [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on **every new DB connection**, so every statement must be idempotent (see section 6). |
-| [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blocklists: `SUB_BLACKLIST` (ignored as source and target), `TARGET_SUB_BLACKLIST` (never crossposted to; targets that drew repeated complaints), `OPPOSITE_SUB_PAIRS` (opposites by design), and `is_crosspost_blocked()`, which checks all three case-insensitively. |
+| [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore as source and target (`SUB_BLACKLIST`), and `is_crosspost_blocked()`, which checks it case-insensitively. |
 | [`src/racb/i18n.py`](./src/racb/i18n.py) | Loads the gettext catalogs, picks the locale for a subreddit, and falls back to English for untranslated strings (body and footer always share one language; a reply built from several messages, like the nonexistent-subreddit reply, switches entirely to English if any piece is untranslated). |
 | [`src/racb/locales/`](./src/racb/locales/) | gettext catalogs: `<locale>/LC_MESSAGES/messages.po` (edited) and `messages.mo` (compiled, git-ignored: the Dockerfile and `tests/conftest.py` build them). Locales: `en` (source text), `es`, `de`, `fr`, `he`, `ru`, and `en@totallynotrobots`, an English variant using the gettext `@modifier` syntax. |
 | [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |

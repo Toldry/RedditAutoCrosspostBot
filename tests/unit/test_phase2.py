@@ -116,9 +116,8 @@ def run_filters_on(comment, target_subreddit=None):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize('source, target', [('pics', 'notdisneyvacation'), ('disneyvacation', 'NotDisneyVacation'),
-                                            ('Bertstrips', 'wholesomebertstrips')])
-def test_run_filters_rejects_rows_for_blocked_targets(make_mock_comment, source, target):
+@pytest.mark.parametrize('source, target', [('pics', 'reviewsbyretards'), ('ReviewsByRetards', 'pics')])
+def test_run_filters_rejects_rows_for_blacklisted_subreddits(make_mock_comment, source, target):
     comment = make_mock_comment(body=f'r/{target}', subreddit=source, score=100)
     result, mock_search = run_filters_on(comment, target)
     assert result.passes_filter is False
