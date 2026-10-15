@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Crosspost Reply Notes:** the crosspost reply now explains how reposts were ruled out ("To prevent reposts, I looked through r/<target> for posts with the same URL."), again says the bot waited (the Phase 3 waiting period) before crossposting, and asks readers who think the crosspost is a mistake to reply "Bad bot" (in their language) with an explanation. Only footnote 1 ("Assuming /u/<user> is human") remains.
+- **Full Image Repost Scan Before Crossposting:** for an image post, Phase 3 now compares the image with every image post the target subreddit got since the source comment was written, instead of only the 50 newest, as far back as Reddit's ~1000-post listing reaches. The reply says how many image posts were checked and over what period, links to `duplicate_detector.py`, and says so when Reddit's listing ended first. Images are compared through Reddit's small previews, 8 downloads at a time, to keep the scan cheap on the free VM. `duplicate_detector.get_reposts_in_sub` is replaced by `scan_subreddit_for_image`, which returns an `ImageRepostScan`, and the module is reorganized and documented for outside readers.
+- **"Bad Bot" In Every Language:** the inbox recognizes "bad bot" / "good bot" in every supported language (`BAD_BOT_PHRASE` / `GOOD_BOT_PHRASE` in each catalog, e.g. "Schlechter Bot", "Плохой бот", "Bad human" on r/totallynotrobots), not just English. A "bad bot" followed by an explanation, as the crosspost reply asks for, is not answered (the bot would otherwise ask why); the negative-feedback report now finds such replies through the inbox.
+- **Reply Phrasing Tests:** `tests/unit/test_crosspost_reply_phrasings.py` renders the crosspost reply for every combination of locale, author (present or deleted), waiting-period plural form and image-scan outcome (700 in all) and checks placeholders, footnotes, plural forms, links, markdown and language consistency.
+
 ## [2.9.1] - 2026-10-15
 
 ### Fixed

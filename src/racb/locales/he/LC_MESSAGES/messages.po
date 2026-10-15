@@ -34,9 +34,33 @@ msgstr ""
 "\n"
 "עשיתי קרוספוסט מ־ r/{source_subreddit} ל־ r/{target_subreddit} אחרי שראיתי את [הקומענט הזה **שנכתב על ידי בן אדם**^1]({source_comment_permalink}) (ניקוד={source_comment_score}), שמרמז כי הפוסט הזה מתאים גם לכאן.\n"
 "\n"
+"כדי למנוע ריפוסטים, חיפשתי ב־ r/{target_subreddit} פוסטים עם אותה כתובת URL.{image_check}\n"
+"\n"
+"חוץ מזה, חיכיתי {timedelta_string} לפני שעשיתי קרוספוסט, למקרה שבן אדם היה רוצה לעשות את זה בעצמו.\n"
+"\n"
+"אם לדעתכם הקרוספוסט הזה הוא טעות, אנא הגיבו לתגובה הזו עם \"בוט רע\" ואחריו הסבר. היוצר של הבוט עובר על המשוב מדי פעם.\n"
+"\n"
 "---\n"
 "^(1 - בהנחה ש־{source_comment_author_name} בן־אנוש)\n"
 "\n"
+
+msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK"
+msgstr " בנוסף, עברתי על כל הפוסטים של תמונות שפורסמו ב־ r/{target_subreddit} מאז שהקומענט נכתב (בסך הכול {image_post_count}) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של התמונה הזו. לא נמצאו כפילויות."
+
+msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
+msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"
+msgstr[0] " בנוסף, עברתי על הפוסטים האחרונים של תמונות ב־ r/{target_subreddit} (בסך הכול {image_post_count}, עד {scan_period} אחורה) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של התמונה הזו. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
+msgstr[1] " בנוסף, עברתי על הפוסטים האחרונים של תמונות ב־ r/{target_subreddit} (בסך הכול {image_post_count}, עד {scan_period} אחורה) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של התמונה הזו. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
+msgstr[2] " בנוסף, עברתי על הפוסטים האחרונים של תמונות ב־ r/{target_subreddit} (בסך הכול {image_post_count}, עד {scan_period} אחורה) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של התמונה הזו. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
+
+msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
+msgstr " מאז שהקומענט נכתב לא פורסמו ב־ r/{target_subreddit} פוסטים של תמונות, כך שלא היה מה [לבדוק]({duplicate_detector_url})."
+
+msgid "BAD_BOT_PHRASE"
+msgstr "בוט רע"
+
+msgid "GOOD_BOT_PHRASE"
+msgstr "בוט טוב"
 
 msgid "THE_USER_WHO_COMMENTED"
 msgstr "המשתמש שהגיב"

@@ -5,7 +5,7 @@ import praw
 import prawcore
 
 from racb import config
-from racb.core import db, reddit
+from racb.core import db, reddit, duplicate_detector
 from racb.phases import phase1
 
 logger = logging.getLogger(__name__)
@@ -70,13 +70,20 @@ def extract_comment_id_from_permalink(permalink):
     return None
 
 
-def run_filters(comment_entry, comment=None):
+def run_filters(comment_entry, comment=None, full_image_scan=False):
+    """Re-checks a scraped comment before it is crossposted.
+
+    With `full_image_scan`, an image post is compared with every image post the target subreddit got since the
+    comment was written (as far back as Reddit lists), instead of with the newest few only. Phase 3 uses it,
+    since its reply tells readers how many posts were checked.
+    """
     class Result:
         passes_filter = False
         reason = None
         comment = None
         target_subreddit = None
         post_with_same_content = None
+        image_scan = None
 
     result = Result()
 
@@ -114,7 +121,16 @@ def run_filters(comment_entry, comment=None):
         result.reason = 'TARGET_SUBREDDIT_CHANGED'
         return result
 
-    gpwsc_result = phase1.get_posts_with_same_content(comment, target_subreddit)
+    if full_image_scan:
+        gpwsc_result = phase1.get_posts_with_same_content(
+            comment,
+            target_subreddit,
+            image_scan_since=getattr(comment, 'created_utc', None),
+            image_scan_limit=duplicate_detector.REDDIT_LISTING_LIMIT,
+        )
+    else:
+        gpwsc_result = phase1.get_posts_with_same_content(comment, target_subreddit)
+    result.image_scan = gpwsc_result.image_scan
     if gpwsc_result.posts_found:
         result.reason = 'POST_WITH_SAME_CONTENT_FOUND'
         result.post_with_same_content = gpwsc_result.posts[0]

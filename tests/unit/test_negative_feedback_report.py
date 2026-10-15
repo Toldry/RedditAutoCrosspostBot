@@ -10,6 +10,7 @@ from scripts.negative_feedback_report import (
     CommentNode,
     FeedbackThread,
     collect_subtree,
+    find_explained_bad_bot_replies,
     find_in_comment_history,
     find_via_inbox,
     is_negative_sentiment_comment,
@@ -142,6 +143,8 @@ def test_written_feedback_needs_more_than_a_sentiment_phrase():
     assert not is_written_feedback(_comment('c3', '[Removed]', author='user'))
     assert not is_written_feedback(_comment('d', 'I am explaining things', author='same_post_bot'))
     assert is_written_feedback(_comment('e', 'bad bot, this is a repost of a repost', author='user'))
+    assert not is_written_feedback(_comment('f', 'Schlechter Bot!', author='user'))
+    assert is_written_feedback(_comment('g', 'Плохой бот, это уже было', author='user'))
 
 
 @pytest.mark.unit
@@ -222,6 +225,32 @@ def test_detailed_trigger_counts_as_feedback():
     thread = load_thread(reddit_instance, trigger, question, covered_ids=set())
 
     assert thread.new_feedback_ids() == ['trig']
+
+
+@pytest.mark.unit
+def test_explained_bad_bot_replies_are_found_in_the_inbox():
+    reddit_instance = MagicMock()
+    reddit_instance.inbox.comment_replies.return_value = [
+        _comment('e1', 'Bad bot, this sub bans crossposts', author='user'),
+        _comment('e2', 'Schlechter Bot, das passt hier nicht', author='user'),
+        _comment('n1', 'bad bot', author='user'),
+        _comment('n2', 'nice crosspost', author='user'),
+    ]
+
+    assert set(find_explained_bad_bot_replies(reddit_instance)) == {'e1', 'e2'}
+
+
+@pytest.mark.unit
+def test_explained_trigger_without_a_bot_answer_is_reported_with_its_replies():
+    reddit_instance, trigger, _ = _exchange([])
+    trigger.body = 'Bad bot, the target sub bans crossposts'
+    follow_up = _comment('f1', 'Agreed, wrong sub', author='user_f', parent_id='t1_trig', created_utc=120.0)
+    trigger.replies = [follow_up]
+
+    thread = load_thread(reddit_instance, trigger, None, covered_ids=set())
+
+    assert sorted(thread.new_feedback_ids()) == ['f1', 'trig']
+    assert thread.question_created_utc == trigger.created_utc
 
 
 @pytest.mark.unit

@@ -34,9 +34,33 @@ msgstr ""
 "\n"
 "Я сделал кросспост из r/{source_subreddit} в r/{target_subreddit}, увидев [этот **написанный человеком**^1 и довольно заплюсованный комментарий]({source_comment_permalink}) (рейтинг={source_comment_score}), который {source_comment_author_name} написал {timedelta_string} назад. Похоже, этот пост хорошо подойдёт и сюда.\n"
 "\n"
+"Чтобы избежать репостов, я поискал в r/{target_subreddit} посты с тем же URL.{image_check}\n"
+"\n"
+"Кроме того, я подождал {timedelta_string} перед кросспостом на случай, если кто-то из людей захочет сделать его сам.\n"
+"\n"
+"Если вы считаете этот кросспост ошибкой, ответьте на этот комментарий словами \"Плохой бот\" и объясните почему. Создатель бота регулярно читает отзывы.\n"
+"\n"
 "---\n"
 "^(1 - Если, конечно, {source_comment_author_name} — человек)\n"
 "\n"
+
+msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK"
+msgstr " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) все посты с картинками, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {image_post_count}). Совпадений не нашлось."
+
+msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
+msgid_plural "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL_PLURAL"
+msgstr[0] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) самые новые посты с картинками в r/{target_subreddit} (всего {image_post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
+msgstr[1] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) самые новые посты с картинками в r/{target_subreddit} (всего {image_post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
+msgstr[2] " Ещё я [сравнил с этой картинкой]({duplicate_detector_url}) самые новые посты с картинками в r/{target_subreddit} (всего {image_post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
+
+msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
+msgstr " За последние {scan_period} в r/{target_subreddit} не было постов с картинками, так что [сравнивать]({duplicate_detector_url}) было не с чем."
+
+msgid "BAD_BOT_PHRASE"
+msgstr "Плохой бот"
+
+msgid "GOOD_BOT_PHRASE"
+msgstr "Хороший бот"
 
 msgid "THE_USER_WHO_COMMENTED"
 msgstr "автор комментария"

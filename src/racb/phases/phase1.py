@@ -95,12 +95,20 @@ def check_pattern(comment):
     return target_subreddit
 
 
-def get_posts_with_same_content(comment, subreddit):
+def get_posts_with_same_content(comment, subreddit, image_scan_since=None,
+                                image_scan_limit=duplicate_detector.DEFAULT_SCAN_LIMIT):
+    """Looks for posts in `subreddit` that link to the same URL or, for an image post, show the same image.
+
+    The image comparison reads at most `image_scan_limit` of the newest posts, stopping at the first one older
+    than `image_scan_since` (a Unix timestamp). Its outcome is kept in `image_scan` (None if no images were
+    compared).
+    """
     class Result:
         posts_found = False
         posts = []
         unable_to_search = False
         unable_to_search_reason = None
+        image_scan = None
 
     result = Result()
     reddit_instance = reddit.get_reddit_instance()
@@ -143,10 +151,12 @@ def get_posts_with_same_content(comment, subreddit):
         result.posts = submissions
         return result
 
-    prior_posts = duplicate_detector.get_reposts_in_sub(comment, subreddit)
-    if prior_posts:
+    result.image_scan = duplicate_detector.scan_subreddit_for_image(
+        comment.submission, subreddit, posted_after=image_scan_since, limit=image_scan_limit,
+    )
+    if result.image_scan and result.image_scan.duplicates:
         result.posts_found = True
-        result.posts = [reddit_instance.submission(id=p['post_id']) for p in prior_posts]
+        result.posts = [duplicate['post'] for duplicate in result.image_scan.duplicates]
 
     return result
 

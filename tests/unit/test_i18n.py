@@ -217,6 +217,10 @@ ALL_TEMPLATE_KWARGS = {
     'alternate_subreddits_string': '* r/x',
     'days': 90,
     'subscribers': '1,234',
+    'image_check': ' I also looked through all 3 image posts.',
+    'image_post_count': 3,
+    'scan_period': '90 days',
+    'duplicate_detector_url': 'https://github.com/Toldry/RedditAutoCrosspostBot/blob/master/x.py',
 }
 
 
@@ -259,8 +263,8 @@ def test_no_markdown_link_is_broken_by_a_space():
 def test_every_superscript_group_is_closed_on_its_line():
     for key, language, template in iterate_templates():
         for line in template.splitlines():
-            if '^(' in line:
-                assert line.rstrip().endswith(')'), f'{key}/{language} has an unclosed ^( group: {line!r}'
+            for group_start in [i for i in range(len(line)) if line.startswith('^(', i)]:
+                assert ')' in line[group_start:], f'{key}/{language} has an unclosed ^( group: {line!r}'
 
 
 @pytest.mark.unit

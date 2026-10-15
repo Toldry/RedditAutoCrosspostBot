@@ -4,7 +4,9 @@
 The bots answer "bad bot" style replies with a comment asking why the post or comment was inappropriate (the
 RESPOND_TO_NEGATIVE_SENTIMENT text, sent by `respond_to_negative_sentiment` in `racb.phases.inbox`). Only
 /u/AutoCrosspostBot sent it from December 2019 until February 2023, when it was switched off; since it was
-switched back on, every bot sends it.
+switched back on, every bot sends it. A "bad bot" reply that already explains itself ("Bad bot, this sub
+bans memes", which the crosspost reply asks for) gets no answer; it is found through the bot's inbox instead.
+"Bad bot" counts in every supported language.
 
 An exchange is reported only if it contains written feedback: a reply anywhere below the bot's question that
 says more than a bare "bad bot" / "good bot", or a "bad bot" comment that itself says more than that. The
@@ -208,6 +210,15 @@ def find_via_inbox(reddit_instance, bot_name, markers, limit=None):
     return found
 
 
+def find_explained_bad_bot_replies(reddit_instance, limit=None):
+    """Finds "bad bot" replies that already explain themselves, which the bots do not answer, through the inbox."""
+    found = {}
+    for item in _iter_listing('inbox', reddit_instance.inbox.comment_replies(limit=limit)):
+        if check_sentiment(getattr(item, 'body', '') or '') == 'explained_negative':
+            found[item.id] = item
+    return found
+
+
 def is_bot_account(thing):
     name = author_name(thing)
     return name is not None and name.lower() in {bot_name.lower() for bot_name in BOT_NAMES}
@@ -218,7 +229,8 @@ def is_written_feedback(comment):
     body = (getattr(comment, 'body', '') or '').strip()
     if not body or body.lower() in DELETED_BODIES or is_bot_account(comment):
         return False
-    return check_sentiment(body) is None
+    # A "bad bot" followed by an explanation is written feedback; a bare "bad bot" / "good bot" is not
+    return check_sentiment(body) not in ('negative', 'positive')
 
 
 def collect_subtree(root_comment):
@@ -289,14 +301,21 @@ def mark_feedback(trigger, question_node, nodes, comments_by_id, covered_ids):
 
 
 def load_thread(reddit_instance, trigger, question, covered_ids):
-    """Builds the thread around one "bad bot" comment, or returns None if it has no new written feedback."""
+    """Builds the thread around one "bad bot" comment, or returns None if it has no new written feedback.
+
+    `question` is the bot's RESPOND_TO_NEGATIVE_SENTIMENT answer, or None for a "bad bot" that explained itself
+    and got no answer; then every reply below the "bad bot" comment counts.
+    """
     trigger.refresh()
     descendants = collect_subtree(trigger)
     trigger_node, nodes = build_tree(trigger, descendants)
-    question_node = nodes.get(question.id)
-    if question_node is None:
-        logger.warning(f'Could not find {reddit.full_url(question.permalink)} below the comment it answered')
-        return None
+    if question is None:
+        question_node = trigger_node
+    else:
+        question_node = nodes.get(question.id)
+        if question_node is None:
+            logger.warning(f'Could not find {reddit.full_url(question.permalink)} below the comment it answered')
+            return None
     comments_by_id = {comment.id: comment for comment in [trigger, *descendants]}
     mark_feedback(trigger, question_node, nodes, comments_by_id, covered_ids)
     if not any(node.is_new for node in trigger_node.walk()):
@@ -310,7 +329,7 @@ def load_thread(reddit_instance, trigger, question, covered_ids):
 
     submission = trigger.submission
     return FeedbackThread(
-        question_created_utc=question.created_utc,
+        question_created_utc=(question or trigger).created_utc,
         subreddit=submission.subreddit.display_name,
         submission_title=submission.title,
         submission_author=author_name(submission) or '[deleted]',
@@ -343,6 +362,20 @@ def gather_feedback(bot_name, covered_ids, limit=None):
             thread = load_thread(reddit_instance, trigger, question, covered_ids)
         except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
             logger.warning(f'Could not read the replies to {reddit.full_url(question.permalink)}: {e!r}')
+            continue
+        if thread is not None:
+            threads.append(thread)
+
+    explained = find_explained_bad_bot_replies(reddit_instance, limit=limit)
+    logger.info(f'/u/{bot_name}: found {len(explained)} "bad bot" replies that explain themselves')
+    for trigger in explained.values():
+        if trigger.id in seen_trigger_ids:
+            continue
+        seen_trigger_ids.add(trigger.id)
+        try:
+            thread = load_thread(reddit_instance, trigger, None, covered_ids)
+        except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+            logger.warning(f'Could not read the replies to {reddit.full_url(trigger.permalink)}: {e!r}')
             continue
         if thread is not None:
             threads.append(thread)
