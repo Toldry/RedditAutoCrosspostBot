@@ -9,8 +9,8 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
         with:
           # Keep in sync with the Dockerfile
           version: '0.11.32'
@@ -37,13 +37,13 @@ jobs:
     outputs:
       deploy-sha: ${{ steps.head.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The latest master, not the pushed SHA: an earlier queued run may have added a release commit
           ref: master
           # Full history and tags, to find the commits since the last release
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           # Keep in sync with the Dockerfile
           version: '0.11.32'
@@ -101,8 +101,8 @@ jobs:
       PASSWORD__SAME_POST: ${{ secrets.PASSWORD__SAME_POST }}
       APP_CLIENT_SECRET__SAME_POST: ${{ secrets.APP_CLIENT_SECRET__SAME_POST }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
         with:
           # Keep in sync with the Dockerfile
           version: '0.11.32'
