@@ -57,13 +57,13 @@ msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
 msgstr " За последние {scan_period} в r/{target_subreddit} не было постов с картинками, так что [сравнивать]({duplicate_detector_url}) было не с чем."
 
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK"
-msgstr " Ещё я [сравнил с этим видео]({duplicate_detector_url}) по превью все посты с видео, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {post_count}). Совпадений не нашлось."
+msgstr " Ещё я [сравнил с этим видео]({duplicate_detector_url}) все посты с видео, опубликованные в r/{target_subreddit} за последние {scan_period} (всего {post_count}). Совпадений не нашлось."
 
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL_PLURAL"
-msgstr[0] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) по превью самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
-msgstr[1] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) по превью самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
-msgstr[2] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) по превью самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
+msgstr[0] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
+msgstr[1] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
+msgstr[2] " Ещё я [сравнил с этим видео]({duplicate_detector_url}) самые новые посты с видео в r/{target_subreddit} (всего {post_count}, до {scan_period} назад). Совпадений не нашлось. Более старые посты Reddit не показывает."
 
 msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
 msgstr " За последние {scan_period} в r/{target_subreddit} не было постов с видео, так что [сравнивать]({duplicate_detector_url}) было не с чем."

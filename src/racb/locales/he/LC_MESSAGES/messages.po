@@ -57,13 +57,13 @@ msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
 msgstr " מאז שהקומענט נכתב לא פורסמו ב־ r/{target_subreddit} פוסטים של תמונות, כך שלא היה מה [לבדוק]({duplicate_detector_url})."
 
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK"
-msgstr " בנוסף, עברתי על כל הפוסטים של סרטונים שפורסמו ב־ r/{target_subreddit} מאז שהקומענט נכתב (בסך הכול {post_count}) ו[בדקתי לפי תמונות התצוגה המקדימה אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות."
+msgstr " בנוסף, עברתי על כל הפוסטים של סרטונים שפורסמו ב־ r/{target_subreddit} מאז שהקומענט נכתב (בסך הכול {post_count}) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות."
 
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL"
 msgid_plural "REPLY_TO_CROSSPOST_VIDEO_CHECK_PARTIAL_PLURAL"
-msgstr[0] " בנוסף, עברתי על הפוסטים האחרונים של סרטונים ב־ r/{target_subreddit} (בסך הכול {post_count}, עד {scan_period} אחורה) ו[בדקתי לפי תמונות התצוגה המקדימה אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
-msgstr[1] " בנוסף, עברתי על הפוסטים האחרונים של סרטונים ב־ r/{target_subreddit} (בסך הכול {post_count}, עד {scan_period} אחורה) ו[בדקתי לפי תמונות התצוגה המקדימה אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
-msgstr[2] " בנוסף, עברתי על הפוסטים האחרונים של סרטונים ב־ r/{target_subreddit} (בסך הכול {post_count}, עד {scan_period} אחורה) ו[בדקתי לפי תמונות התצוגה המקדימה אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
+msgstr[0] " בנוסף, עברתי על הפוסטים האחרונים של סרטונים ב־ r/{target_subreddit} (בסך הכול {post_count}, עד {scan_period} אחורה) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
+msgstr[1] " בנוסף, עברתי על הפוסטים האחרונים של סרטונים ב־ r/{target_subreddit} (בסך הכול {post_count}, עד {scan_period} אחורה) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
+msgstr[2] " בנוסף, עברתי על הפוסטים האחרונים של סרטונים ב־ r/{target_subreddit} (בסך הכול {post_count}, עד {scan_period} אחורה) ו[בדקתי אם יש ביניהם כפילויות]({duplicate_detector_url}) של הסרטון הזה. לא נמצאו כפילויות. רדיט לא מציג פוסטים ישנים יותר."
 
 msgid "REPLY_TO_CROSSPOST_NO_VIDEO_POSTS"
 msgstr " מאז שהקומענט נכתב לא פורסמו ב־ r/{target_subreddit} פוסטים של סרטונים, כך שלא היה מה [לבדוק]({duplicate_detector_url})."
