@@ -32,16 +32,24 @@ def main():
     for attribute in ('archived', 'locked', 'removed_by_category', 'banned_by', 'can_mod_post'):
         print(f'Item {attribute + ":":<13}{vars(item).get(attribute, "n/a")}')
 
-    try:
-        result = r._core.request(method='POST', path='api/del/', data={'id': fullname, 'api_type': 'json'})
-        print(f'POST /api/del/:    OK {result!r}')
-    except prawcore.exceptions.ResponseException as e:
-        response = e.response
-        print(f'POST /api/del/:    {response.status_code}')
-        print(f'Request URL:       {response.request.method} {response.request.url}')
-        print(f'Request body:      {response.request.body}')
-        print(f'Response headers:  {dict(response.headers)}')
-        print(f'Response body:     {response.text[:1000]}')
+    # "404 page not found" in text/plain is Go's default router 404, so the path itself may be the
+    # problem. PRAW uses "api/del/"; try that first, then the same endpoint without the trailing slash.
+    for path in ('api/del/', 'api/del'):
+        try:
+            result = r._core.request(method='POST', path=path, data={'id': fullname, 'api_type': 'json'})
+            print(f'POST /{path}:'.ljust(19) + f'OK {result!r}')
+            return
+        except prawcore.exceptions.ResponseException as e:
+            response = e.response
+            print(f'POST /{path}:'.ljust(19) + f'{response.status_code} {response.text[:200]!r}')
+
+    # Control: does any other write on this item work? Save then unsave leaves no trace.
+    for path in ('api/save/', 'api/unsave/'):
+        try:
+            r._core.request(method='POST', path=path, data={'id': fullname})
+            print(f'POST /{path}:'.ljust(19) + 'OK')
+        except prawcore.exceptions.ResponseException as e:
+            print(f'POST /{path}:'.ljust(19) + f'{e.response.status_code} {e.response.text[:200]!r}')
 
 
 if __name__ == '__main__':
