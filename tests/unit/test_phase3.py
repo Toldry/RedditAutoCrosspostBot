@@ -97,6 +97,18 @@ def test_reply_to_crosspost_omits_waiting_and_downvote_notes(make_mock_comment, 
         assert removed_phrase not in reply_text
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
+def test_reply_to_crosspost_marks_source_comment_as_human_made(make_mock_comment, target_subreddit):
+    comment = make_mock_comment(subreddit='test_source')
+    cross_post = MagicMock()
+    phase3.reply_to_crosspost(comment, cross_post, target_subreddit)
+    reply_text = cross_post.reply.call_args.args[0]
+    assert '**^1' in reply_text
+    assert '^(1 - ' in reply_text
+    assert f'/u/{comment.author.name}' in reply_text.split('^(1 - ')[1].split(')')[0]
+
+
 
 @pytest.mark.unit
 def test_process_oldest_entry_handles_and_deletes_row():
