@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Russian:** A new `ru` locale with every string translated, including Russian's three plural forms for day counts (1 день, 3 дня, 5 дней). It covers 38 subreddits, among them r/ru, r/Pikabu, r/KafkaFPS, r/SPb and r/rubooks; most were found by sampling the languages of their newest comments.
+- **Translation completeness test:** A unit test fails when any locale leaves a string, or one of its plural forms, untranslated.
+
+### Fixed
+- **Untranslated replies:** Spanish and French subreddits got their "subreddit doesn't exist", "that's where we are" and "same content" replies entirely in English, because those strings had no Spanish or French translation. Every locale now translates every string, including the "bad bot" question and the new "good bot" thank-you.
+
 ## [2.6.0] - 2026-10-15
 
 ### Changed
