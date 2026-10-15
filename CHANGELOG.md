@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-10-15
+
 ### Fixed
 - **Cloud Logging Queries:** the queries in `docs/logs.md` found nothing when typed into the Logs Explorer's search bar, which turns unquoted text into a full-text search. They now use `log_id("gcplogs-docker-driver")` in the query editor, with quoted values.
 
