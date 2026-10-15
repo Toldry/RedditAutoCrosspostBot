@@ -23,6 +23,13 @@ readonly IAP_SOURCE_RANGE=35.235.240.0/20
 readonly GITHUB_OIDC_ISSUER=https://token.actions.githubusercontent.com
 readonly DEPLOY_KEY_COMMENT=racb-github-deploy
 readonly FALLBACK_KEY_FILE=racb-deploy-key
+# The bot credentials the CI integration tests need, copied from the VM's .env
+readonly REDDIT_SECRET_NAMES=(
+  PASSWORD APP_CLIENT_SECRET
+  PASSWORD__SUB_DOESNT_EXIST APP_CLIENT_SECRET__SUB_DOESNT_EXIST
+  PASSWORD__SAME_SUBREDDIT APP_CLIENT_SECRET__SAME_SUBREDDIT
+  PASSWORD__SAME_POST APP_CLIENT_SECRET__SAME_POST
+)
 
 log() { printf '\n==> %s\n' "$*"; }
 die() {
@@ -112,6 +119,15 @@ declare -A github_variables=(
 )
 
 if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
+  log "Copying the 8 bot credentials for the integration tests from the VM's .env to GitHub secrets"
+  secret_pattern="^($(IFS='|'; echo "${REDDIT_SECRET_NAMES[*]}"))="
+  gcloud_in_project compute ssh "$VM_USER@$VM_NAME" --zone="$GCP_ZONE" --tunnel-through-iap \
+    --command="grep -E '$secret_pattern' '$VM_REPO_DIR/.env'" | tr -d '\r' >"$key_dir/reddit_secrets.env"
+  found_count="$(grep -cE "$secret_pattern" "$key_dir/reddit_secrets.env" || true)"
+  [[ $found_count -eq ${#REDDIT_SECRET_NAMES[@]} ]] \
+    || die "expected ${#REDDIT_SECRET_NAMES[@]} bot credentials in the VM's .env, found $found_count"
+  gh secret set --repo "$GITHUB_REPOSITORY" --env-file "$key_dir/reddit_secrets.env"
+
   log "Saving the variables and the deploy key secret in $GITHUB_REPOSITORY"
   gh secret set VM_DEPLOY_SSH_KEY --repo "$GITHUB_REPOSITORY" <"$key_dir/deploy_key"
   for name in "${!github_variables[@]}"; do
@@ -127,5 +143,8 @@ else
   done
   echo "Settings > Secrets and variables > Actions > Secrets:"
   echo "  VM_DEPLOY_SSH_KEY                the whole content of $PWD/$FALLBACK_KEY_FILE"
+  for name in "${REDDIT_SECRET_NAMES[@]}"; do
+    printf '  %-32s %s\n' "$name" "the value of $name in the VM's .env"
+  done
   echo "Delete $PWD/$FALLBACK_KEY_FILE once the secret is saved."
 fi

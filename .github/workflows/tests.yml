@@ -58,17 +58,69 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           uv run bump-my-version bump ${{ steps.level.outputs.level }}
           git push --follow-tags origin HEAD:master
-      # The release commit if one was made, otherwise the master that was checked out above
+      # What deploy may ship: only the commit this run tested, or the release commit made right on top
+      # of it. If master moved on meanwhile, the newer push's own run tests and deploys it instead.
       - id: head
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          head_sha="$(git rev-parse HEAD)"
+          if [ "$head_sha" = "$GITHUB_SHA" ] || {
+            [ "$(git rev-parse HEAD^)" = "$GITHUB_SHA" ] &&
+            [ "$(git log -1 --format=%ae HEAD)" = '41898282+github-actions[bot]@users.noreply.github.com' ]
+          }; then
+            echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::master moved past $GITHUB_SHA; the run for the newer push deploys it"
+          fi
 
-  # Rebuilds and restarts the bot on the VM at the commit the release job ended on, so only tested code
-  # ships. Setup and security model: docs/auto-deploy.md. Off until the AUTO_DEPLOY variable is 'true'.
-  deploy:
-    needs: release
+  # Live tests against Reddit as the 4 real bot accounts, in the private test subreddits r/racb_test_1 and
+  # r/racb_test_2, then a cleanup of what they posted. Both must pass before deploy runs, so they only run
+  # when auto-deploy is on. The credentials are the bots' .env values, stored as repository secrets.
+  integration-tests:
+    needs: unit-tests
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/master'
       && vars.AUTO_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # Two runs posting in the same test subreddits at once could see each other's posts
+    concurrency:
+      group: reddit-integration-tests
+      cancel-in-progress: false
+    env:
+      PASSWORD: ${{ secrets.PASSWORD }}
+      APP_CLIENT_SECRET: ${{ secrets.APP_CLIENT_SECRET }}
+      PASSWORD__SUB_DOESNT_EXIST: ${{ secrets.PASSWORD__SUB_DOESNT_EXIST }}
+      APP_CLIENT_SECRET__SUB_DOESNT_EXIST: ${{ secrets.APP_CLIENT_SECRET__SUB_DOESNT_EXIST }}
+      PASSWORD__SAME_SUBREDDIT: ${{ secrets.PASSWORD__SAME_SUBREDDIT }}
+      APP_CLIENT_SECRET__SAME_SUBREDDIT: ${{ secrets.APP_CLIENT_SECRET__SAME_SUBREDDIT }}
+      PASSWORD__SAME_POST: ${{ secrets.PASSWORD__SAME_POST }}
+      APP_CLIENT_SECRET__SAME_POST: ${{ secrets.APP_CLIENT_SECRET__SAME_POST }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          # Keep in sync with the Dockerfile
+          version: '0.11.32'
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Live integration tests
+        run: uv run pytest -m integration
+      # Runs even when the tests failed, so a failed run leaves no test posts behind; --strict fails the job
+      # (and so blocks deploy) if any test item could not be deleted or any bot could not be checked
+      - name: Clean up test posts and comments
+        if: success() || failure()
+        run: uv run python scripts/cleanup_test_history.py --strict
+
+  # Rebuilds and restarts the bot on the VM at the commit the release job ended on, once the unit tests,
+  # the live integration tests and their cleanup all passed. Setup and security model:
+  # docs/auto-deploy.md. Off until the AUTO_DEPLOY variable is 'true'.
+  deploy:
+    needs: [release, integration-tests]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/master'
+      && vars.AUTO_DEPLOY == 'true' && needs.release.outputs.deploy-sha != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
