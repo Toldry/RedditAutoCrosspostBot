@@ -146,19 +146,19 @@ def test_reply_to_crosspost_reports_partial_image_scan(make_mock_comment):
 
 
 @pytest.mark.unit
-def test_reply_to_crosspost_reports_that_there_were_no_image_posts(make_mock_comment):
+def test_reply_to_crosspost_says_nothing_when_there_were_no_posts_to_compare(make_mock_comment):
     comment = make_mock_comment(subreddit='test_source')
     comment.created_utc = time.time() - 90 * 86400
     cross_post = MagicMock()
     phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=make_media_scan(0))
     reply_text = cross_post.reply.call_args.args[0]
-    assert 'No image posts were made in r/pics in the last 90 days' in reply_text
+    assert phase3.DUPLICATE_DETECTOR_SOURCE_URL not in reply_text
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
 @pytest.mark.parametrize('scan', [
-    make_media_scan(1), make_media_scan(2), make_media_scan(5), make_media_scan(0),
+    make_media_scan(1), make_media_scan(2), make_media_scan(5),
     make_media_scan(1, complete=False, oldest_post_utc=0), make_media_scan(21, complete=False, oldest_post_utc=0),
 ])
 def test_image_scan_sentence_formats_in_every_language(make_mock_comment, target_subreddit, scan):

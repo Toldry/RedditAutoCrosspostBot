@@ -149,8 +149,8 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
     The reply (`REPLY_TO_CROSSPOST`) says the target was searched for the same URL and, for image and video
     posts, adds one sentence from `phase3.describe_media_scan`: how many image (or video) posts were compared
     and over what period (`REPLY_TO_CROSSPOST_IMAGE_CHECK` / `..._VIDEO_CHECK`), the same for a scan cut short
-    by Reddit's listing limit (`..._IMAGE_CHECK_PARTIAL` / `..._VIDEO_CHECK_PARTIAL`), or that there were none
-    (`..._NO_IMAGE_POSTS`; a video scan that found none adds no sentence). That sentence links to
+    by Reddit's listing limit (`..._IMAGE_CHECK_PARTIAL` / `..._VIDEO_CHECK_PARTIAL`). A scan that
+    found no posts to compare adds no sentence. That sentence links to
     `duplicate_detector.py` on GitHub (`DUPLICATE_DETECTOR_SOURCE_URL`), so keep that file readable.
   - Handles Reddit API crosspost exceptions gracefully via modern `e.items` inspection (e.g., `NO_CROSSPOSTS`, `SUBREDDIT_NOTALLOWED`, `NO_IMAGES`, `SUBMIT_VALIDATION_*`).
   - Deletes the record from PostgreSQL. This happens **after** the crosspost, and Phase 3 keeps no
@@ -212,7 +212,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`docs/db-viewer.md`](./docs/db-viewer.md) | How to start the optional read-only `pgweb` database viewer on the VM and open it through an SSH tunnel. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1645 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, waiting period and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/unit/`](./tests/unit/) | 1638 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, waiting period and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |

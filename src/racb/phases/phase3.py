@@ -149,19 +149,17 @@ def describe_media_scan(media_scan, source_comment, target_subreddit):
         return ''
     media = media_scan.media.upper()  # IMAGE or VIDEO, as in the message keys
     count = media_scan.posts_checked
+    if not count:
+        # Nothing to compare with: too rare to be worth its own sentence
+        return ''
     if media_scan.complete:
-        # Every image (or video) post made since the comment was written. A subreddit without a single video
-        # post in that time is too rare to be worth its own sentence, so it gets none.
-        if not count and media == 'VIDEO':
-            return ''
-        string_key = f'REPLY_TO_CROSSPOST_{media}_CHECK' if count else 'REPLY_TO_CROSSPOST_NO_IMAGE_POSTS'
+        # Every image (or video) post made since the comment was written
+        string_key = f'REPLY_TO_CROSSPOST_{media}_CHECK'
         period_start = getattr(source_comment, 'created_utc', None)
-    elif count:
+    else:
         # Reddit's listing ended first, so only the newest ones were compared
         string_key = f'REPLY_TO_CROSSPOST_{media}_CHECK_PARTIAL'
         period_start = media_scan.oldest_post_utc
-    else:
-        return ''
     if period_start is None:
         return ''
 

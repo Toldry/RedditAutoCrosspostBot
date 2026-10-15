@@ -51,9 +51,6 @@ msgstr " I ALSO LOOKED THROUGH ALL {post_count} IMAGE POSTS MADE IN r/{target_su
 msgid "REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL"
 msgstr " I ALSO LOOKED THROUGH THE {post_count} NEWEST IMAGE POSTS IN r/{target_subreddit}, GOING BACK {scan_period}, AND [CHECKED FOR DUPLICATES]({duplicate_detector_url}) OF THIS IMAGE. NONE WERE FOUND."
 
-msgid "REPLY_TO_CROSSPOST_NO_IMAGE_POSTS"
-msgstr " NO IMAGE POSTS WERE MADE IN r/{target_subreddit} IN THE LAST {scan_period}, SO THERE WAS NOTHING TO [CHECK FOR DUPLICATES]({duplicate_detector_url})."
-
 msgid "REPLY_TO_CROSSPOST_VIDEO_CHECK"
 msgstr " I ALSO LOOKED THROUGH ALL {post_count} VIDEO POSTS MADE IN r/{target_subreddit} IN THE LAST {scan_period} AND [CHECKED FOR DUPLICATES]({duplicate_detector_url}) OF THIS VIDEO. NONE WERE FOUND."
 
