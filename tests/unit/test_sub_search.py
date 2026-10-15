@@ -33,6 +33,36 @@ def test_get_matches_filters_exact_match_and_limits():
 
 
 @pytest.mark.unit
+def test_get_matches_drops_topic_only_matches_and_ranks_by_name_similarity():
+    # Real /subreddits/search output for 'wtfdidijustread' (2026-10-15): it matches on topic, not name.
+    mock_sub_search_results = [
+        MagicMock(display_name='DaFuqDidIJustRead'),
+        MagicMock(display_name='evenwithcontext'),
+        MagicMock(display_name='nocontext'),
+        MagicMock(display_name='HilariousComments'),
+        MagicMock(display_name='guessthereddit'),
+        MagicMock(display_name='IGTHFT_Mods'),
+        MagicMock(display_name='wtfdidijustread76'),
+    ]
+
+    mock_reddit = MagicMock()
+    mock_reddit.subreddits.search.return_value = mock_sub_search_results
+
+    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit):
+        results = sub_search.get_matches('wtfdidijustread')
+        assert results == ['wtfdidijustread76', 'DaFuqDidIJustRead']
+
+
+@pytest.mark.unit
+def test_get_matches_returns_empty_when_nothing_is_similar():
+    mock_reddit = MagicMock()
+    mock_reddit.subreddits.search.return_value = [MagicMock(display_name='nocontext')]
+
+    with patch('racb.core.sub_search.get_reddit_instance', return_value=mock_reddit):
+        assert sub_search.get_matches('wtfdidijustread') == []
+
+
+@pytest.mark.unit
 def test_get_matches_handles_exception():
     mock_reddit = MagicMock()
     mock_reddit.subreddits.search.side_effect = prawcore.exceptions.ServerError(MagicMock())

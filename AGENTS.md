@@ -30,7 +30,7 @@ from environment variables (section 4). Auxiliary replies are sent by re-fetchin
 auxiliary bot's PRAW instance (`get_comment_with_different_praw_instance`). All auxiliary bots act during Phase 1:
 1. **`sub_doesnt_exist_bot`** (`u/sub_doesnt_exist_bot`):
    - Trigger: Comment links to a non-existent subreddit (HTTP 404 / redirect).
-   - Behavior: Performs live community search via `reddit.subreddits.search()` to suggest close existing subreddits, or suggests creating the subreddit if the name length is 3–24 characters.
+   - Behavior: Performs live community search via `reddit.subreddits.search()` to suggest close existing subreddits. That endpoint matches on topic (title and description), so `get_matches()` keeps only names at least `MIN_NAME_SIMILARITY` (0.6, `difflib` ratio) similar to the requested one; or suggests creating the subreddit if the name length is 3–24 characters.
 2. **`same_subreddit_bot`** (`u/same_subreddit_bot`):
    - Trigger: Comment links to the exact same subreddit where it was posted.
    - Behavior: Replies humorously (*"Yes, that's where we are."*).
@@ -154,7 +154,7 @@ Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1
 | [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_listen_only()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
 | [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check) and the bot-name constants. |
 | [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
-| [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Live Reddit community search using `reddit.subreddits.search()` for typo suggestions. |
+| [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Live Reddit community search using `reddit.subreddits.search()` for typo suggestions, filtered and ranked by name similarity. |
 | [`src/racb/core/duplicate_detector.py`](./src/racb/core/duplicate_detector.py) | Self-hosted perceptual image hashing (`imagehash` / `dhash`) for visual duplicate detection in target subreddits. |
 | [`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py) | Phase 1 comment matching, blacklisting, auxiliary bot dispatching, DB insertion. |
 | [`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py) | Phase 2 batch comment filtering via `reddit.info()` and DB cleanup. |
