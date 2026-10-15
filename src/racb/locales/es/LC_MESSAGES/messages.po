@@ -21,6 +21,10 @@ msgstr ""
 
 msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
 msgstr ""
+"\n"
+"Gracias por los comentarios, ¿te importaría explicar por qué esta publicación/comentario era inapropiado?\n"
+"\n"
+"El creador de este bot revisará las respuestas e intentará cambiar el código para reducir casos como este."
 
 msgid "REPLY_TO_CROSSPOST"
 msgstr ""
@@ -28,25 +32,28 @@ msgstr ""
 "Compartí esto de r/{source_subreddit} en r/{target_subreddit} después de ver [este comentario **hecho por humanos** con una votación decente]({source_comment_permalink}) (score={source_comment_score}), que parece sugerir que esta publicación también encajaría bien aquí.\n"
 
 msgid "THE_USER_WHO_COMMENTED"
-msgstr ""
+msgstr "el usuario que comentó"
 
 msgid "THATS_WHERE_WE_ARE"
-msgstr ""
+msgstr "Sí, ahí es donde estamos."
 
 msgid "NONEXISTENT_SUBREDDIT"
-msgstr ""
+msgstr "El subreddit r/{target_subreddit} no existe."
 
 msgid "ALTERNATE_SUBS_SUGGESTION"
 msgstr ""
+"¿Quisiste decir?:\n"
+"\n"
+"{alternate_subreddits_string}"
 
 msgid "MAYBE_TYPO"
-msgstr ""
+msgstr "¿Quizás hay un error tipográfico?"
 
 msgid "PROMPT_NONEXISTENT_SUBREDDIT_CREATION"
-msgstr ""
+msgstr "Considera [**crear un nuevo subreddit** r/{target_subreddit}](/subreddits/create?name={target_subreddit})."
 
 msgid "FOUND_POST_WITH_SAME_CONTENT"
-msgstr ""
+msgstr "Encontré [esta publicación]({same_content_post_url}) en r/{target_subreddit} con el mismo contenido que la publicación actual."
 
 msgid "DURATION_IN_DAYS"
 msgid_plural "DURATION_IN_DAYS_PLURAL"

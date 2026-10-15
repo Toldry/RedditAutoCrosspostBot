@@ -86,3 +86,12 @@ fr = [
 "en@totallynotrobots" = [
     "totallynotrobots",
 ]
+
+# Russian. r/russian (learners) and r/AskARussian (written in English) are left out on purpose.
+ru = [
+    "ru",
+    "Pikabu",
+    "KafkaFPS",
+    "tjournal_refugees",
+    "liberta",
+]

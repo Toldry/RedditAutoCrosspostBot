@@ -1,9 +1,12 @@
 """Unit tests for racb.i18n translation and localization module."""
 
+import gettext
+import io
 import string
 
 import pytest
-from babel.messages.mofile import read_mo
+from babel.messages.catalog import Catalog
+from babel.messages.mofile import read_mo, write_mo
 from babel.messages.pofile import read_po
 
 from racb import i18n
@@ -14,7 +17,7 @@ from racb.core.reddit import (
     SAME_POST_BOT_NAME,
 )
 
-EXPECTED_LOCALES = ['de', 'en', 'en@totallynotrobots', 'es', 'fr', 'he']
+EXPECTED_LOCALES = ['de', 'en', 'en@totallynotrobots', 'es', 'fr', 'he', 'ru']
 PO_PATHS = sorted(i18n.LOCALES_DIR.glob(f'*/LC_MESSAGES/{i18n.DOMAIN}.po'))
 
 
@@ -83,6 +86,29 @@ def test_english_catalog_is_complete_and_defines_every_key():
         assert keys <= english_keys, f'{locale_of(po_path)} has keys that en lacks: {keys - english_keys}'
 
 
+def english_keys():
+    english = read_catalog(i18n.LOCALES_DIR / 'en' / 'LC_MESSAGES' / 'messages.po')
+    return {message_key(message) for message in english if message.id}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('po_path', PO_PATHS, ids=locale_of)
+def test_every_locale_translates_every_key(po_path):
+    catalog = read_catalog(po_path)
+    translated = {}
+    for message in catalog:
+        if not message.id:
+            continue
+        strings = message.string if isinstance(message.string, (list, tuple)) else (message.string,)
+        expected_forms = catalog.num_plurals if message.pluralizable else 1
+        assert len(strings) == expected_forms and all(strings), (
+            f'{locale_of(po_path)} leaves {message_key(message)} (or one of its plural forms) untranslated'
+        )
+        translated[message_key(message)] = message
+    missing = english_keys() - translated.keys()
+    assert not missing, f'{locale_of(po_path)} is missing {sorted(missing)}'
+
+
 @pytest.mark.unit
 def test_every_locale_translates_the_suffix():
     for locale in EXPECTED_LOCALES:
@@ -96,6 +122,7 @@ def test_subreddit_language_map():
     assert i18n.subreddit_language_map['ani_bm'] == 'he'
     assert i18n.subreddit_language_map['moi_dlvv'] == 'fr'
     assert i18n.subreddit_language_map['totallynotrobots'] == 'en@totallynotrobots'
+    assert i18n.subreddit_language_map['pikabu'] == 'ru'
     assert i18n.subreddit_language_map.get('unknown_sub_name_123', 'en') == 'en'
     assert i18n.get_language('ICH_IEL') == 'de'
 
@@ -134,13 +161,38 @@ def test_get_translated_string_totallynotrobots():
     assert 'WRITTEN BY A HUMAN' in text
 
 
+PARTIAL_LOCALE = 'xx'
+PARTIAL_SUBREDDIT = 'partly_translated_sub'
+
+
+@pytest.fixture
+def partial_locale(monkeypatch):
+    """Maps PARTIAL_SUBREDDIT to a locale that translates only the suffix and NONEXISTENT_SUBREDDIT.
+
+    Every real locale is complete, so the fallback paths need a made-up partial one.
+    """
+    catalog = Catalog(locale='es')
+    catalog.add('POST_SUFFIX_TEXT', '\n\n---\n^(🤖 parcial 🤖)')
+    catalog.add('NONEXISTENT_SUBREDDIT', 'r/{target_subreddit} no existe.')
+    mo_buffer = io.BytesIO()
+    write_mo(mo_buffer, catalog)
+    mo_buffer.seek(0)
+    partial_catalog = gettext.GNUTranslations(mo_buffer)
+
+    real_get_catalog = i18n.get_catalog
+    monkeypatch.setattr(
+        i18n, 'get_catalog',
+        lambda locale: partial_catalog if locale == PARTIAL_LOCALE else real_get_catalog(locale),
+    )
+    monkeypatch.setitem(i18n.subreddit_language_map, PARTIAL_SUBREDDIT, PARTIAL_LOCALE)
+
+
 @pytest.mark.unit
-def test_untranslated_string_falls_back_to_english_with_an_english_suffix():
-    # THATS_WHERE_WE_ARE has no Spanish translation
-    text = i18n.get_translated_string('THATS_WHERE_WE_ARE', 'yo_elvr', bot_name='BotX')
+def test_untranslated_string_falls_back_to_english_with_an_english_suffix(partial_locale):
+    text = i18n.get_translated_string('THATS_WHERE_WE_ARE', PARTIAL_SUBREDDIT, bot_name='BotX')
     assert text.startswith("Yes, that's where we are.")
     assert '𝙱𝙴𝙴𝙿 𝙱𝙾𝙾𝙿' in text  # the English footer
-    assert 'escrito por un bot' not in text
+    assert 'parcial' not in text
 
 
 @pytest.mark.unit
@@ -219,6 +271,7 @@ def test_format_duration_in_days_is_localized():
     assert i18n.format_duration_in_days(90 * 86400, 'pics') == '90 days'
     assert i18n.format_duration_in_days(90 * 86400, 'ich_iel') == '90 Tage'
     assert i18n.format_duration_in_days(90 * 86400, 'ani_bm') == '90 ימים'
+    assert i18n.format_duration_in_days(90 * 86400, 'pikabu') == '90 дней'
 
 
 @pytest.mark.unit
@@ -230,11 +283,16 @@ def test_format_duration_in_days_uses_plural_forms():
     # Hebrew has a dual form for two
     assert i18n.format_duration_in_days(86400, 'ani_bm') == 'יום אחד'
     assert i18n.format_duration_in_days(2 * 86400, 'ani_bm') == 'יומיים'
+    # Russian picks one of three forms by the last digits
+    for days, expected in [(1, '1 день'), (21, '21 день'), (3, '3 дня'), (24, '24 дня'),
+                           (5, '5 дней'), (11, '11 дней'), (14, '14 дней'), (111, '111 дней')]:
+        assert i18n.format_duration_in_days(days * 86400, 'pikabu') == expected
 
 
 @pytest.mark.unit
-def test_language_with_all_needs_every_key_translated():
+def test_language_with_all_needs_every_key_translated(partial_locale):
     assert i18n.language_with_all(['NONEXISTENT_SUBREDDIT', 'MAYBE_TYPO'], 'ich_iel') == 'de'
-    # THATS_WHERE_WE_ARE has no Spanish translation, so the whole set falls back to English
-    assert i18n.language_with_all(['POST_SUFFIX_TEXT', 'THATS_WHERE_WE_ARE'], 'yo_elvr') == 'en'
+    assert i18n.language_with_all(['NONEXISTENT_SUBREDDIT', 'POST_SUFFIX_TEXT'], PARTIAL_SUBREDDIT) == 'xx'
+    # THATS_WHERE_WE_ARE has no translation in the partial locale, so the whole set falls back to English
+    assert i18n.language_with_all(['POST_SUFFIX_TEXT', 'THATS_WHERE_WE_ARE'], PARTIAL_SUBREDDIT) == 'en'
     assert i18n.language_with_all(['NONEXISTENT_SUBREDDIT'], 'pics') == 'en'

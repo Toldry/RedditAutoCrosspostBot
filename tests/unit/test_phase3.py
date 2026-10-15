@@ -87,7 +87,7 @@ def test_reply_to_crosspost_formats_waiting_period(make_mock_comment):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'totallynotrobots'])
+@pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
 def test_reply_to_crosspost_omits_waiting_and_downvote_notes(make_mock_comment, target_subreddit):
     comment = make_mock_comment(subreddit='test_source')
     cross_post = MagicMock()

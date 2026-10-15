@@ -21,6 +21,10 @@ msgstr ""
 
 msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
 msgstr ""
+"\n"
+"תודה על המשוב, אכפת לך לפרט למה הפוסט/התגובה הזו לא הייתה במקום?\n"
+"\n"
+"היוצר של הבוט יקרא את התגובות וינסה לשנות את הקוד כדי לצמצם מקרים כאלה."
 
 msgid "REPLY_TO_CROSSPOST"
 msgstr ""
