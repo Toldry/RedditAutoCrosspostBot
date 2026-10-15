@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.7] - 2026-10-15
+
 ### Fixed
 - **Auto-Deploy Setup on a Fresh Project:** `scripts/setup_auto_deploy.sh` failed with "Service account ... does not exist" when granting roles right after creating the `github-deployer` service account, because IAM takes a short while to see a new account. It now retries those grants for up to 2 minutes.
 
