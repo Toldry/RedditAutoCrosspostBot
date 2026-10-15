@@ -1,8 +1,11 @@
 """Unit tests for racb.phases.phase3 module."""
 
+import time
 from unittest.mock import patch, MagicMock
 import pytest
 import praw.exceptions
+from racb import i18n
+from racb.core import duplicate_detector
 from racb.phases import phase3
 
 
@@ -39,7 +42,7 @@ def test_exec_crosspost_success(make_mock_comment):
         res = phase3.exec_crosspost(comment, 'target_sub', reply_to_crosspost_flag=True)
         assert res.success is True
         assert res.crosspost == mock_crosspost
-        mock_reply.assert_called_once_with(comment, mock_crosspost, 'target_sub')
+        mock_reply.assert_called_once_with(comment, mock_crosspost, 'target_sub', image_scan=None)
 
 
 @pytest.mark.unit
@@ -88,17 +91,83 @@ def test_reply_to_crosspost_formats_waiting_period(make_mock_comment):
 
 @pytest.mark.unit
 @pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
-def test_reply_to_crosspost_asks_for_bad_bot_feedback_instead_of_downvotes(make_mock_comment, target_subreddit):
+def test_reply_to_crosspost_asks_for_bad_bot_feedback_in_its_language(make_mock_comment, target_subreddit):
     comment = make_mock_comment(subreddit='test_source')
     cross_post = MagicMock()
     phase3.reply_to_crosspost(comment, cross_post, target_subreddit)
     reply_text = cross_post.reply.call_args.args[0]
+    bad_bot_phrase = i18n.get_translated_string('BAD_BOT_PHRASE', target_subreddit, add_suffix=False)
+    assert bad_bot_phrase.lower() in reply_text.lower()
     assert 'downvote' not in reply_text.lower()
-    assert 'bad bot' in reply_text.lower()  # the inbox only recognizes the English phrase
-    assert '^3' in reply_text
-    assert '^(2)' in reply_text
-    assert '^(2 - ' in reply_text
-    assert '^(3 - ' in reply_text
+    assert '^1' in reply_text
+    for removed_footnote in ['^2', '^(2', '^3', '^(3']:
+        assert removed_footnote not in reply_text
+
+
+def make_image_scan(image_posts_checked=0, complete=True, oldest_post_utc=None):
+    return duplicate_detector.ImageRepostScan(
+        image_posts_checked=image_posts_checked, complete=complete, oldest_post_utc=oldest_post_utc,
+    )
+
+
+@pytest.mark.unit
+def test_reply_to_crosspost_without_image_scan_has_no_image_sentence(make_mock_comment):
+    comment = make_mock_comment(subreddit='test_source')
+    cross_post = MagicMock()
+    phase3.reply_to_crosspost(comment, cross_post, 'pics', image_scan=None)
+    reply_text = cross_post.reply.call_args.args[0]
+    assert 'To prevent reposts, I looked through r/pics for posts with the same URL.\n' in reply_text
+    assert 'duplicate_detector.py' not in reply_text
+
+
+@pytest.mark.unit
+def test_reply_to_crosspost_reports_complete_image_scan(make_mock_comment):
+    comment = make_mock_comment(subreddit='test_source')
+    comment.created_utc = time.time() - 90 * 86400
+    cross_post = MagicMock()
+    phase3.reply_to_crosspost(comment, cross_post, 'pics', image_scan=make_image_scan(412))
+    reply_text = cross_post.reply.call_args.args[0]
+    assert (
+        'I also looked through all 412 image posts made in r/pics in the last 90 days and '
+        f'[checked for duplicates]({phase3.DUPLICATE_DETECTOR_SOURCE_URL}) of this image. None were found.'
+    ) in reply_text
+
+
+@pytest.mark.unit
+def test_reply_to_crosspost_reports_partial_image_scan(make_mock_comment):
+    comment = make_mock_comment(subreddit='test_source')
+    comment.created_utc = time.time() - 90 * 86400
+    scan = make_image_scan(870, complete=False, oldest_post_utc=time.time() - 12 * 86400)
+    cross_post = MagicMock()
+    phase3.reply_to_crosspost(comment, cross_post, 'pics', image_scan=scan)
+    reply_text = cross_post.reply.call_args.args[0]
+    assert 'the 870 newest image posts in r/pics, going back 12 days' in reply_text
+    assert "Reddit doesn't list older posts" in reply_text
+
+
+@pytest.mark.unit
+def test_reply_to_crosspost_reports_that_there_were_no_image_posts(make_mock_comment):
+    comment = make_mock_comment(subreddit='test_source')
+    comment.created_utc = time.time() - 90 * 86400
+    cross_post = MagicMock()
+    phase3.reply_to_crosspost(comment, cross_post, 'pics', image_scan=make_image_scan(0))
+    reply_text = cross_post.reply.call_args.args[0]
+    assert 'No image posts were made in r/pics in the last 90 days' in reply_text
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
+@pytest.mark.parametrize('scan', [
+    make_image_scan(1), make_image_scan(2), make_image_scan(5), make_image_scan(0),
+    make_image_scan(1, complete=False, oldest_post_utc=0), make_image_scan(21, complete=False, oldest_post_utc=0),
+])
+def test_image_scan_sentence_formats_in_every_language(make_mock_comment, target_subreddit, scan):
+    comment = make_mock_comment(subreddit='test_source')
+    comment.created_utc = time.time() - 90 * 86400
+    sentence = phase3.describe_image_scan(scan, comment, target_subreddit)
+    assert sentence.startswith(' ')
+    assert phase3.DUPLICATE_DETECTOR_SOURCE_URL in sentence
+    assert '{' not in sentence
 
 
 @pytest.mark.unit

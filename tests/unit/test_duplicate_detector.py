@@ -69,7 +69,7 @@ def test_compute_image_hash_network_error():
 
 
 @pytest.mark.unit
-def test_get_reposts_in_sub_matches_identical_image(make_mock_comment):
+def test_scan_matches_a_resized_copy_of_the_image(make_mock_comment):
     img_bytes_1 = create_test_image_bytes(color='green', size=(200, 200))
     img_bytes_2 = create_test_image_bytes(color='green', size=(100, 100))  # Resized version of same image
 
@@ -91,14 +91,16 @@ def test_get_reposts_in_sub_matches_identical_image(make_mock_comment):
 
     with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit):
         with patch('requests.get', side_effect=mock_requests_get):
-            duplicates = duplicate_detector.get_reposts_in_sub(source_comment, 'target_sub')
+            scan = duplicate_detector.scan_subreddit_for_image(source_comment.submission, 'target_sub')
+            duplicates = scan.duplicates
+            assert scan.image_posts_checked == 1
             assert len(duplicates) == 1
             assert duplicates[0]['post_id'] == 'candidate_123'
             assert duplicates[0]['distance'] <= duplicate_detector.DEFAULT_HASH_THRESHOLD
 
 
 @pytest.mark.unit
-def test_get_reposts_in_sub_ignores_different_images(make_mock_comment):
+def test_scan_ignores_different_images(make_mock_comment):
     img_source = Image.new('RGB', (100, 100), color='white')
     # Create distinct patterns for source and candidate
     for x in range(50):
@@ -133,8 +135,11 @@ def test_get_reposts_in_sub_ignores_different_images(make_mock_comment):
 
     with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit):
         with patch('requests.get', side_effect=mock_requests_get):
-            duplicates = duplicate_detector.get_reposts_in_sub(source_comment, 'target_sub', hash_threshold=2)
-            assert len(duplicates) == 0
+            scan = duplicate_detector.scan_subreddit_for_image(
+                source_comment.submission, 'target_sub', hash_threshold=2,
+            )
+            assert scan.image_posts_checked == 1
+            assert len(scan.duplicates) == 0
 
 
 @pytest.mark.unit
@@ -231,3 +236,91 @@ def test_download_image_bytes_rejects_oversized_images():
     with patch('requests.get', return_value=declared_oversized):
         assert duplicate_detector.download_image_bytes('https://i.redd.it/huge.png') is None
 
+
+
+def make_post(post_id, url, created_utc, preview_resolutions=None):
+    post = MagicMock()
+    post.id = post_id
+    post.url = url
+    post.created_utc = created_utc
+    if preview_resolutions is None:
+        del post.preview
+    else:
+        post.preview = {'images': [{'resolutions': preview_resolutions}]}
+    return post
+
+
+def scan_listing(posts, posted_after=None, limit=1000, image_bytes_by_url=None):
+    """Runs scan_subreddit_for_image over a fake "new" listing; every image is plain green unless given."""
+    source = make_post('source', 'https://i.redd.it/source.png', created_utc=0)
+    mock_reddit = MagicMock()
+    mock_reddit.subreddit.return_value.new.return_value = posts[:limit]
+    image_bytes_by_url = image_bytes_by_url or {}
+    downloaded_urls = []
+
+    def mock_requests_get(url, **kwargs):
+        downloaded_urls.append(url)
+        return make_http_response(image_bytes_by_url.get(url, create_test_image_bytes(color='green')))
+
+    with patch('racb.core.duplicate_detector.get_reddit_instance', return_value=mock_reddit), \
+            patch('requests.get', side_effect=mock_requests_get):
+        scan = duplicate_detector.scan_subreddit_for_image(source, 'target_sub', posted_after=posted_after, limit=limit)
+    return scan, downloaded_urls
+
+
+@pytest.mark.unit
+def test_scan_returns_none_for_a_post_that_is_not_an_image():
+    link_post = make_post('link', 'https://example.com/article', created_utc=0)
+    assert duplicate_detector.scan_subreddit_for_image(link_post, 'target_sub') is None
+
+
+@pytest.mark.unit
+def test_scan_stops_at_the_first_post_older_than_posted_after():
+    posts = [
+        make_post('new_image', 'https://i.redd.it/a.png', created_utc=300),
+        make_post('new_link', 'https://example.com/b', created_utc=250),
+        make_post('old_image', 'https://i.redd.it/c.png', created_utc=100),
+    ]
+    scan, downloaded_urls = scan_listing(posts, posted_after=200)
+    assert scan.complete is True
+    assert scan.image_posts_checked == 1  # the link post is skipped, the old image is never read
+    assert scan.oldest_post_utc == 250
+    assert 'https://i.redd.it/c.png' not in downloaded_urls
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['new_image']
+
+
+@pytest.mark.unit
+def test_scan_is_incomplete_when_the_listing_runs_out_first():
+    posts = [make_post(f'p{i}', f'https://i.redd.it/{i}.png', created_utc=1000 - i) for i in range(3)]
+    scan, _ = scan_listing(posts, posted_after=0, limit=3)
+    assert scan.complete is False
+    assert scan.image_posts_checked == 3
+    assert scan.oldest_post_utc == 998
+
+
+@pytest.mark.unit
+def test_scan_is_complete_when_the_subreddit_has_fewer_posts_than_the_limit():
+    posts = [make_post('only', 'https://i.redd.it/only.png', created_utc=500)]
+    scan, _ = scan_listing(posts, posted_after=0, limit=1000)
+    assert scan.complete is True
+
+
+@pytest.mark.unit
+def test_scan_does_not_count_images_it_could_not_read():
+    posts = [make_post('broken', 'https://i.redd.it/broken.png', created_utc=500)]
+    scan, _ = scan_listing(posts, image_bytes_by_url={'https://i.redd.it/broken.png': b'not an image'})
+    assert scan.image_posts_checked == 0
+    assert scan.duplicates == []
+
+
+@pytest.mark.unit
+def test_scan_compares_small_previews_instead_of_full_images():
+    resolutions = [
+        {'url': 'https://preview.redd.it/a.png?width=108&amp;s=1', 'width': 108},
+        {'url': 'https://preview.redd.it/a.png?width=320&amp;s=2', 'width': 320},
+        {'url': 'https://preview.redd.it/a.png?width=640&amp;s=3', 'width': 640},
+    ]
+    posts = [make_post('with_preview', 'https://i.redd.it/a.png', created_utc=500, preview_resolutions=resolutions)]
+    _, downloaded_urls = scan_listing(posts)
+    assert 'https://preview.redd.it/a.png?width=320&s=2' in downloaded_urls
+    assert 'https://i.redd.it/a.png' not in downloaded_urls

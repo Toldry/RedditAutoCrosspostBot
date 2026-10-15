@@ -1,6 +1,7 @@
 """Phase 3: Final validation and execution of crossposts with localized replies."""
 
 import logging
+import time
 
 import praw
 
@@ -9,6 +10,12 @@ from racb.phases import phase2
 from racb import config, i18n
 
 logger = logging.getLogger(__name__)
+
+# Linked from the crosspost reply, so readers can see how the image duplicate check works
+DUPLICATE_DETECTOR_SOURCE_URL = (
+    'https://github.com/Toldry/RedditAutoCrosspostBot/blob/master/src/racb/core/duplicate_detector.py'
+)
+SECONDS_PER_DAY = 86400
 
 
 def process_comment_entries():
@@ -51,17 +58,17 @@ def process_oldest_entry():
 
 def handle_comment(comment_entry):
     logger.info(f'Begin processing comment entry: {reddit.full_url(comment_entry["permalink"])}')
-    result = phase2.run_filters(comment_entry)
+    result = phase2.run_filters(comment_entry, full_image_scan=True)
     if not result.passes_filter:
         logger.info(f'Comment {reddit.full_url(comment_entry["permalink"])} did not pass final filter: {result.reason}')
         return
 
     source_comment = result.comment
     target_subreddit = result.target_subreddit
-    exec_crosspost(source_comment, target_subreddit)
+    exec_crosspost(source_comment, target_subreddit, image_scan=result.image_scan)
 
 
-def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=True):
+def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=True, image_scan=None):
     class Result:
         success = False
         crosspost = None
@@ -85,7 +92,7 @@ def exec_crosspost(source_comment, target_subreddit, reply_to_crosspost_flag=Tru
         result.success = True
         result.crosspost = cross_post
         if reply_to_crosspost_flag:
-            reply_to_crosspost(source_comment, cross_post, target_subreddit)
+            reply_to_crosspost(source_comment, cross_post, target_subreddit, image_scan=image_scan)
     except Exception as e:
         hce_res = handle_crosspost_exception(e, source_comment, target_subreddit)
         if hce_res.handled_with_grace:
@@ -110,7 +117,7 @@ def get_crosspost_title_for_crosspost(submission, target_subreddit):
         return None
 
 
-def reply_to_crosspost(source_comment, cross_post, target_subreddit):
+def reply_to_crosspost(source_comment, cross_post, target_subreddit, image_scan=None):
     source_subreddit = source_comment.subreddit.display_name
     text = i18n.get_translated_string(
         'REPLY_TO_CROSSPOST',
@@ -131,8 +138,37 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit):
         source_submission_id=source_comment.submission.id,
         timedelta_string=timedelta_string,
         source_comment_author_name=source_comment_author_name,
+        image_check=describe_image_scan(image_scan, source_comment, target_subreddit),
     )
     return cross_post.reply(text)
+
+
+def describe_image_scan(image_scan, source_comment, target_subreddit):
+    """Returns the sentence saying which image posts were compared with this one, or '' if none were."""
+    if image_scan is None:
+        return ''
+    count = image_scan.image_posts_checked
+    if image_scan.complete:
+        # Every image post made since the comment was written
+        string_key = 'REPLY_TO_CROSSPOST_IMAGE_CHECK' if count else 'REPLY_TO_CROSSPOST_NO_IMAGE_POSTS'
+        period_start = getattr(source_comment, 'created_utc', None)
+    elif count:
+        # Reddit's listing ended first, so only the newest image posts were compared
+        string_key = 'REPLY_TO_CROSSPOST_IMAGE_CHECK_PARTIAL'
+        period_start = image_scan.oldest_post_utc
+    else:
+        return ''
+    if period_start is None:
+        return ''
+
+    scan_period = i18n.format_duration_in_days(max(time.time() - period_start, SECONDS_PER_DAY), target_subreddit)
+    _, text = i18n.lookup(string_key, target_subreddit, count=count or None)  # The zero message has no plurals
+    return text.format(
+        image_post_count=count,
+        target_subreddit=target_subreddit,
+        scan_period=scan_period,
+        duplicate_detector_url=DUPLICATE_DETECTOR_SOURCE_URL,
+    )
 
 
 def handle_crosspost_exception(e, comment, target_subreddit):

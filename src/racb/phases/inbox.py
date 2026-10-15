@@ -1,5 +1,6 @@
 """Responds to comments and feedback from the Reddit inbox."""
 
+import functools
 import logging
 import re
 
@@ -12,6 +13,7 @@ from racb import config, i18n
 
 logger = logging.getLogger(__name__)
 
+# Feedback phrases recognized in every subreddit, on top of each locale's BAD_BOT_PHRASE / GOOD_BOT_PHRASE
 NEGATIVE_PHRASES = [
     'bad bot',
     'delete this',
@@ -67,6 +69,8 @@ def handle_comment_reply(comment, reddit_instance=None, bot_name=reddit.AUTO_CRO
             respond_to_positive_sentiment(comment, bot_name)
         elif sentiment == 'negative':
             respond_to_negative_sentiment(comment, bot_name)
+        elif sentiment == 'explained_negative':
+            respond_to_explained_negative_sentiment(comment, bot_name)
 
         if sentiment is not None:
             reddit_instance.inbox.mark_read([comment])
@@ -82,12 +86,41 @@ def handle_comment_reply(comment, reddit_instance=None, bot_name=reddit.AUTO_CRO
         reddit_instance.inbox.mark_read([comment])
 
 
+def normalize_feedback(text):
+    """Lowercases `text`, drops punctuation and collapses whitespace, so "Bad bot!" equals "bad bot"."""
+    without_punctuation = re.sub(r'[^\w\s]', '', text, flags=re.S)
+    return ' '.join(without_punctuation.split()).lower()
+
+
+@functools.cache
+def feedback_phrases():
+    """Returns (bad bot phrases, good bot phrases) in every supported language, normalized."""
+    negative = {normalize_feedback(phrase) for phrase in NEGATIVE_PHRASES}
+    positive = {normalize_feedback(phrase) for phrase in POSITIVE_PHRASES}
+    bad_bot = {'bad bot'}
+    for locale in i18n.available_locales():
+        _, bad_phrase = i18n.lookup_in_languages('BAD_BOT_PHRASE', [locale, i18n.DEFAULT_LANGUAGE])
+        _, good_phrase = i18n.lookup_in_languages('GOOD_BOT_PHRASE', [locale, i18n.DEFAULT_LANGUAGE])
+        bad_bot.add(normalize_feedback(bad_phrase))
+        positive.add(normalize_feedback(good_phrase))
+    return bad_bot, negative | bad_bot, positive
+
+
 def check_sentiment(text):
-    cleaned_text = re.sub(r'[^\w\s]', '', text, flags=re.S).strip().lower()
-    if cleaned_text in NEGATIVE_PHRASES:
+    """Classifies a reply to a bot.
+
+    Returns 'negative' or 'positive' for a bare feedback phrase ("bad bot", "Schlechter Bot", "good bot", ...),
+    'explained_negative' for a "bad bot" phrase followed by an explanation ("Bad bot, this sub bans memes"),
+    and None for anything else.
+    """
+    bad_bot, negative, positive = feedback_phrases()
+    cleaned_text = normalize_feedback(text)
+    if cleaned_text in negative:
         return 'negative'
-    elif cleaned_text in POSITIVE_PHRASES:
+    elif cleaned_text in positive:
         return 'positive'
+    elif any(cleaned_text.startswith(phrase + ' ') for phrase in bad_bot):
+        return 'explained_negative'
     return None
 
 
@@ -127,3 +160,8 @@ def respond_to_positive_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NA
 
 def respond_to_negative_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
     return reply_to_feedback(comment, 'RESPOND_TO_NEGATIVE_SENTIMENT', bot_name)
+
+
+def respond_to_explained_negative_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
+    """Thanks a "bad bot" reply that already says why, instead of asking why."""
+    return reply_to_feedback(comment, 'RESPOND_TO_EXPLAINED_NEGATIVE_SENTIMENT', bot_name)

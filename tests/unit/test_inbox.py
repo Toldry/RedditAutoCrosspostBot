@@ -18,6 +18,42 @@ def test_check_sentiment():
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize('bad_phrase, good_phrase', [
+    ('Bad bot', 'Good bot'),
+    ('Bad human', 'Good human'),
+    ('Schlechter Bot', 'Guter Bot'),
+    ('Mal bot', 'Buen bot'),
+    ('Mauvais bot', 'Bon bot'),
+    ('בוט רע', 'בוט טוב'),
+    ('Плохой бот', 'Хороший бот'),
+])
+def test_check_sentiment_recognizes_every_supported_language(bad_phrase, good_phrase):
+    assert inbox.check_sentiment(f'{bad_phrase}!') == 'negative'
+    assert inbox.check_sentiment(f'  {good_phrase} ') == 'positive'
+    assert inbox.check_sentiment(f'{bad_phrase}, this subreddit bans crossposts') == 'explained_negative'
+
+
+@pytest.mark.unit
+def test_check_sentiment_does_not_treat_other_replies_starting_with_no_as_feedback():
+    assert inbox.check_sentiment('No, this is the right subreddit') is None
+    assert inbox.check_sentiment('badbot') is None
+
+
+@pytest.mark.unit
+def test_explained_bad_bot_reply_is_thanked_instead_of_asked_why():
+    mock_comment = MagicMock(spec=praw.models.Comment)
+    mock_comment.body = 'Bad bot, r/pics does not allow crossposts'
+    mock_reddit = MagicMock()
+    with patch('racb.phases.inbox.get_reddit_instance', return_value=mock_reddit), \
+            patch('racb.phases.inbox.respond_to_explained_negative_sentiment') as thank, \
+            patch('racb.phases.inbox.respond_to_negative_sentiment') as ask_why:
+        inbox.handle_comment_reply(mock_comment)
+    thank.assert_called_once()
+    ask_why.assert_not_called()
+    mock_reddit.inbox.mark_read.assert_called_once_with([mock_comment])
+
+
+@pytest.mark.unit
 def test_handle_comment_reply_marks_read():
     mock_comment = MagicMock(spec=praw.models.Comment)
     mock_comment.body = 'good bot'

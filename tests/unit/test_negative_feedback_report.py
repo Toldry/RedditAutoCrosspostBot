@@ -85,6 +85,9 @@ def test_markers_match_current_and_legacy_wordings():
     assert is_negative_sentiment_comment(FIRST_VERSION_TEXT, markers)
     assert not is_negative_sentiment_comment('I crossposted this from r/a to r/b', markers)
     assert not is_negative_sentiment_comment('', markers)
+    thanks = ('Thanks for explaining. The creator of this bot reads this feedback and will try to change the code '
+              'to reduce incidences like these.')
+    assert is_negative_sentiment_comment(thanks, markers)
 
 
 @pytest.mark.unit
@@ -142,6 +145,8 @@ def test_written_feedback_needs_more_than_a_sentiment_phrase():
     assert not is_written_feedback(_comment('c3', '[Removed]', author='user'))
     assert not is_written_feedback(_comment('d', 'I am explaining things', author='same_post_bot'))
     assert is_written_feedback(_comment('e', 'bad bot, this is a repost of a repost', author='user'))
+    assert not is_written_feedback(_comment('f', 'Schlechter Bot!', author='user'))
+    assert is_written_feedback(_comment('g', 'Плохой бот, это уже было', author='user'))
 
 
 @pytest.mark.unit

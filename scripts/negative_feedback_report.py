@@ -4,7 +4,9 @@
 The bots answer "bad bot" style replies with a comment asking why the post or comment was inappropriate (the
 RESPOND_TO_NEGATIVE_SENTIMENT text, sent by `respond_to_negative_sentiment` in `racb.phases.inbox`). Only
 /u/AutoCrosspostBot sent it from December 2019 until February 2023, when it was switched off; since it was
-switched back on, every bot sends it.
+switched back on, every bot sends it. A "bad bot" reply that already explains itself ("Bad bot, this sub
+bans memes") gets RESPOND_TO_EXPLAINED_NEGATIVE_SENTIMENT, a thank-you, instead; "bad bot" counts in every
+supported language.
 
 An exchange is reported only if it contains written feedback: a reply anywhere below the bot's question that
 says more than a bare "bad bot" / "good bot", or a "bad bot" comment that itself says more than that. The
@@ -59,7 +61,8 @@ REPORT_DATA_PATTERN = re.compile(
     rf'<script type="application/json" id="{REPORT_DATA_ELEMENT_ID}">(?P<data>.*?)</script>',
     re.DOTALL,
 )
-MESSAGE_KEY = 'RESPOND_TO_NEGATIVE_SENTIMENT'
+# The bots' answers to "bad bot": a question asking why, or thanks when the reply already said why
+MESSAGE_KEYS = ('RESPOND_TO_NEGATIVE_SENTIMENT', 'RESPOND_TO_EXPLAINED_NEGATIVE_SENTIMENT')
 # Earlier wordings of the message, which only ever went out in English. The first version (2019) said
 # "why this crosspost was inappropriate", later ones "why this post/comment was inappropriate".
 LEGACY_MESSAGE_PREFIXES = ('Thanks for the feedback, would you mind detailing why this',)
@@ -126,16 +129,17 @@ def normalize_text(text):
 
 
 def message_markers():
-    """Returns normalized text fragments that identify a RESPOND_TO_NEGATIVE_SENTIMENT comment in any locale."""
+    """Returns normalized text fragments that identify a bot's answer to "bad bot" (MESSAGE_KEYS) in any locale."""
     markers = {normalize_text(prefix) for prefix in LEGACY_MESSAGE_PREFIXES}
     for locale in i18n.available_locales():
-        try:
-            _, text = i18n.lookup_in_languages(MESSAGE_KEY, [locale])
-        except KeyError:
-            continue
-        first_line = next((line for line in text.splitlines() if line.strip()), '')
-        if first_line:
-            markers.add(normalize_text(first_line))
+        for message_key in MESSAGE_KEYS:
+            try:
+                _, text = i18n.lookup_in_languages(message_key, [locale])
+            except KeyError:
+                continue
+            first_line = next((line for line in text.splitlines() if line.strip()), '')
+            if first_line:
+                markers.add(normalize_text(first_line))
     return markers
 
 
@@ -218,7 +222,8 @@ def is_written_feedback(comment):
     body = (getattr(comment, 'body', '') or '').strip()
     if not body or body.lower() in DELETED_BODIES or is_bot_account(comment):
         return False
-    return check_sentiment(body) is None
+    # A "bad bot" followed by an explanation is written feedback; a bare "bad bot" / "good bot" is not
+    return check_sentiment(body) not in ('negative', 'positive')
 
 
 def collect_subtree(root_comment):
