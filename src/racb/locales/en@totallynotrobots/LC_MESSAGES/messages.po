@@ -18,7 +18,7 @@ msgstr ""
 "---\n"
 "^(🧑 THIS COMMENT WAS WRITTEN BY A HUMAN. SCHLERP SCHLORP 🧑)\n"
 "\n"
-"^[GITHUB](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[RANK](https://www.botrank.net/bots/{bot_name})"
+"^[GitHub](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[RANK](https://www.botrank.net/bots/{bot_name})"
 
 msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
 msgstr ""

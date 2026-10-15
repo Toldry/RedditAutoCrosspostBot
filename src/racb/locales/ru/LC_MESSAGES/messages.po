@@ -17,7 +17,7 @@ msgstr ""
 "---\n"
 "^(🤖 Этот комментарий написан ботом. Бип-буп 🤖)\n"
 "\n"
-"^[github](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://www.botrank.net/bots/{bot_name})"
+"^[GitHub](https://github.com/Toldry/RedditAutoCrosspostBot) ^| ^[Rank](https://www.botrank.net/bots/{bot_name})"
 
 msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
 msgstr ""
