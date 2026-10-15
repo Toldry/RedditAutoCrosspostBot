@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Automatic Deployment:** A new `deploy` CI job rebuilds and restarts the bot on the Google Cloud VM after every push to `master` that passes the unit tests, the live integration tests and their cleanup, at the commit the `release` job ended on. The live tests run in a new `integration-tests` job with the bot credentials stored as repository secrets, followed by `scripts/cleanup_test_history.py --strict`, which removes leftover test posts and fails if any could not be deleted. If `master` moved on during a run, that run deploys nothing and the newer push's run deploys instead. It signs in to Google Cloud with Workload Identity Federation (no stored key), reaches the VM over an IAP tunnel, and runs the new `scripts/redeploy.sh` through an SSH key that can run nothing else. The script checks that the bot is still running 30 seconds later and fails the job otherwise. It stays off until the `AUTO_DEPLOY` repository variable is `true`; the one-time setup (`scripts/setup_auto_deploy.sh`, `scripts/authorize_deploy_key.sh`) is described in `docs/auto-deploy.md`.
+- **Strict Test Cleanup:** `scripts/cleanup_test_history.py --strict` exits with code 1 when a bot could not be checked or a test item could not be deleted, and any such problems are now listed at the end of every run.
+
 ## [2.4.5] - 2026-10-15
 
 ### Fixed
