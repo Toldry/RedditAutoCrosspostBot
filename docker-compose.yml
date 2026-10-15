@@ -41,6 +41,36 @@ services:
     networks:
       - racb_net
 
+  # Read-only web viewer for the database (https://github.com/sosedoff/pgweb).
+  # Off by default: start it with `docker compose --profile viewer up -d pgweb`.
+  # Reach it only through an SSH tunnel; see docs/db-viewer.md.
+  pgweb:
+    image: sosedoff/pgweb:0.17.0
+    container_name: racb_pgweb
+    profiles: ["viewer"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGWEB_DATABASE_URL: postgresql://${POSTGRES_USER:-racb_user}:${POSTGRES_PASSWORD:-racb_secure_password}@db:5432/${POSTGRES_DB:-racb}?sslmode=disable
+      PGWEB_AUTH_USER: ${PGWEB_AUTH_USER:-admin}
+      PGWEB_AUTH_PASS: ${PGWEB_AUTH_PASS:-}
+    # pgweb serves without any login when the password is empty, so refuse to start instead
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        if [ -z "$$PGWEB_AUTH_PASS" ]; then
+        echo "Set PGWEB_AUTH_PASS in .env before starting pgweb" >&2; exit 1; fi;
+        exec /usr/bin/pgweb --bind=0.0.0.0 --listen=8081
+        --readonly --lock-session --no-ssh --skip-open
+    ports:
+      # Localhost only, like the database: never reachable from the internet
+      - "127.0.0.1:8081:8081"
+    networks:
+      - racb_net
+
 networks:
   racb_net:
     driver: bridge
