@@ -24,7 +24,7 @@ msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
 msgstr ""
 
 msgid "RESPOND_TO_POSITIVE_SENTIMENT"
-msgstr ""
+msgstr "THANK YOU, FELLOW HUMAN (◕ᴗ◕✿)"
 
 msgid "REPLY_TO_CROSSPOST"
 msgstr ""

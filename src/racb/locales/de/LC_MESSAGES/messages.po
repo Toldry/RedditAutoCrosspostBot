@@ -23,7 +23,7 @@ msgid "RESPOND_TO_NEGATIVE_SENTIMENT"
 msgstr ""
 
 msgid "RESPOND_TO_POSITIVE_SENTIMENT"
-msgstr ""
+msgstr "Danke (◕ᴗ◕✿)"
 
 msgid "REPLY_TO_CROSSPOST"
 msgstr ""
