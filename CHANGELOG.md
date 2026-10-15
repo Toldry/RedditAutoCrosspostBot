@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Replies to Feedback:** The bots answer feedback again. A "bad bot" style reply gets the question asking why the post or comment was inappropriate, and the first "good bot" under a bot comment gets "Thank you (◕ᴗ◕✿)" (later ones under the same comment are not thanked). Both use the usual footer and respect `DRY_RUN`.
+
+### Fixed
+- **Inbox Feedback Crash:** Every "good bot" or "bad bot" reply raised `AttributeError` since 2.4.2, because the inbox handler called `full_url` on the PRAW instance instead of the `racb.core.reddit` module, so feedback was never logged or marked read. A reply that Reddit rejects (locked or archived thread) is now marked read instead of being retried every 10 minutes.
+
 ## [2.4.5] - 2026-10-15
 
 ### Fixed
