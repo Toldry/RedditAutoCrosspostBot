@@ -32,5 +32,10 @@ RUN uv sync --locked --no-dev --no-install-project --no-cache
 COPY . .
 RUN uv sync --locked --no-dev --no-cache
 
+# Compile the gettext catalogs (.po -> .mo), which are not committed. Babel runs in a throwaway
+# environment (--isolated), so it never lands in /opt/venv
+RUN uv run --locked --isolated --only-group i18n --no-cache \
+    pybabel compile --statistics -d src/racb/locales
+
 # Run bot module entrypoint
 CMD ["python", "-m", "racb"]

@@ -14,7 +14,7 @@ import requests
 import schedule
 
 from racb.version import __version__
-from racb import config
+from racb import config, i18n
 from racb.config import env_bool
 from racb.core import db, known_subreddits, reddit
 from racb.phases import phase1, phase2, phase3, inbox, cleanup
@@ -179,6 +179,12 @@ def main():
     logger.info(f'=== Starting RedditAutoCrosspostBot v{__version__} ===')
     if config.is_dry_run():
         logger.info('DRY_RUN is enabled: no replies, crossposts or deletions will be made')
+
+    try:
+        i18n.check_catalogs_compiled()
+    except i18n.CatalogNotCompiledError as e:
+        logger.critical(f'Startup failed: {e}')
+        sys.exit(1)
 
     try:
         reddit.authenticate_all_bots()

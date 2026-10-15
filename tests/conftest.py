@@ -1,7 +1,29 @@
 """Shared fixtures and test helpers for RACB test suite."""
 
+from pathlib import Path
 from unittest.mock import MagicMock
+
 import pytest
+from babel.messages.mofile import write_mo
+from babel.messages.pofile import read_po
+
+LOCALES_DIR = Path(__file__).parent.parent / 'src' / 'racb' / 'locales'
+
+
+def compile_catalogs():
+    """Compiles every messages.po to messages.mo, like `pybabel compile -d src/racb/locales`.
+
+    The .mo files are not committed, so every test run builds them fresh from the .po sources.
+    """
+    for po_path in LOCALES_DIR.glob('*/LC_MESSAGES/messages.po'):
+        with open(po_path, 'rb') as po_file:
+            catalog = read_po(po_file)
+        with open(po_path.with_suffix('.mo'), 'wb') as mo_file:
+            write_mo(mo_file, catalog)
+
+
+def pytest_configure(config):
+    compile_catalogs()
 
 
 class MockRedditor:
