@@ -57,6 +57,8 @@ docker compose up -d --build
 ```bash
 docker compose logs -f bot
 ```
+On the GCP VM you can also send the logs to Google Cloud Logging and search them in the browser; see
+[`docs/logs.md`](./docs/logs.md).
 
 ### 4. Stop Services
 ```bash
