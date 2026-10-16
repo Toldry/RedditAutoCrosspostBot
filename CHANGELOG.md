@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.0.5] - 2026-10-16
+
+### Fixed
+
+- **Bots No Longer Answer Nested Comments:** `same_subreddit_bot` and `same_post_bot` replied to a subreddit reference anywhere in a comment thread, not only to comments answering the post. They now answer top-level comments only, like the crosspost recommendation itself. `sub_doesnt_exist_bot` still answers at any depth, and for those replies Phase 1 now only checks that the target exists instead of running the full duplicate scan.
+
+
 ## [3.0.4] - 2026-10-16
 
 ### Changed
