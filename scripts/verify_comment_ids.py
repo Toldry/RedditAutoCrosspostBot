@@ -1,6 +1,6 @@
 """Checks, against live Reddit, the assumptions the ID-range comment reader (comment_reader.py) relies on.
 
-Read-only: it makes about 30 requests as /u/AutoCrosspostBot and writes nothing. It only needs
+Read-only: it makes about 15 requests as /u/AutoCrosspostBot and writes nothing. It only needs
 `racb.core.reddit`, so it also runs on a bot that does not have the comment reader yet. On the VM:
 
     cd /opt/RedditAutoCrosspostBot
@@ -11,7 +11,8 @@ It checks:
 1. Comment IDs follow creation time (the r/all listing's newest 100 comments, sorted by ID, are also
    sorted by time, give or take a few seconds).
 2. Blocks of 100 consecutive IDs come back mostly full, as one request each, with the fields the r/all
-   filter reads (over_18, quarantine, subreddit_type).
+   filter reads (subreddit_type), and their submissions say whether they are NSFW or quarantined (over_18,
+   quarantine), which Phase 1 reads since the comments themselves do not.
 3. How many comment IDs Reddit hands out per second, and so how many requests per minute the reader needs.
 4. How long a block request and an r/all listing request take, and how many bytes each returns.
 """
@@ -27,7 +28,10 @@ SAMPLE_BLOCKS = 10
 # Sample blocks start this many IDs below the newest comment, so every ID in them exists already
 SAMPLE_DEPTH_IDS = 5_000
 RATE_SECONDS = 60
-FILTER_FIELDS = ('over_18', 'quarantine', 'subreddit_type', 'created_utc')
+FILTER_FIELDS = ('subreddit_type', 'created_utc')
+SUBMISSION_FIELDS = ('over_18', 'quarantine')
+# The r/all listing is filtered after the limit is applied, so a limit of 1 can return nothing
+HEAD_LISTING_LIMIT = 25
 
 response_bytes = []
 
@@ -92,7 +96,7 @@ def main():
 
     print(f'\n2. Are blocks of {BLOCK_SIZE} consecutive IDs mostly real comments?')
     head = to_number(by_id[-1].id)
-    counts, seconds, sizes, missing_fields, shown, spans = [], [], [], set(), 0, []
+    counts, seconds, sizes, missing_fields, shown, spans, link_ids = [], [], [], set(), 0, [], []
     for index in range(SAMPLE_BLOCKS):
         start = head - SAMPLE_DEPTH_IDS - index * BLOCK_SIZE
         comments, elapsed, size = fetch_block(instance, start)
@@ -102,10 +106,11 @@ def main():
         for comment in comments:
             fields = vars(comment)
             missing_fields.update(field for field in FILTER_FIELDS if field not in fields)
-            hidden = (fields.get('over_18') or fields.get('quarantine')
-                      or fields.get('subreddit_type') in ('private', 'user')
+            hidden = (fields.get('subreddit_type') in ('private', 'user')
                       or str(fields.get('subreddit', '')).lower().startswith('u_'))
             shown += not hidden
+            if not hidden and fields.get('link_id'):
+                link_ids.append(fields['link_id'])
         created = [comment.created_utc for comment in comments]
         if created:
             spans.append(max(created) - min(created))
@@ -115,15 +120,27 @@ def main():
                            f'{total} of {SAMPLE_BLOCKS * BLOCK_SIZE} IDs returned ({total / SAMPLE_BLOCKS:.0f}%)'))
     results.append(verdict(not missing_fields, 'every comment has ' + ', '.join(FILTER_FIELDS)
                            + (f' (missing: {sorted(missing_fields)})' if missing_fields else '')))
-    print(f'  {shown} of {total} would be on r/all ({100 * shown / max(total, 1):.0f}%)')
+    print(f'  {shown} of {total} pass the comment filter ({100 * shown / max(total, 1):.0f}%)')
+    # One request for up to 100 of their submissions, to see what Phase 1's NSFW check reads
+    submissions = list(instance.info(fullnames=list(dict.fromkeys(link_ids))[:BLOCK_SIZE]))
+    missing_submission_fields = {field for submission in submissions for field in SUBMISSION_FIELDS
+                                 if field not in vars(submission)}
+    results.append(verdict(submissions and not missing_submission_fields,
+                           f'{len(submissions)} submissions fetched, each has ' + ', '.join(SUBMISSION_FIELDS)
+                           + (f' (missing: {sorted(missing_submission_fields)})' if missing_submission_fields else '')))
+    hidden_posts = sum(bool(vars(s).get('over_18') or vars(s).get('quarantine')) for s in submissions)
+    print(f'  {hidden_posts} of {len(submissions)} of those posts are NSFW or quarantined')
     if spans:
         results.append(verdict(statistics.median(spans) < 120,
                                f'a block covers {statistics.median(spans):.0f} s of comments (median)'))
 
     print(f'\n3. How fast does Reddit hand out comment IDs? (waiting {RATE_SECONDS} s)')
     time.sleep(RATE_SECONDS)
-    later, _, _ = newest_listing(instance, 1)
-    ids_per_second = (to_number(later[0].id) - head) / max(RATE_SECONDS, 1)
+    later, _, _ = newest_listing(instance, HEAD_LISTING_LIMIT)
+    if not later:
+        print('  the r/all listing returned no comments; cannot measure')
+        later = by_id
+    ids_per_second = (max(to_number(comment.id) for comment in later) - head) / max(RATE_SECONDS, 1)
     blocks_per_minute = ids_per_second * 60 / BLOCK_SIZE
     print(f'  {ids_per_second:.0f} IDs per second, so about {blocks_per_minute:.0f} block requests per minute')
     print(f'  (the listing reader saw about 14 comments per second by day)')

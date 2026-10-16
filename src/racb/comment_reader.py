@@ -17,9 +17,11 @@ gaps or overlap:
   saved to the database every `CURSOR_SAVE_SECONDS` and at shutdown, so a restart resumes where the previous
   run stopped instead of skipping what was posted meanwhile.
 
-`/api/info` also returns comments that r/all leaves out (private and NSFW subreddits, user profiles), so
-those are dropped. Subreddits that only opted out of r/all cannot be told apart from a comment, so their
-comments are now read too.
+`/api/info` also returns comments that r/all leaves out (private subreddits, user profiles), so those are
+dropped. Its comments say nothing about NSFW or quarantine (no `over_18` or `quarantine` field, checked live
+on 2026-10-16), so Phase 1 drops those by their submission (`phase1.is_hidden_from_r_all`), which it fetches
+anyway, and only for regex matches. Subreddits that only opted out of r/all cannot be told apart from a
+comment, so their comments are now read too.
 """
 
 import logging
@@ -35,6 +37,10 @@ logger = logging.getLogger(__name__)
 
 # /api/info returns at most 100 items per request
 BLOCK_SIZE = 100
+
+# Comments the head poll asks for. Reddit filters the r/all listing after applying the limit, so asking for
+# one comment sometimes returns none (seen live on 2026-10-16); the newest of a few is the head
+HEAD_LISTING_LIMIT = 25
 
 # Seconds to wait between two head polls (each poll itself takes a few seconds). It only sets how soon a new
 # comment is read, not how many: every block up to the head is queued at once. Fewer polls, fewer requests.
@@ -81,11 +87,13 @@ def block_fullnames(block_start):
 
 
 def is_shown_on_r_all(comment):
-    """Whether r/all would list this comment: not NSFW, quarantined, private or on a user profile."""
+    """Whether r/all could list this comment: not in a private subreddit or on a user profile.
+
+    NSFW and quarantined comments pass: `/api/info` comments carry no field for either, so Phase 1 checks
+    their submission instead (`phase1.is_hidden_from_r_all`).
+    """
     # vars(), not getattr: reading a field the comment lacks would make PRAW fetch it, one request each
     fields = vars(comment)
-    if fields.get('over_18') or fields.get('quarantine'):
-        return False
     if fields.get('subreddit_type') in HIDDEN_SUBREDDIT_TYPES:
         return False
     subreddit = fields.get('subreddit')
@@ -95,10 +103,10 @@ def is_shown_on_r_all(comment):
 
 def fetch_head():
     """Returns the number of the newest comment on r/all (one request, as /u/AutoCrosspostBot)."""
-    newest = list(reddit.get_reddit_instance().subreddit('all').comments(limit=1))
+    newest = list(reddit.get_reddit_instance().subreddit('all').comments(limit=HEAD_LISTING_LIMIT))
     if not newest:
         raise RuntimeError('The r/all comment listing returned no comments')
-    return comment_id_to_number(newest[0].id)
+    return max(comment_id_to_number(comment.id) for comment in newest)
 
 
 def fetch_block(bot_name, block_start):

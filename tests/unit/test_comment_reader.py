@@ -35,8 +35,9 @@ def wait_until(condition, timeout=WAIT_SECONDS):
 
 
 def fake_comment(number, **fields):
+    # The fields /api/info returns for a comment (it has no over_18 or quarantine)
     defaults = {'id': number_to_comment_id(number), 'subreddit': 'pics', 'subreddit_type': 'public',
-                'over_18': False, 'quarantine': False, 'created_utc': 1_700_000_000.0 + number}
+                'created_utc': 1_700_000_000.0 + number}
     defaults.update(fields)
     return SimpleNamespace(**defaults)
 
@@ -98,8 +99,9 @@ def test_a_block_is_100_consecutive_fullnames():
 @pytest.mark.parametrize('fields, shown', [
     ({}, True),
     ({'subreddit_type': 'restricted'}, True),
-    ({'over_18': True}, False),
-    ({'quarantine': True}, False),
+    # Phase 1 drops these by their submission: /api/info comments carry neither field
+    ({'over_18': True}, True),
+    ({'quarantine': True}, True),
     ({'subreddit_type': 'private'}, False),
     ({'subreddit_type': 'user'}, False),
     ({'subreddit': 'u_someone'}, False),
@@ -119,6 +121,25 @@ def test_is_shown_on_r_all_never_reads_missing_fields_through_getattr():
     comment = LazyComment()
     comment.subreddit = 'pics'
     assert is_shown_on_r_all(comment) is True
+
+
+@pytest.mark.unit
+def test_fetch_head_takes_the_newest_of_several_comments():
+    listing = [SimpleNamespace(id='k3l2x9a'), SimpleNamespace(id='k3l2x9c'), SimpleNamespace(id='k3l2x9b')]
+    instance = MagicMock()
+    instance.subreddit.return_value.comments.return_value = iter(listing)
+    with patch('racb.comment_reader.reddit.get_reddit_instance', return_value=instance):
+        assert comment_reader.fetch_head() == comment_id_to_number('k3l2x9c')
+    assert instance.subreddit.return_value.comments.call_args.kwargs['limit'] > 1
+
+
+@pytest.mark.unit
+def test_fetch_head_raises_on_an_empty_listing():
+    instance = MagicMock()
+    instance.subreddit.return_value.comments.return_value = iter([])
+    with patch('racb.comment_reader.reddit.get_reddit_instance', return_value=instance):
+        with pytest.raises(RuntimeError):
+            comment_reader.fetch_head()
 
 
 @pytest.mark.unit
@@ -205,7 +226,7 @@ def test_the_cursor_holds_the_watermark_and_the_blocks_done_above_it():
 def test_read_block_hands_on_shown_comments_and_records_the_request():
     handled = []
     metrics = MagicMock()
-    comments = [fake_comment(1), fake_comment(2, over_18=True), fake_comment(3)]
+    comments = [fake_comment(1), fake_comment(2, subreddit_type='private'), fake_comment(3)]
     fetched = []
 
     def fetch_block(bot_name, start):

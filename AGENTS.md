@@ -90,7 +90,9 @@ flowchart TD
     R -->|No| X1["ignore"]
     R -->|Yes| M{"distinguished ==\n'moderator'?"}
     M -->|Yes| X2["ignore"]
-    M -->|No| T{"Submission title contains\nsub/subs/subreddit/subreddits?"}
+    M -->|No| NS{"Submission NSFW\nor quarantined?"}
+    NS -->|Yes| X6["ignore"]
+    NS -->|No| T{"Submission title contains\nsub/subs/subreddit/subreddits?"}
     T -->|Yes| X3["ignore"]
     T -->|No| BL{"Source or target in\nSUB_BLACKLIST?\n(case-insensitive)"}
     BL -->|Yes| X4["ignore"]
@@ -116,8 +118,10 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 - **Phase 1 ([`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py)):**
   - Continuous reading of every new comment by ID (`comment_reader.CommentReader`, the default,
     `STREAM_SOURCE=ids`): blocks of 100 consecutive comment IDs fetched with `reddit.info()` on
-    `STREAM_READERS` threads, keeping only what r/all would show (`is_shown_on_r_all`: not NSFW, quarantined,
-    private or on a user profile). Subreddits that opted out of r/all cannot be told apart, so their comments
+    `STREAM_READERS` threads, keeping only what r/all could show (`is_shown_on_r_all`: not private or on a user
+    profile). `/api/info` comments have no `over_18` or `quarantine` field, so Phase 1 drops NSFW and
+    quarantined ones by their submission (`phase1.is_hidden_from_r_all`, no extra request). The head poll
+    asks the listing for 25 comments and takes the newest, because `limit=1` sometimes returns none. Subreddits that opted out of r/all cannot be told apart, so their comments
     are read too. `STREAM_SOURCE=listing` instead reads
     `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)` one request at a time, which
     sees only a fraction of r/all (section 9).
@@ -724,7 +728,7 @@ A back-off on the main thread only pauses finding new comments; the readers, wor
 | Phase 1 backlog | Phase 1 (duplicate search, up to 200 preview downloads per match, subreddit suggestions) runs on `PHASE1_WORKERS` threads. If matches arrive faster than they can handle for long enough to fill the 1000-ID queue, new matches are dropped; the heartbeat counts them. Not observed; matches are a small fraction of `r/all`. |
 | Comment coverage | `STREAM_SOURCE=listing` reads at most 100 comments per request, one request at a time. On 2026-10-15/16 that was about 850 comments a minute by day and up to 2,500 at night, when Reddit answered faster, so it missed most of r/all. The `ids` reader was written for that; it relies on Reddit numbering comments in order site-wide, which `test_live_comment_reader_reads_recent_comments_by_id` checks before every deploy, and its real coverage is still to be confirmed from the heartbeat. |
 | Re-reads after a crash | The comment cursor is saved every 30 s and at shutdown. After a crash or `kill -9`, up to 30 s of comments are read again, so an auxiliary bot could reply twice to a comment from those seconds. |
-| Opted-out subreddits | `/api/info` does not say whether a subreddit opted out of r/all, so the `ids` reader also reads comments in subreddits that did (NSFW, quarantined, private and profile comments are dropped). |
+| Opted-out subreddits | `/api/info` does not say whether a subreddit opted out of r/all, so the `ids` reader also reads comments in subreddits that did (private and profile comments are dropped by the reader, NSFW and quarantined ones by Phase 1). |
 | Rotated reposts | Not detected as duplicates (see the image-matching note in section 5). |
 | Edited video reposts | Videos are compared by their preview frame only. A trimmed, re-cut or re-encoded copy usually has a different preview frame and is missed. |
 | Pre-v2.3 rows | Have `target_subreddit = NULL`, so the bait-and-switch check is skipped for them until they age out (at most one Phase 3 waiting period after upgrading). |
