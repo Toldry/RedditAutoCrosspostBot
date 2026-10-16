@@ -78,7 +78,7 @@ sequenceDiagram
    the bot is down for a few seconds per deploy. PostgreSQL is not restarted unless its definition changed.
 
 Building happens on the VM, as it does by hand today. That is deliberate: the image contains `.env` with
-all the bot passwords ([`AGENTS.md`](../AGENTS.md) section 8), so it must never be pushed to a registry.
+all the bot passwords ([`AGENTS.md`](./AGENTS.md) section 8), so it must never be pushed to a registry.
 
 ## Security model
 

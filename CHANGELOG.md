@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Agent Guide Location:** `AGENTS.md` moved to `docs/AGENTS.md`. A root `CLAUDE.md` imports it (`@docs/AGENTS.md`), so Claude Code still loads it automatically. Agents that only look for a root `AGENTS.md` have to be pointed to the new path.
+- **Single-Entry Runs in the README:** the README now documents `--process-one`, with commands for a local run, inside the Docker stack, and from your own computer over SSH to the VM.
+
 ## [2.14.0] - 2026-10-16
 
 ### Added

@@ -25,7 +25,7 @@ everything else (see section 7).
 
 ### Companion Auxiliary Bots (Phase 1 Immediate Triggers)
 Each of the 4 bots has its **own** Reddit account and "script"-type OAuth app. Client IDs are hardcoded in
-`bot_details` in [`src/racb/core/reddit.py`](./src/racb/core/reddit.py). Passwords and client secrets come
+`bot_details` in [`src/racb/core/reddit.py`](../src/racb/core/reddit.py). Passwords and client secrets come
 from environment variables (section 4). Auxiliary replies are sent by re-fetching the comment through the
 auxiliary bot's PRAW instance (`get_comment_with_different_praw_instance`). All auxiliary bots act during Phase 1:
 1. **`sub_doesnt_exist_bot`** (`u/sub_doesnt_exist_bot`):
@@ -53,7 +53,7 @@ auxiliary bot's PRAW instance (`get_comment_with_different_praw_instance`). All 
 
 ## 2. Architecture & Lifecycle Phases
 
-The core processing pipeline follows a 3-phase staggered lifecycle orchestrated in [`src/racb/main.py`](./src/racb/main.py):
+The core processing pipeline follows a 3-phase staggered lifecycle orchestrated in [`src/racb/main.py`](../src/racb/main.py):
 
 ```mermaid
 flowchart TD
@@ -104,9 +104,9 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 `sub_doesnt_exist_bot` reply and is handled the same way.
 
 ### Phase Details
-- **Phase 1 ([`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py)):**
+- **Phase 1 ([`src/racb/phases/phase1.py`](../src/racb/phases/phase1.py)):**
   - Continuous streaming from `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)`.
-  - Filters: Discards moderator comments, submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`src/racb/constants.py`](./src/racb/constants.py), compared case-insensitively by `is_crosspost_blocked`). Non-top-level comments (`comment.parent_id != comment.link_id`) are discarded only **after** auxiliary-bot dispatch (see the warning in section 1).
+  - Filters: Discards moderator comments, submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`src/racb/constants.py`](../src/racb/constants.py), compared case-insensitively by `is_crosspost_blocked`). Non-top-level comments (`comment.parent_id != comment.link_id`) are discarded only **after** auxiliary-bot dispatch (see the warning in section 1).
   - Qualified suggestions are stored via stored procedure `insert_scraped_comment(permalink, target_subreddit)`.
   - Phases 2 and 3 re-parse the target from the live comment body and reject the row
     (`TARGET_SUBREDDIT_CHANGED`) if it no longer equals the stored target, case-insensitively. This blocks
@@ -115,7 +115,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
   - Auxiliary replies go through `phase1.reply_as_bot()`, which only logs when `DRY_RUN` is enabled.
   - Any error while handling one comment is caught in `main.handle_comment_safely()` and skips only that
     comment (section 7).
-- **Phase 2 ([`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py)):**
+- **Phase 2 ([`src/racb/phases/phase2.py`](../src/racb/phases/phase2.py)):**
   - Runs periodically via `schedule` (or manually via `python -m racb --only-phase2`).
   - Fetches unchecked rows older than `PHASE2_WAITING_PERIOD` using `get_unchecked_comments_older_than(interval)`.
   - Executes **batch fetching via `reddit.info(fullnames=chunk)`** in chunks of 100 to minimize API requests by 99%:
@@ -139,7 +139,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     under 99%.
   - If the batch `info()` call throws, it falls back to fetching each comment individually (`run_filters(ce, comment=None)`).
   - Prunes failing entries from DB to conserve PostgreSQL table storage.
-- **Phase 3 ([`src/racb/phases/phase3.py`](./src/racb/phases/phase3.py)):**
+- **Phase 3 ([`src/racb/phases/phase3.py`](../src/racb/phases/phase3.py)):**
   - Runs periodically (every 6 minutes) if `LISTEN_ONLY` is false.
   - Queries records older than `PHASE3_WAITING_PERIOD` using `get_comments_older_than(interval)`. This
     function does **not** filter on `phase2_checked`, so Phase 3 depends on Phase 2 having pruned rows first.
@@ -156,7 +156,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     The resulting `RepostScan` (posts checked, whether the scan reached the comment's date) is passed to
     the reply.
   - Formats submission title (e.g. uppercase for `r/totallynotrobots`).
-  - Executes `submission.crosspost()` and posts an explanatory reply using localized text templates loaded by [`src/racb/i18n.py`](./src/racb/i18n.py) from the gettext catalogs in [`src/racb/locales/`](./src/racb/locales/).
+  - Executes `submission.crosspost()` and posts an explanatory reply using localized text templates loaded by [`src/racb/i18n.py`](../src/racb/i18n.py) from the gettext catalogs in [`src/racb/locales/`](../src/racb/locales/).
     The reply (`REPLY_TO_CROSSPOST`) says the target was searched for the same URL and, for image and video
     posts, adds one sentence from `phase3.describe_media_scan`: how many image (or video) posts were compared
     and over what period (`REPLY_TO_CROSSPOST_IMAGE_CHECK` / `..._VIDEO_CHECK`), the same for a scan cut short
@@ -169,10 +169,10 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
   - With `DRY_RUN`, it logs what it would crosspost and keeps the row.
   - `python -m racb --process-one` runs this on the oldest row only and exits (section 5).
 - **Maintenance & Feedback:**
-  - [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py): Periodically fetches the latest 40 submissions made by `AutoCrosspostBot` and deletes any with score < 0.
+  - [`src/racb/phases/cleanup.py`](../src/racb/phases/cleanup.py): Periodically fetches the latest 40 submissions made by `AutoCrosspostBot` and deletes any with score < 0.
     Only submissions are covered. Comments made by any of the 4 bots are never cleaned up. A failed
     delete is logged and skipped; `DRY_RUN` only logs.
-  - [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py): Evaluates feedback (`good bot` / `bad bot`).
+  - [`src/racb/phases/inbox.py`](../src/racb/phases/inbox.py): Evaluates feedback (`good bot` / `bad bot`).
     `process_unread_inboxes()` runs every 10 minutes and reads the unread inbox of **all 4** bots
     (there is no continuous inbox stream any more). Feedback is logged at INFO, answered by the bot that
     received it, and marked read. The phrases are recognized in **every** supported language, in any
@@ -193,57 +193,58 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 
 | File | Purpose |
 | :--- | :--- |
-| [`src/racb/main.py`](./src/racb/main.py) | Application entry point, logging setup, stream loop, exception recovery, and `schedule` runner. |
-| [`src/racb/__main__.py`](./src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
-| [`src/racb/__init__.py`](./src/racb/__init__.py) | Package marker; re-exports `__version__`. |
-| [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_listen_only()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
-| [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check) and the bot-name constants. |
-| [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
-| [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Typo suggestions: merges candidates from `known_subreddits` and `reddit.subreddits.search()`, filtered and ranked by name similarity. |
-| [`src/racb/core/known_subreddits.py`](./src/racb/core/known_subreddits.py) | Buffers subreddit names seen in the comment stream (no I/O per comment) and writes them to `known_subreddits` in one batch every 5 minutes; also the trigram lookup. |
-| [`src/racb/core/duplicate_detector.py`](./src/racb/core/duplicate_detector.py) | Self-hosted perceptual image hashing (`imagehash` / `dhash`) for visual duplicate detection in target subreddits: `scan_subreddit_for_duplicates` compares an image or video post (videos by preview frame) with the subreddit's posts of the same kind back to a given time and returns a `RepostScan`. Linked from every crosspost reply about an image or video, so it is written to be read by outsiders; its module docstring explains the method. |
-| [`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py) | Phase 1 comment matching, blacklisting, auxiliary bot dispatching, DB insertion. |
-| [`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py) | Phase 2 batch comment filtering via `reddit.info()` and DB cleanup. |
-| [`src/racb/phases/phase3.py`](./src/racb/phases/phase3.py) | Phase 3 final validation, crosspost execution, comment reply, modern API exception handling. |
-| [`src/racb/phases/inbox.py`](./src/racb/phases/inbox.py) | Evaluates feedback sent to the bot's inbox. |
-| [`src/racb/phases/cleanup.py`](./src/racb/phases/cleanup.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
-| [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on **every new DB connection**, so every statement must be idempotent (see section 6). |
-| [`src/racb/constants.py`](./src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore as source and target (`SUB_BLACKLIST`), and `is_crosspost_blocked()`, which checks it case-insensitively. |
-| [`src/racb/i18n.py`](./src/racb/i18n.py) | Loads the gettext catalogs, picks the locale for a subreddit, and falls back to English for untranslated strings (body and footer always share one language; a reply built from several messages, like the nonexistent-subreddit reply, switches entirely to English if any piece is untranslated). |
-| [`src/racb/locales/`](./src/racb/locales/) | gettext catalogs: `<locale>/LC_MESSAGES/messages.po` (edited) and `messages.mo` (compiled, git-ignored: the Dockerfile and `tests/conftest.py` build them). Locales: `en` (source text), `es`, `de`, `fr`, `he`, `ru`, and `en@totallynotrobots`, an English variant using the gettext `@modifier` syntax. |
-| [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
-| [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
-| [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether CHANGELOG `[Unreleased]` has entries. |
-| [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run`, `--limit N` (`0` means all) and `--strict` (exit code 1 if a bot could not be checked or a test item could not be deleted). Slow; for manual use. |
-| [`scripts/delete_test_artifacts.py`](./scripts/delete_test_artifacts.py) | Deletes only the posts and comments the integration tests recorded in their manifest (`$RACB_TEST_ARTIFACTS_FILE`, default `racb-test-artifacts.jsonl` in the temp directory), as the bot that wrote each one, then removes the manifest. Supports `--dry-run`, `--manifest PATH` and `--strict`. The last step of CI's `integration-tests` job. |
-| [`scripts/redeploy.sh`](./scripts/redeploy.sh) | Runs **on the VM**: resets the checkout to a commit of `origin/master` (argument, `SSH_ORIGINAL_COMMAND`, or the latest), runs `docker compose up --detach --build`, and fails if the bot is not running 30 s later. The CI `deploy` job's SSH key is pinned to it. Refuses to run on a dirty or diverged checkout. |
-| [`scripts/authorize_deploy_key.sh`](./scripts/authorize_deploy_key.sh) | Runs **on the VM** once: adds the CI deploy key to `~/.ssh/authorized_keys` as a forced command for `redeploy.sh` and prints the host key. |
-| [`scripts/setup_auto_deploy.sh`](./scripts/setup_auto_deploy.sh) | One-time setup of automatic deployment, run in Cloud Shell: service account, Workload Identity Federation, IAP firewall rule, deploy key, GitHub variables. See [`docs/auto-deploy.md`](./docs/auto-deploy.md). |
-| [`docs/auto-deploy.md`](./docs/auto-deploy.md) | How the CI `deploy` job works, its security model, setup, rollback and troubleshooting. |
-| [`docs/db-viewer.md`](./docs/db-viewer.md) | How to start the optional read-only `pgweb` database viewer on the VM and open it through an SSH tunnel. |
-| [`docs/logs.md`](./docs/logs.md) | How to read the bot's logs over SSH or in Google Cloud Logging, and how to turn Cloud Logging on. |
-| [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
-| [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1639 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, waiting period and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
-| [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
-| [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
-| [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
-| [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. On `master`, a `release` job then bumps the version and tags it (section 5), and, when the `AUTO_DEPLOY` variable is `true`, an `integration-tests` job runs the live tests with the bot credentials from repository secrets, then deletes what they created with `delete_test_artifacts.py --strict` (even after failed or cancelled tests), after which a `deploy` job redeploys the VM at the released commit ([`docs/auto-deploy.md`](./docs/auto-deploy.md)). |
-| [`.github/dependabot.yml`](./.github/dependabot.yml) | Dependabot config for `pyproject.toml` / `uv.lock` (`uv` ecosystem) and GitHub Actions. Version updates are **paused** with `open-pull-requests-limit: 0`; delete those lines to resume monthly PRs. |
-| [`examples/example_reddit_comment.py`](./examples/example_reddit_comment.py) | Not executable code: a commented-out attribute dump of a PRAW `Comment` and `Submission`, kept for reference. |
-| [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
-| [`deploy/instance-flags.yaml`](./deploy/instance-flags.yaml) | Declarative Google Cloud CLI flags file for provisioning the Always Free e2-micro instance. |
-| [`Dockerfile`](./Dockerfile) | Lightweight Python 3.11 container image definition. |
-| [`docker-compose.yml`](./docker-compose.yml) | Multi-container stack definition (PostgreSQL 15 + Python bot worker, plus the optional `pgweb` viewer in the `viewer` profile, bound to `127.0.0.1:8081`). Containers keep at most 3 × 10 MB of Docker logs. |
-| [`docker-compose.gcp.yml`](./docker-compose.gcp.yml) | Override for the GCP VM only, enabled by `COMPOSE_FILE` in its `.env`: sends the bot's output to Cloud Logging with Docker's `gcplogs` driver. See [`docs/logs.md`](./docs/logs.md). |
-| [`.bumpversion.toml`](./.bumpversion.toml) | Configuration for `bump-my-version`, which the CI `release` job runs. |
-| [`.gitignore`](./.gitignore) | Ignores **all dotfiles** (`.*`) except an explicit allowlist. See section 8. |
-| [`CHANGELOG.md`](./CHANGELOG.md) | Release history following Keep a Changelog. |
-| [`.env.example`](./.env.example) | Environment variable template. |
-| [`pyproject.toml`](./pyproject.toml) | Project metadata for uv and hatchling: `requires-python = ">=3.11"`, runtime dependencies with lower bounds (PRAW and prawcore also capped below their next major), and the `dev` dependency group (`bump-my-version`, `pytest`, `pytest-mock`). The version is read dynamically from `src/racb/version.py`. |
-| [`uv.lock`](./uv.lock) | Cross-platform lockfile: the exact version and hashes of **every** package, including transitive ones (numpy, scipy, ...). Generated by `uv lock`; never edit it by hand. |
-| [`.python-version`](./.python-version) | `3.11`. Tells uv which interpreter to use for `.venv` (and CI). Keep it in sync with the Dockerfile base image. |
-| [`.dockerignore`](./.dockerignore) | Keeps local virtualenvs and caches out of the image. It deliberately does **not** exclude `.env` (section 8). |
+| [`src/racb/main.py`](../src/racb/main.py) | Application entry point, logging setup, stream loop, exception recovery, and `schedule` runner. |
+| [`src/racb/__main__.py`](../src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
+| [`src/racb/__init__.py`](../src/racb/__init__.py) | Package marker; re-exports `__version__`. |
+| [`src/racb/config.py`](../src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_listen_only()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
+| [`src/racb/core/reddit.py`](../src/racb/core/reddit.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check) and the bot-name constants. |
+| [`src/racb/core/db.py`](../src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
+| [`src/racb/core/sub_search.py`](../src/racb/core/sub_search.py) | Typo suggestions: merges candidates from `known_subreddits` and `reddit.subreddits.search()`, filtered and ranked by name similarity. |
+| [`src/racb/core/known_subreddits.py`](../src/racb/core/known_subreddits.py) | Buffers subreddit names seen in the comment stream (no I/O per comment) and writes them to `known_subreddits` in one batch every 5 minutes; also the trigram lookup. |
+| [`src/racb/core/duplicate_detector.py`](../src/racb/core/duplicate_detector.py) | Self-hosted perceptual image hashing (`imagehash` / `dhash`) for visual duplicate detection in target subreddits: `scan_subreddit_for_duplicates` compares an image or video post (videos by preview frame) with the subreddit's posts of the same kind back to a given time and returns a `RepostScan`. Linked from every crosspost reply about an image or video, so it is written to be read by outsiders; its module docstring explains the method. |
+| [`src/racb/phases/phase1.py`](../src/racb/phases/phase1.py) | Phase 1 comment matching, blacklisting, auxiliary bot dispatching, DB insertion. |
+| [`src/racb/phases/phase2.py`](../src/racb/phases/phase2.py) | Phase 2 batch comment filtering via `reddit.info()` and DB cleanup. |
+| [`src/racb/phases/phase3.py`](../src/racb/phases/phase3.py) | Phase 3 final validation, crosspost execution, comment reply, modern API exception handling. |
+| [`src/racb/phases/inbox.py`](../src/racb/phases/inbox.py) | Evaluates feedback sent to the bot's inbox. |
+| [`src/racb/phases/cleanup.py`](../src/racb/phases/cleanup.py) | Auto-cleanup job deleting downvoted posts made by the bot. |
+| [`src/racb/sql/instantiate_db.sql`](../src/racb/sql/instantiate_db.sql) | DDL schema, indexes, view `v_scraped_comments`, and PL/pgSQL stored procedures. Executed on **every new DB connection**, so every statement must be idempotent (see section 6). |
+| [`src/racb/constants.py`](../src/racb/constants.py) | Hardcoded blacklist of subreddits to ignore as source and target (`SUB_BLACKLIST`), and `is_crosspost_blocked()`, which checks it case-insensitively. |
+| [`src/racb/i18n.py`](../src/racb/i18n.py) | Loads the gettext catalogs, picks the locale for a subreddit, and falls back to English for untranslated strings (body and footer always share one language; a reply built from several messages, like the nonexistent-subreddit reply, switches entirely to English if any piece is untranslated). |
+| [`src/racb/locales/`](../src/racb/locales/) | gettext catalogs: `<locale>/LC_MESSAGES/messages.po` (edited) and `messages.mo` (compiled, git-ignored: the Dockerfile and `tests/conftest.py` build them). Locales: `en` (source text), `es`, `de`, `fr`, `he`, `ru`, and `en@totallynotrobots`, an English variant using the gettext `@modifier` syntax. |
+| [`src/racb/locales/subreddits.toml`](../src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
+| [`src/racb/version.py`](../src/racb/version.py) | Application version definition (`__version__`). |
+| [`scripts/release_level.py`](../scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether CHANGELOG `[Unreleased]` has entries. |
+| [`scripts/cleanup_test_history.py`](../scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run`, `--limit N` (`0` means all) and `--strict` (exit code 1 if a bot could not be checked or a test item could not be deleted). Slow; for manual use. |
+| [`scripts/delete_test_artifacts.py`](../scripts/delete_test_artifacts.py) | Deletes only the posts and comments the integration tests recorded in their manifest (`$RACB_TEST_ARTIFACTS_FILE`, default `racb-test-artifacts.jsonl` in the temp directory), as the bot that wrote each one, then removes the manifest. Supports `--dry-run`, `--manifest PATH` and `--strict`. The last step of CI's `integration-tests` job. |
+| [`scripts/redeploy.sh`](../scripts/redeploy.sh) | Runs **on the VM**: resets the checkout to a commit of `origin/master` (argument, `SSH_ORIGINAL_COMMAND`, or the latest), runs `docker compose up --detach --build`, and fails if the bot is not running 30 s later. The CI `deploy` job's SSH key is pinned to it. Refuses to run on a dirty or diverged checkout. |
+| [`scripts/authorize_deploy_key.sh`](../scripts/authorize_deploy_key.sh) | Runs **on the VM** once: adds the CI deploy key to `~/.ssh/authorized_keys` as a forced command for `redeploy.sh` and prints the host key. |
+| [`scripts/setup_auto_deploy.sh`](../scripts/setup_auto_deploy.sh) | One-time setup of automatic deployment, run in Cloud Shell: service account, Workload Identity Federation, IAP firewall rule, deploy key, GitHub variables. See [`docs/auto-deploy.md`](./auto-deploy.md). |
+| [`docs/auto-deploy.md`](./auto-deploy.md) | How the CI `deploy` job works, its security model, setup, rollback and troubleshooting. |
+| [`docs/db-viewer.md`](./db-viewer.md) | How to start the optional read-only `pgweb` database viewer on the VM and open it through an SSH tunnel. |
+| [`docs/logs.md`](./logs.md) | How to read the bot's logs over SSH or in Google Cloud Logging, and how to turn Cloud Logging on. |
+| [`CLAUDE.md`](../CLAUDE.md) | Imports this file (`@docs/AGENTS.md`) so Claude Code loads it automatically. Edit this file, not `CLAUDE.md`. |
+| [`scripts/negative_feedback_report.py`](../scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
+| [`tests/conftest.py`](../tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
+| [`tests/unit/`](../tests/unit/) | 1639 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, waiting period and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/integration/test_reddit_integration.py`](../tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
+| [`tests/assets/test_sample.png`](../tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
+| [`pytest.ini`](../pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
+| [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. On `master`, a `release` job then bumps the version and tags it (section 5), and, when the `AUTO_DEPLOY` variable is `true`, an `integration-tests` job runs the live tests with the bot credentials from repository secrets, then deletes what they created with `delete_test_artifacts.py --strict` (even after failed or cancelled tests), after which a `deploy` job redeploys the VM at the released commit ([`docs/auto-deploy.md`](./auto-deploy.md)). |
+| [`.github/dependabot.yml`](../.github/dependabot.yml) | Dependabot config for `pyproject.toml` / `uv.lock` (`uv` ecosystem) and GitHub Actions. Version updates are **paused** with `open-pull-requests-limit: 0`; delete those lines to resume monthly PRs. |
+| [`examples/example_reddit_comment.py`](../examples/example_reddit_comment.py) | Not executable code: a commented-out attribute dump of a PRAW `Comment` and `Submission`, kept for reference. |
+| [`deploy/cloud-init.yaml`](../deploy/cloud-init.yaml) | Universal cloud-init configuration for provisioning cloud VMs (GCP, Oracle, AWS) with swap and Docker. It does **not** clone or start the bot. |
+| [`deploy/instance-flags.yaml`](../deploy/instance-flags.yaml) | Declarative Google Cloud CLI flags file for provisioning the Always Free e2-micro instance. |
+| [`Dockerfile`](../Dockerfile) | Lightweight Python 3.11 container image definition. |
+| [`docker-compose.yml`](../docker-compose.yml) | Multi-container stack definition (PostgreSQL 15 + Python bot worker, plus the optional `pgweb` viewer in the `viewer` profile, bound to `127.0.0.1:8081`). Containers keep at most 3 × 10 MB of Docker logs. |
+| [`docker-compose.gcp.yml`](../docker-compose.gcp.yml) | Override for the GCP VM only, enabled by `COMPOSE_FILE` in its `.env`: sends the bot's output to Cloud Logging with Docker's `gcplogs` driver. See [`docs/logs.md`](./logs.md). |
+| [`.bumpversion.toml`](../.bumpversion.toml) | Configuration for `bump-my-version`, which the CI `release` job runs. |
+| [`.gitignore`](../.gitignore) | Ignores **all dotfiles** (`.*`) except an explicit allowlist. See section 8. |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Release history following Keep a Changelog. |
+| [`.env.example`](../.env.example) | Environment variable template. |
+| [`pyproject.toml`](../pyproject.toml) | Project metadata for uv and hatchling: `requires-python = ">=3.11"`, runtime dependencies with lower bounds (PRAW and prawcore also capped below their next major), and the `dev` dependency group (`bump-my-version`, `pytest`, `pytest-mock`). The version is read dynamically from `src/racb/version.py`. |
+| [`uv.lock`](../uv.lock) | Cross-platform lockfile: the exact version and hashes of **every** package, including transitive ones (numpy, scipy, ...). Generated by `uv lock`; never edit it by hand. |
+| [`.python-version`](../.python-version) | `3.11`. Tells uv which interpreter to use for `.venv` (and CI). Keep it in sync with the Dockerfile base image. |
+| [`.dockerignore`](../.dockerignore) | Keeps local virtualenvs and caches out of the image. It deliberately does **not** exclude `.env` (section 8). |
 
 `uv sync` installs `racb` itself into `.venv` as an **editable** package (from `src/`), so `python -m racb`
 works from any directory without `PYTHONPATH`. The Docker image does the same, with its venv at
@@ -328,7 +329,7 @@ cleanup job **still deletes** submissions. Use `DRY_RUN=True` for a fully read-o
    docker compose exec db psql -U racb_user -d racb -c "SELECT * FROM v_scraped_comments ORDER BY scraped_time DESC LIMIT 20;"
    ```
    For a read-only view in the browser, start `pgweb` (`docker compose --profile viewer up -d pgweb`, needs
-   `PGWEB_AUTH_PASS` in `.env`) and tunnel to port 8081; see [`docs/db-viewer.md`](./docs/db-viewer.md).
+   `PGWEB_AUTH_PASS` in `.env`) and tunnel to port 8081; see [`docs/db-viewer.md`](./db-viewer.md).
 
 ### Setup & Local Execution (Without Docker)
 1. **Install Dependencies** (needs [uv](https://docs.astral.sh/uv/getting-started/installation/)):
@@ -338,7 +339,7 @@ cleanup job **still deletes** submissions. Use `DRY_RUN=True` for a fully read-o
    Prefix commands with `uv run` (e.g. `uv run pytest`), or activate `.venv` first.
 2. **Database Setup:**
    Ensure a local PostgreSQL instance is running and set `DATABASE_URL` in `.env`.
-   When [`src/racb/core/db.py`](./src/racb/core/db.py) initializes, it automatically runs [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) to ensure tables, views, and functions exist.
+   When [`src/racb/core/db.py`](../src/racb/core/db.py) initializes, it automatically runs [`src/racb/sql/instantiate_db.sql`](../src/racb/sql/instantiate_db.sql) to ensure tables, views, and functions exist.
    The connection is **lazy**: it opens on first use (a Phase 1 match or a scheduled phase), not at startup.
 3. **Run the Bot:**
    ```bash
@@ -413,15 +414,15 @@ uv run pytest -m integration
 We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). **Releases are fully automatic; nobody bumps the version by hand.**
 
 After every push to `master`, once the unit tests pass, the `release` job in
-[`.github/workflows/tests.yml`](./.github/workflows/tests.yml):
-1. runs [`scripts/release_level.py`](./scripts/release_level.py), which prints `none` if CHANGELOG
+[`.github/workflows/tests.yml`](../.github/workflows/tests.yml):
+1. runs [`scripts/release_level.py`](../scripts/release_level.py), which prints `none` if CHANGELOG
    `## [Unreleased]` is empty, otherwise the bump implied by the commits since the last `v*` tag
    (merge commits and earlier release commits are ignored):
    - `major`: a breaking Conventional Commit, `type!: ...` / `type(scope)!: ...` or a `BREAKING CHANGE:` footer
    - `minor`: a `feat` commit
    - `patch`: anything else, including commits that are not Conventional Commits
-2. runs `uv run bump-my-version bump <level>`, which updates [`src/racb/version.py`](./src/racb/version.py)
-   and [`CHANGELOG.md`](./CHANGELOG.md), makes a `chore(release): bump version X -> Y` commit as
+2. runs `uv run bump-my-version bump <level>`, which updates [`src/racb/version.py`](../src/racb/version.py)
+   and [`CHANGELOG.md`](../CHANGELOG.md), makes a `chore(release): bump version X -> Y` commit as
    `github-actions[bot]`, and an annotated `vX.Y.Z` tag;
 3. pushes both to `master` (`git push --follow-tags`).
 
@@ -443,19 +444,19 @@ Mechanics worth knowing:
 
 ### Critical Implementation Details & Gotchas
 - **PRAW Native Rate Limiting:**
-  [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) configures `ratelimit_seconds=300` on all `praw.Reddit` instances. PRAW handles Reddit rate limit sleeps and retries natively.
+  [`src/racb/core/reddit.py`](../src/racb/core/reddit.py) configures `ratelimit_seconds=300` on all `praw.Reddit` instances. PRAW handles Reddit rate limit sleeps and retries natively.
   Precisely: request-rate limiting (the per-minute OAuth quota) is handled by prawcore. `ratelimit_seconds`
   only controls how long PRAW will **sleep** on a `RATELIMIT` API error ("you are doing that too much")
   before retrying. Up to 300 s of that sleep happens on the single main thread, so the stream stalls meanwhile.
 - **PRAW delete endpoint patch:**
-  [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) sets `praw.endpoints.API_PATH['del'] = 'api/del'` at import.
+  [`src/racb/core/reddit.py`](../src/racb/core/reddit.py) sets `praw.endpoints.API_PATH['del'] = 'api/del'` at import.
   On 2026-10-15 Reddit answered PRAW's default `POST /api/del/` (trailing slash) with a plain-text
   `404 page not found` for every item, while `POST /api/del` worked. By 2026-10-16 both paths worked again
   (tested live on the bot's profile and in r/racb_test_1), so it was probably temporary on Reddit's side.
   The patch is harmless and kept as a safeguard. If deletes 404 again, compare both paths with
   `/api/del/` vs `/api/del` before assuming anything else is wrong.
 - **PostgreSQL Stored Procedures:**
-  Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `get_oldest_scraped_comment`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](./src/racb/core/db.py).
+  Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `get_oldest_scraped_comment`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](../src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](../src/racb/core/db.py).
 - **Batch Comment Processing in Phase 2:**
   To adhere to Reddit API rate limits (100 QPM), Phase 2 fetches up to 100 comments per request using `reddit.info(fullnames=...)`. Do not revert to individual per-comment HTTP requests.
 - **Dependencies are locked** in `uv.lock`, including transitive ones, so a Docker rebuild cannot pull an
@@ -474,7 +475,7 @@ Mechanics worth knowing:
 
 ## 6. Database Schema
 
-Defined in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql):
+Defined in [`src/racb/sql/instantiate_db.sql`](../src/racb/sql/instantiate_db.sql):
 
 | Object | Definition |
 | :--- | :--- |
@@ -572,7 +573,7 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 - `deploy/cloud-init.yaml` adds **every** account under `/home` to the `docker` group (root-equivalent)
   and makes `/opt` group-writable. This is deliberate, for the GCP web-SSH workflow on a single-admin VM;
   do not reuse it on a shared machine. It installs Docker only; cloning and starting the bot is manual.
-- **Automatic deploys** ([`docs/auto-deploy.md`](./docs/auto-deploy.md)) build on the VM, never in CI, because
+- **Automatic deploys** ([`docs/auto-deploy.md`](./auto-deploy.md)) build on the VM, never in CI, because
   the image contains `.env`. They `git reset --hard` the VM checkout, so `scripts/redeploy.sh` refuses to run
   when tracked files were edited on the VM. Keep `redeploy.sh`'s body inside `main()`: the reset rewrites the
   running script.
@@ -602,8 +603,8 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 1. **Preserve Comments & Docstrings:** Do not remove existing comments, docstrings, or developer notes during edits.
 2. **Follow Existing Style:** Use clean, standard Python style matching the codebase (PEP 8 conventions, explicit error handling with `prawcore.exceptions` and `praw.exceptions.RedditAPIException`).
 3. **Graceful Reddit Exception Handling:** Any newly introduced Reddit API calls must handle potential exceptions (`Forbidden`, `ServerError`, `RedditAPIException`, sub bans, locked threads, deleted comments) without crashing the main loop.
-4. **Localization Awareness:** When adding or modifying bot comments, update the `.po` catalog of every locale under [`src/racb/locales/`](./src/racb/locales/) (message ids are symbolic keys; `en` holds the source text, and an empty `msgstr` falls back to English, but a unit test requires every locale to translate every key). Do not commit `.mo` files: they are git-ignored, the Dockerfile compiles them into the image, and `tests/conftest.py` recompiles them before every test run. To run the bot locally outside Docker, run `uv run pybabel compile -d src/racb/locales` first; the bot refuses to start if a catalog is not compiled. Counts use plural forms (`ngettext`, plural id `<KEY>_PLURAL`). To add a locale, create its `.po` (e.g. `uv run pybabel init -i src/racb/locales/en/LC_MESSAGES/messages.po -d src/racb/locales -l <locale>`) and list its subreddits in [`subreddits.toml`](./src/racb/locales/subreddits.toml).
-5. **Mandatory Changelog Updates, No Manual Version Bumps:** Every code, configuration, or infrastructure change MUST add an entry to [`CHANGELOG.md`](./CHANGELOG.md) under `## [Unreleased]` in the same branch. **Never bump the version or create a tag yourself**, on a feature branch or on `master`: the CI `release` job does it after merge (section 5). Parallel branches would otherwise claim the same version number. Use Conventional Commit subjects, since they choose the bump (`feat` minor, `!` major, anything else patch).
+4. **Localization Awareness:** When adding or modifying bot comments, update the `.po` catalog of every locale under [`src/racb/locales/`](../src/racb/locales/) (message ids are symbolic keys; `en` holds the source text, and an empty `msgstr` falls back to English, but a unit test requires every locale to translate every key). Do not commit `.mo` files: they are git-ignored, the Dockerfile compiles them into the image, and `tests/conftest.py` recompiles them before every test run. To run the bot locally outside Docker, run `uv run pybabel compile -d src/racb/locales` first; the bot refuses to start if a catalog is not compiled. Counts use plural forms (`ngettext`, plural id `<KEY>_PLURAL`). To add a locale, create its `.po` (e.g. `uv run pybabel init -i src/racb/locales/en/LC_MESSAGES/messages.po -d src/racb/locales -l <locale>`) and list its subreddits in [`subreddits.toml`](../src/racb/locales/subreddits.toml).
+5. **Mandatory Changelog Updates, No Manual Version Bumps:** Every code, configuration, or infrastructure change MUST add an entry to [`CHANGELOG.md`](../CHANGELOG.md) under `## [Unreleased]` in the same branch. **Never bump the version or create a tag yourself**, on a feature branch or on `master`: the CI `release` job does it after merge (section 5). Parallel branches would otherwise claim the same version number. Use Conventional Commit subjects, since they choose the bump (`feat` minor, `!` major, anything else patch).
 6. **Never run live integration tests casually:** plain `pytest` runs only unit tests. `pytest -m integration` posts publicly as the real bot accounts.
 7. **Keep section 9 current:** when you fix a known defect, delete its row; when you find a new one, add it.
 8. **Read configuration through `src/racb/config.py`:** do not add new `os.environ` reads or boolean/duration parsers elsewhere.
