@@ -124,7 +124,13 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit, media_scan=
         target_subreddit,
         bot_name=reddit.AUTO_CROSSPOST_BOT_NAME,
     )
-    timedelta_string = i18n.format_duration_in_days(config.phase3_waiting_period_seconds(), target_subreddit)
+    # The time since the comment was written, not the configured waiting period: --process-one skips the wait
+    comment_created_utc = getattr(source_comment, 'created_utc', None)
+    if comment_created_utc is None:
+        comment_age_seconds = config.phase3_waiting_period_seconds()
+    else:
+        comment_age_seconds = time.time() - comment_created_utc
+    timedelta_string = i18n.format_duration_in_days(comment_age_seconds, target_subreddit)
     if source_comment.author:
         source_comment_author_name = f'/u/{source_comment.author.name}'
     else:

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Crosspost Reply Day Count:** the reply under a crosspost said the source comment was written, and that the bot waited, the configured `PHASE3_WAITING_PERIOD` (e.g. "90 days") before crossposting, even when less time had passed, as with `--process-one`, which skips the wait. It now gives the number of days since the comment was actually written, in every language.
+
 ## [2.14.0] - 2026-10-16
 
 ### Added
