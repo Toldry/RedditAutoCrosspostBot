@@ -189,3 +189,45 @@ BEGIN RETURN QUERY
 END;
 $$
 LANGUAGE plpgsql;
+
+-- Where the comment reader (racb/comment_reader.py) stopped, so a restart resumes there instead of
+-- skipping what was posted meanwhile. Every comment ID below next_comment_id (a base-36 comment ID as a
+-- number) has been read, and so have the blocks of IDs starting at each of done_blocks.
+CREATE TABLE IF NOT EXISTS stream_cursors (
+    name VARCHAR (32) PRIMARY KEY,
+    next_comment_id BIGINT NOT NULL,
+    done_blocks BIGINT[] NOT NULL DEFAULT '{}',
+    updated_at TIMESTAMP NOT NULL
+);
+
+DROP FUNCTION IF EXISTS save_stream_cursor(VARCHAR, BIGINT, BIGINT[]);
+CREATE OR REPLACE FUNCTION save_stream_cursor(cursor_name VARCHAR, new_next_comment_id BIGINT, new_done_blocks BIGINT[])
+RETURNS
+    VOID
+AS
+$$
+BEGIN
+    INSERT INTO stream_cursors(name, next_comment_id, done_blocks, updated_at)
+    VALUES (cursor_name, new_next_comment_id, new_done_blocks, LOCALTIMESTAMP)
+    ON CONFLICT (name) DO UPDATE
+    SET next_comment_id = EXCLUDED.next_comment_id,
+        done_blocks = EXCLUDED.done_blocks,
+        updated_at = EXCLUDED.updated_at;
+END;
+$$
+LANGUAGE plpgsql;
+
+DROP FUNCTION IF EXISTS get_stream_cursor(VARCHAR);
+CREATE OR REPLACE FUNCTION get_stream_cursor(cursor_name VARCHAR)
+RETURNS
+    TABLE (next_comment_id BIGINT, done_blocks BIGINT[], updated_at TIMESTAMP)
+AS
+$$
+BEGIN
+    RETURN QUERY
+    SELECT sc.next_comment_id, sc.done_blocks, sc.updated_at
+    FROM stream_cursors AS sc
+    WHERE sc.name = cursor_name;
+END;
+$$
+LANGUAGE plpgsql;

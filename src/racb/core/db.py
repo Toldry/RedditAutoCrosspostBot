@@ -205,3 +205,19 @@ def find_similar_subreddits(subreddit_name, max_results):
     with conn.cursor() as cur:
         cur.callproc('find_similar_subreddits', (subreddit_name, max_results))
         return [row[0] for row in cur.fetchall()]
+
+
+def save_stream_cursor(cursor_name, next_comment_id, done_blocks):
+    """Stores where the comment reader stopped: every ID below `next_comment_id`, and the `done_blocks`."""
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.callproc('save_stream_cursor', (cursor_name, next_comment_id, list(done_blocks)))
+        conn.commit()
+
+
+def get_stream_cursor(cursor_name):
+    """Returns the saved cursor as a dict (next_comment_id, done_blocks, updated_at), or None if there is none."""
+    conn = get_connection()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.callproc('get_stream_cursor', (cursor_name,))
+        return cur.fetchone()

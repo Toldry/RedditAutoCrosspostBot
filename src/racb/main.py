@@ -15,7 +15,9 @@ import prawcore
 from racb.version import __version__
 from racb import config, i18n
 from racb.config import env_bool
+from racb.comment_reader import CommentReader
 from racb.core import db, known_subreddits, reddit, shutdown
+from racb.core.cpu_usage import CpuUsage
 from racb.phases import phase1, phase2, phase3, inbox, cleanup
 from racb.workers import PeriodicJob, Phase1Workers
 
@@ -38,8 +40,12 @@ DATABASE_CONNECTION_ERRORS = db.CONNECTION_ERRORS
 class StreamMetrics:
     """Tracks throughput and events for Reddit comment and inbox streaming.
 
-    The stream thread and the Phase 1 workers record events while the heartbeat job reads and resets
-    the counters, so every access holds a lock.
+    The stream or reader threads and the Phase 1 workers record events while the heartbeat job reads and
+    resets the counters, so every access holds a lock.
+
+    Besides the counts, the heartbeat says how the comments were read (requests, comments per request,
+    seconds per request), how far behind the newest comment the bot is, and how much CPU it used. That tells
+    whether the bot keeps up with Reddit, and whether the VM's CPU is the limit (see `cpu_usage`).
     """
 
     def __init__(self):
@@ -51,6 +57,17 @@ class StreamMetrics:
         self.total_matches = 0
         self.total_aux = 0
         self.interval_dropped = 0
+        self.interval_requests = 0
+        self.interval_request_comments = 0
+        self.interval_request_seconds = 0.0
+        self.interval_head_polls = 0
+        self.interval_head_seconds = 0.0
+        self.interval_failed_blocks = 0
+        self.interval_skipped_ids = 0
+        # Creation time of the newest comment read so far, and how many IDs wait to be read
+        self.newest_created_utc = None
+        self.lag_ids = None
+        self.cpu_usage = CpuUsage()
         self.last_log_time = time.time()
 
     def record_comment(self):
@@ -73,9 +90,41 @@ class StreamMetrics:
         with self._lock:
             self.interval_dropped += 1
 
+    def record_request(self, seconds, comments_returned):
+        """Counts one request that read comments (a listing batch or an ID block)."""
+        with self._lock:
+            self.interval_requests += 1
+            self.interval_request_seconds += seconds
+            self.interval_request_comments += comments_returned
+
+    def record_head_poll(self, seconds):
+        with self._lock:
+            self.interval_head_polls += 1
+            self.interval_head_seconds += seconds
+
+    def record_failed_block(self):
+        """Counts a block of comment IDs given up on after repeated errors."""
+        with self._lock:
+            self.interval_failed_blocks += 1
+
+    def record_skipped_ids(self, count):
+        """Counts comment IDs skipped because the reader fell too far behind."""
+        with self._lock:
+            self.interval_skipped_ids += count
+
+    def record_newest_created(self, created_utc):
+        with self._lock:
+            if self.newest_created_utc is None or created_utc > self.newest_created_utc:
+                self.newest_created_utc = created_utc
+
+    def set_lag_ids(self, lag_ids):
+        with self._lock:
+            self.lag_ids = lag_ids
+
     def log_heartbeat(self):
         with self._lock:
-            elapsed_min = max(1, round((time.time() - self.last_log_time) / 60))
+            now = time.time()
+            elapsed_min = max(1, round((now - self.last_log_time) / 60))
             message = (
                 f'[Heartbeat] Last ~{elapsed_min}m: scanned {self.interval_scanned:,} comments on r/all | '
                 f'{self.interval_matches} recommendation(s) stored | {self.interval_aux} aux bot reply(s) '
@@ -83,12 +132,54 @@ class StreamMetrics:
             )
             if self.interval_dropped:
                 message += f' | {self.interval_dropped} match(es) dropped, Phase 1 queue full'
+            message += self._reading_summary(now)
             self.interval_scanned = 0
             self.interval_matches = 0
             self.interval_aux = 0
             self.interval_dropped = 0
-            self.last_log_time = time.time()
+            self.interval_requests = 0
+            self.interval_request_comments = 0
+            self.interval_request_seconds = 0.0
+            self.interval_head_polls = 0
+            self.interval_head_seconds = 0.0
+            self.interval_failed_blocks = 0
+            self.interval_skipped_ids = 0
+            self.last_log_time = now
         logger.info(message)
+
+    def _reading_summary(self, now):
+        """The heartbeat's second half: how comments were read, how far behind, and CPU use."""
+        parts = []
+        if self.interval_requests:
+            parts.append(
+                f'reads: {self.interval_requests:,} requests, '
+                f'{self.interval_request_comments / self.interval_requests:.1f} comments/request, '
+                f'{self.interval_request_seconds / self.interval_requests:.2f} s/request'
+            )
+        else:
+            parts.append('reads: 0 requests')
+        if self.interval_head_polls:
+            parts.append(
+                f'head: {self.interval_head_polls:,} polls, '
+                f'{self.interval_head_seconds / self.interval_head_polls:.2f} s/poll'
+            )
+        behind = []
+        if self.newest_created_utc is not None:
+            behind.append(f'{max(0, now - self.newest_created_utc):.0f} s')
+        if self.lag_ids is not None:
+            behind.append(f'{self.lag_ids:,} IDs')
+        if behind:
+            parts.append('behind: ' + ', '.join(behind))
+        if self.interval_failed_blocks:
+            parts.append(f'{self.interval_failed_blocks} ID block(s) failed')
+        if self.interval_skipped_ids:
+            parts.append(f'{self.interval_skipped_ids:,} IDs skipped')
+        process_percent, steal_percent = self.cpu_usage.sample()
+        cpu = f'CPU: {process_percent:.1f}% of a core'
+        if steal_percent is not None:
+            cpu += f', steal {steal_percent:.1f}%'
+        parts.append(cpu)
+        return ' | ' + ' | '.join(parts)
 
 
 metrics = StreamMetrics()
@@ -132,12 +223,20 @@ def configure_logging():
     logging.getLogger().setLevel(level)
 
 
-def init_comment_stream():
+def init_comment_stream(continue_after_id=None):
+    """Returns PRAW's r/all comment stream (STREAM_SOURCE=listing).
+
+    After a stream error, `continue_after_id` (the newest comment seen, as a fullname) makes the new stream
+    start right after it, instead of skipping everything posted during the back-off.
+    """
     logger.info('Initializing Reddit comment stream...')
     reddit_instance = reddit.get_reddit_instance()
     scanned_subreddits = 'all'
     subreddit = reddit_instance.subreddit(scanned_subreddits)
-    c_stream = subreddit.stream.comments(skip_existing=True, pause_after=-1)
+    if continue_after_id:
+        c_stream = subreddit.stream.comments(continue_after_id=continue_after_id, pause_after=-1)
+    else:
+        c_stream = subreddit.stream.comments(skip_existing=True, pause_after=-1)
     logger.info('Stream initialized successfully. Listening for comments on r/all...')
     return c_stream
 
@@ -253,8 +352,8 @@ def install_signal_handlers():
 def start_bot():
     """Runs the bot until a signal or a fatal error stops it.
 
-    The main thread reads the r/all stream. The scheduled jobs and the Phase 1 workers run on their own
-    threads (`racb.workers`), so they never pause the stream.
+    The main thread reads new comments (`run_stream`). The scheduled jobs and the Phase 1 workers run on
+    their own threads (`racb.workers`), so they never pause reading.
     """
     install_signal_handlers()
     logger.info('Configuring background task schedule...')
@@ -265,11 +364,12 @@ def start_bot():
     phase1_workers = Phase1Workers(handle_comment_id, worker_count, metrics=metrics).start()
     logger.info(f'Started {len(jobs)} scheduled job thread(s) and {worker_count} Phase 1 worker thread(s)')
 
+    reader_threads = []
     try:
-        run_stream(phase1_workers)
+        reader_threads = run_stream(phase1_workers)
     finally:
         shutdown.request_stop()
-        wait_for_threads(jobs + phase1_workers.threads, phase1_workers)
+        wait_for_threads(jobs + phase1_workers.threads + (reader_threads or []), phase1_workers)
 
     error = shutdown.fatal_error()
     if error is not None:
@@ -278,12 +378,35 @@ def start_bot():
 
 
 def run_stream(phase1_workers):
+    """Reads new comments on the main thread until shutdown, from STREAM_SOURCE.
+
+    Returns the reader threads it started, so the shutdown can wait for them.
+    """
+    if config.stream_source() == 'listing':
+        run_listing_stream(phase1_workers)
+        return []
+    reader_count = config.stream_reader_count()
+    reader = CommentReader(
+        lambda comment: dispatch_comment(comment, phase1_workers),
+        reader_count,
+        metrics=metrics,
+        handle_exception=handle_exception,
+    )
+    logger.info(f'Reading every new comment by ID on {reader_count} reader thread(s)')
+    reader.start()
+    reader.run()
+    return reader.threads
+
+
+def run_listing_stream(phase1_workers):
+    """STREAM_SOURCE=listing: reads PRAW's r/all comment stream, one request at a time."""
     c_stream = None
+    newest_seen = {'fullname': None}
     while not shutdown.stop_requested():
         try:
             if c_stream is None:
-                c_stream = init_comment_stream()
-            main_loop(c_stream, phase1_workers)
+                c_stream = init_comment_stream(continue_after_id=newest_seen['fullname'])
+            main_loop(c_stream, phase1_workers, newest_seen)
         except Exception as e:
             should_raise = handle_exception(e)
             if should_raise:
@@ -348,9 +471,10 @@ def handle_exception(e):
 
 
 def dispatch_comment(comment, phase1_workers):
-    """Handles one stream comment on the stream thread, without any I/O.
+    """Handles one new comment without any I/O, on the main thread or a reader thread.
 
-    Only comments that look like a subreddit suggestion go on to Phase 1, on a worker thread.
+    Only comments that look like a subreddit suggestion go on to Phase 1, on a worker thread. Reader
+    threads call this several at once; everything it touches is locked or thread safe.
     """
     try:
         metrics.record_comment()
@@ -395,12 +519,29 @@ def handle_comment_safely(comment):
             logger.exception(f'Unexpected error while handling comment {reddit.full_url(permalink)}: {e!r}')
 
 
-def main_loop(c_stream, phase1_workers):
-    """Reads one batch from the stream. Returns when the batch is done or a shutdown was requested."""
+def main_loop(c_stream, phase1_workers, newest_seen=None):
+    """Reads one batch from the stream. Returns when the batch is done or a shutdown was requested.
+
+    With `pause_after=-1`, PRAW yields None after every response, so one batch is one request. Its
+    duration and size go to the heartbeat. `newest_seen['fullname']` keeps the newest comment for a
+    stream restart.
+    """
+    started = time.monotonic()
+    batch_size = 0
+    newest_created = None
     for comment in c_stream:
         if comment is None or shutdown.stop_requested():
             break
+        batch_size += 1
         dispatch_comment(comment, phase1_workers)
+        if newest_seen is not None:
+            newest_seen['fullname'] = f't1_{comment.id}'
+        created = vars(comment).get('created_utc')
+        if created is not None and (newest_created is None or created > newest_created):
+            newest_created = created
+    metrics.record_request(time.monotonic() - started, batch_size)
+    if newest_created is not None:
+        metrics.record_newest_created(newest_created)
 
 
 if __name__ == '__main__':

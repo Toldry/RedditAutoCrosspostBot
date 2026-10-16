@@ -284,3 +284,91 @@ def test_main_loop_stops_reading_the_stream_on_shutdown(make_mock_comment):
     with patch('racb.main.known_subreddits.record'):
         main_loop(stream(), phase1_workers)
     phase1_workers.submit.assert_called_once_with('first')
+
+
+@pytest.mark.unit
+def test_heartbeat_reports_reads_lag_and_cpu(caplog):
+    import logging
+    import time
+    metrics = StreamMetrics()
+    metrics.cpu_usage = MagicMock()
+    metrics.cpu_usage.sample.return_value = (3.25, 1.5)
+    metrics.record_request(2.0, 100)
+    metrics.record_request(1.0, 80)
+    metrics.record_head_poll(4.0)
+    metrics.record_newest_created(time.time() - 12)
+    metrics.set_lag_ids(1234)
+    metrics.record_failed_block()
+    with caplog.at_level(logging.INFO, logger='racb.main'):
+        metrics.log_heartbeat()
+    message = caplog.records[-1].getMessage()
+    assert 'reads: 2 requests, 90.0 comments/request, 1.50 s/request' in message
+    assert 'head: 1 polls, 4.00 s/poll' in message
+    assert 'behind: 12 s, 1,234 IDs' in message
+    assert '1 ID block(s) failed' in message
+    assert message.endswith('CPU: 3.2% of a core, steal 1.5%')
+    assert metrics.interval_requests == 0
+    assert metrics.interval_failed_blocks == 0
+
+
+@pytest.mark.unit
+def test_main_loop_records_each_batch_as_one_request(make_mock_comment):
+    from racb.main import main_loop, metrics
+    newest_seen = {'fullname': None}
+    requests_before = metrics.interval_requests
+    comments = [make_mock_comment(comment_id='first'), make_mock_comment(comment_id='second')]
+    with patch('racb.main.known_subreddits.record'):
+        main_loop(iter(comments + [None]), MagicMock(), newest_seen)
+    assert metrics.interval_requests == requests_before + 1
+    assert newest_seen['fullname'] == 't1_second'
+
+
+@pytest.mark.unit
+def test_listing_stream_resumes_after_the_newest_comment_after_an_error():
+    from racb.main import run_listing_stream
+    from racb.core import shutdown
+    calls = []
+
+    def fake_main_loop(c_stream, phase1_workers, newest_seen):
+        calls.append(newest_seen['fullname'])
+        if len(calls) == 1:
+            newest_seen['fullname'] = 't1_abc'
+            raise prawcore.exceptions.ServerError(MagicMock())
+        shutdown.request_stop()
+
+    with patch('racb.main.init_comment_stream') as mock_init, \
+         patch('racb.main.main_loop', side_effect=fake_main_loop), \
+         patch('racb.main.handle_exception', return_value=False):
+        run_listing_stream(MagicMock())
+    assert [call.kwargs['continue_after_id'] for call in mock_init.call_args_list] == [None, 't1_abc']
+
+
+@pytest.mark.unit
+def test_init_comment_stream_continues_after_a_given_comment():
+    from racb.main import init_comment_stream
+    with patch('racb.main.reddit.get_reddit_instance') as mock_instance:
+        init_comment_stream(continue_after_id='t1_abc')
+        init_comment_stream()
+    comments = mock_instance.return_value.subreddit.return_value.stream.comments
+    assert comments.call_args_list[0].kwargs == {'continue_after_id': 't1_abc', 'pause_after': -1}
+    assert comments.call_args_list[1].kwargs == {'skip_existing': True, 'pause_after': -1}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('source', ['ids', 'listing'])
+def test_run_stream_reads_from_stream_source(source):
+    from racb.main import run_stream
+    with patch.dict('os.environ', {'STREAM_SOURCE': source, 'STREAM_READERS': '3'}), \
+         patch('racb.main.run_listing_stream') as mock_listing, \
+         patch('racb.main.CommentReader') as mock_reader:
+        threads = run_stream(MagicMock())
+    if source == 'listing':
+        mock_listing.assert_called_once()
+        mock_reader.assert_not_called()
+        assert threads == []
+    else:
+        mock_listing.assert_not_called()
+        assert mock_reader.call_args.args[1] == 3
+        mock_reader.return_value.start.assert_called_once_with()
+        mock_reader.return_value.run.assert_called_once_with()
+        assert threads is mock_reader.return_value.threads

@@ -10,6 +10,7 @@ import pytest
 import prawcore
 from praw.models import PostMedia
 
+from racb import comment_reader
 from racb.core import reddit
 from racb.phases import phase1, phase3, cleanup
 from scripts.delete_test_artifacts import record_artifact
@@ -96,6 +97,27 @@ def test_live_main_startup_flow(monkeypatch):
          patch('racb.main.configure_logging'):
         main()
         mock_start_bot.assert_called_once()
+
+
+@pytest.mark.integration
+def test_live_comment_reader_reads_recent_comments_by_id():
+    """Reads 4 blocks of comment IDs just below r/all's newest comment, one per bot account.
+
+    The comment reader relies on Reddit numbering comments in order across the whole site. If that ever
+    stops being true, most of these IDs come back empty, this test fails, and CI does not deploy a bot
+    that would read nothing.
+    """
+    block_count = len(reddit.BOT_NAMES)
+    first_block = comment_reader.fetch_head() - 10 * comment_reader.BLOCK_SIZE
+    comments = []
+    for index, bot_name in enumerate(reddit.BOT_NAMES):
+        comments += comment_reader.fetch_block(bot_name, first_block + index * comment_reader.BLOCK_SIZE)
+    numbers = [comment_reader.comment_id_to_number(comment.id) for comment in comments]
+    last_id = first_block + block_count * comment_reader.BLOCK_SIZE
+    assert all(first_block <= number < last_id for number in numbers)
+    # Comments in private subreddits are not returned, so not every ID comes back
+    assert len(comments) >= block_count * comment_reader.BLOCK_SIZE // 2, f'only {len(comments)} comments'
+    assert any(comment_reader.is_shown_on_r_all(comment) for comment in comments)
 
 
 @pytest.mark.integration

@@ -1,5 +1,6 @@
 """Unit tests for racb.config module."""
 
+import os
 from unittest.mock import patch
 import pytest
 from racb import config
@@ -59,3 +60,24 @@ def test_every_bot_has_an_enabled_switch_that_defaults_to_on():
     with patch.dict('os.environ', {'SAME_POST_BOT_ENABLED': 'False'}):
         assert not config.is_bot_enabled(reddit.SAME_POST_BOT_NAME)
         assert config.is_bot_enabled(reddit.AUTO_CROSSPOST_BOT_NAME)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('value, expected', [
+    (None, 'ids'), ('ids', 'ids'), ('Listing', 'listing'), (' listing ', 'listing'), ('firehose', 'ids'),
+])
+def test_stream_source(value, expected):
+    from racb import config
+    environment = {} if value is None else {'STREAM_SOURCE': value}
+    with patch.dict('os.environ', environment):
+        if value is None:
+            os.environ.pop('STREAM_SOURCE', None)
+        assert config.stream_source() == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('value, expected', [('8', 8), ('0', 1), ('many', 4)])
+def test_stream_reader_count(value, expected):
+    from racb import config
+    with patch.dict('os.environ', {'STREAM_READERS': value}):
+        assert config.stream_reader_count() == expected

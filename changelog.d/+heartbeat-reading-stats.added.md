@@ -1,0 +1,1 @@
+**Reading and CPU Figures in the Heartbeat:** each heartbeat now also says how many requests read comments, how many comments each returned and how long each took, how far behind the newest comment the bot is, and its CPU use (share of one core, and the VM's steal time), so you can tell whether it keeps up with Reddit and whether the VM is the limit.
