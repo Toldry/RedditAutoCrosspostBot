@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Banned Subreddits:** a suggestion of a banned subreddit (such as r/jar) got a `sub_doesnt_exist_bot` reply saying the subreddit does not exist and inviting the reader to create it, because Reddit answers 404 for banned subreddits too. A 404 whose reason is `banned` is now `SUBREDDIT_IS_BANNED` and gets no reply.
+
 ## [2.13.0] - 2026-10-16
 
 ### Added

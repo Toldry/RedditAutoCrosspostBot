@@ -124,9 +124,13 @@ def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
         query = f'url:\"{comment.submission.url}\"'
         submissions = reddit_instance.subreddit(subreddit).search(query=query, sort='new', time_filter='all')
         submissions = list(submissions)
-    except prawcore.exceptions.NotFound:
+    except prawcore.exceptions.NotFound as e:
         result.unable_to_search = True
-        result.unable_to_search_reason = 'SUBREDDIT_DOES_NOT_EXIST'
+        # Reddit also answers 404 for a banned subreddit, which exists but cannot be created again
+        if _error_reason(e) == 'banned':
+            result.unable_to_search_reason = 'SUBREDDIT_IS_BANNED'
+        else:
+            result.unable_to_search_reason = 'SUBREDDIT_DOES_NOT_EXIST'
         return result
     except prawcore.exceptions.Forbidden:
         result.unable_to_search = True
