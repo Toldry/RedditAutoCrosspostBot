@@ -46,9 +46,13 @@ auxiliary bot's PRAW instance (`get_comment_with_different_praw_instance`). All 
    - Trigger: Comment links to a target subreddit that already contains a post with the exact same URL/content or visually matching image.
    - Behavior: Detects existing posts via Reddit search and self-hosted perceptual image hashing (`imagehash`), replying with a link to the prior post.
 
-> [!WARNING]
-> Auxiliary bots reply to matching comments at **any depth**. The top-level-only check
-> (`comment.parent_id == comment.link_id`) runs **after** the auxiliary dispatch and gates only the DB insert.
+> [!NOTE]
+> Only **top-level** comments (`comment.parent_id == comment.link_id`, a direct answer to the post) count as
+> recommendations and get a reply from `same_subreddit_bot` or `same_post_bot`. `sub_doesnt_exist_bot` is the
+> one bot that also answers replies to other comments. For those, Phase 1 only checks whether the target exists
+> (`get_posts_with_same_content(..., existence_only=True)`: the URL search, no duplicate scan).
+> Every bot requires the **whole** body to be the subreddit reference (the matching rule above). A comment
+> edited after the bot answered (e.g. `r/name` later extended with `\n\nWait...`) keeps that answer.
 
 ---
 
@@ -90,14 +94,18 @@ flowchart TD
     T -->|Yes| X3["ignore"]
     T -->|No| BL{"Source or target in\nSUB_BLACKLIST?\n(case-insensitive)"}
     BL -->|Yes| X4["ignore"]
-    BL -->|No| SS{"target == source\n(case-insensitive)?"}
+    BL -->|No| TL{"Top-level comment?"}
+    TL -->|No| SSN{"target == source\n(case-insensitive)?"}
+    SSN -->|Yes| X5["ignore"]
+    SSN -->|No| EX["get_posts_with_same_content(existence_only=True)\n1 URL search"]
+    EX -->|SUBREDDIT_DOES_NOT_EXIST| A3
+    EX -->|otherwise| X6["ignore"]
+    TL -->|Yes| SS{"target == source\n(case-insensitive)?"}
     SS -->|Yes| A1["same_subreddit_bot reply"]
     SS -->|No| DUP["get_posts_with_same_content()\n1 URL search + 1 other-discussions call\n+ image/video-hash scan of\n100 newest + 100 all-time top posts"]
     DUP -->|posts_found| A2["same_post_bot reply"]
     DUP -->|SUBREDDIT_DOES_NOT_EXIST| A3["sub_doesnt_exist_bot reply"]
-    DUP -->|otherwise| TL{"Top-level comment?"}
-    TL -->|No| X5["ignore"]
-    TL -->|Yes| DB[("insert_scraped_comment(permalink, target)")]
+    DUP -->|otherwise| DB[("insert_scraped_comment(permalink, target)")]
 ```
 
 Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1. Phase 2 deletes it later.
@@ -113,7 +121,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     are read too. `STREAM_SOURCE=listing` instead reads
     `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)` one request at a time, which
     sees only a fraction of r/all (section 9).
-  - Filters: Discards moderator comments, submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`src/racb/constants.py`](./src/racb/constants.py), compared case-insensitively by `is_crosspost_blocked`). Non-top-level comments (`comment.parent_id != comment.link_id`) are discarded only **after** auxiliary-bot dispatch (see the warning in section 1).
+  - Filters: Discards moderator comments, submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`src/racb/constants.py`](./src/racb/constants.py), compared case-insensitively by `is_crosspost_blocked`). Non-top-level comments (`comment.parent_id != comment.link_id`) can only get a `sub_doesnt_exist_bot` reply and are never stored (see the note in section 1).
   - Qualified suggestions are stored via stored procedure `insert_scraped_comment(permalink, target_subreddit)`.
   - Phases 2 and 3 re-parse the target from the live comment body and reject the row
     (`TARGET_SUBREDDIT_CHANGED`) if it no longer equals the stored target, case-insensitively. This blocks

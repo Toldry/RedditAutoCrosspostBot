@@ -31,7 +31,13 @@ def handle_incoming_comment(comment, metrics=None):
     if is_crosspost_blocked(source_subreddit, target_subreddit):
         return
 
+    # Only sub_doesnt_exist_bot answers replies to other comments. Every other bot, and the crosspost
+    # recommendation itself, only counts comments that answer the post directly
+    top_level = is_top_level_comment(comment)
+
     if target_subreddit.lower() == source_subreddit:
+        if not top_level:
+            return None
         if not config.is_bot_enabled(reddit.SAME_SUBREDDIT_BOT_NAME):
             logger.info(f'Found "same subreddit" comment ({reddit.full_url(comment.permalink)}); same_subreddit_bot is disabled.')
             return None
@@ -41,8 +47,9 @@ def handle_incoming_comment(comment, metrics=None):
             metrics.record_aux()
         return reply
 
-    result_obj = get_posts_with_same_content(comment, target_subreddit)
-    if result_obj.posts_found:
+    # A reply only needs to know whether the target exists, which the first search tells
+    result_obj = get_posts_with_same_content(comment, target_subreddit, existence_only=not top_level)
+    if top_level and result_obj.posts_found:
         if not config.is_bot_enabled(reddit.SAME_POST_BOT_NAME):
             logger.info(f'Found post with duplicate content in r/{target_subreddit} ({reddit.full_url(comment.permalink)}); same_post_bot is disabled.')
             return None
@@ -108,7 +115,8 @@ def check_pattern(comment):
 def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
                                 media_scan_limit=duplicate_detector.QUICK_SCAN_NEWEST_LIMIT,
                                 media_scan_top_limit=duplicate_detector.QUICK_SCAN_TOP_LIMIT,
-                                media_scan_top_time_filters=('all',), search_titles=False):
+                                media_scan_top_time_filters=('all',), search_titles=False,
+                                existence_only=False):
     """Looks for posts in `subreddit` that link to the same URL or, for an image or video post, look the same.
 
     Also counts as the same content: a post in `subreddit` that Reddit lists among the submission's "other
@@ -118,6 +126,9 @@ def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
     The picture comparison reads at most `media_scan_limit` of the newest posts, stopping at the first one older
     than `media_scan_since` (a Unix timestamp), plus the `media_scan_top_limit` top posts of each period in
     `media_scan_top_time_filters`. Its outcome is kept in `media_scan` (None if nothing was compared).
+
+    With `existence_only`, it stops after the URL search, which is enough to fill `unable_to_search` and
+    `unable_to_search_reason`; `posts_found` then stays False.
     """
     class Result:
         posts_found = False
@@ -165,6 +176,9 @@ def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
             return result
         else:
             raise
+
+    if existence_only:
+        return result
 
     if len(submissions) > 0:
         result.posts_found = True
