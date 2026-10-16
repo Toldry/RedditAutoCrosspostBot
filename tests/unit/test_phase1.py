@@ -22,6 +22,13 @@ def test_check_pattern(make_mock_comment):
     assert phase1.check_pattern(make_mock_comment(body='r/this_subreddit_name_is_way_too_long_for_reddit')) is None
     assert phase1.check_pattern(make_mock_comment(body='just some text')) is None
 
+    # Anything besides the reference, on the same line or another one, disqualifies the comment
+    assert phase1.check_pattern(make_mock_comment(body='r/brothrewinafunfact\n\nWait...')) is None
+    assert phase1.check_pattern(make_mock_comment(body='Wait...\n\nr/brothrewinafunfact')) is None
+    assert phase1.check_pattern(make_mock_comment(body='r/funny\nr/pics')) is None
+    assert phase1.check_pattern(make_mock_comment(body='r/funny.')) is None
+    assert phase1.check_pattern(make_mock_comment(body=' r/funny')) is None
+
 
 @pytest.mark.unit
 def test_is_mod_post(make_mock_comment):
@@ -469,3 +476,92 @@ def test_banned_target_gets_no_sub_doesnt_exist_reply(make_mock_comment):
             patch('racb.phases.phase1.db.add_comment'):
         phase1.handle_incoming_comment(comment)
     mock_reply.assert_not_called()
+
+
+NESTED = dict(parent_id='t1_c999', link_id='t3_sub123')
+
+
+@pytest.mark.unit
+def test_same_subreddit_bot_ignores_nested_comments(make_mock_comment):
+    comment = make_mock_comment(body='r/test_source', subreddit='test_source', **NESTED)
+    with patch('racb.phases.phase1.reply_to_source_equals_target_comment') as mock_reply, \
+            patch('racb.phases.phase1.get_posts_with_same_content') as mock_search, \
+            patch('racb.phases.phase1.db.add_comment') as mock_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    mock_reply.assert_not_called()
+    mock_search.assert_not_called()
+    mock_add.assert_not_called()
+
+
+@pytest.mark.unit
+def test_nested_comment_only_checks_that_the_target_exists(make_mock_comment):
+    comment = make_mock_comment(body='r/target_sub', subreddit='test_source', **NESTED)
+    mock_reddit = MagicMock()
+    mock_reddit.subreddit.return_value.search.return_value = [MagicMock(permalink='/r/target_sub/comments/dup1/')]
+    with patch('racb.core.reddit.get_reddit_instance', return_value=mock_reddit), \
+            patch('racb.phases.phase1.find_other_discussions') as mock_other_discussions, \
+            patch('racb.core.duplicate_detector.scan_subreddit_for_duplicates') as mock_scan, \
+            patch('racb.phases.phase1.reply_to_same_content_post_comment') as mock_reply, \
+            patch('racb.phases.phase1.db.add_comment') as mock_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    mock_reply.assert_not_called()
+    mock_other_discussions.assert_not_called()
+    mock_scan.assert_not_called()
+    mock_add.assert_not_called()
+
+
+@pytest.mark.unit
+def test_same_post_bot_ignores_nested_comments(make_mock_comment):
+    comment = make_mock_comment(body='r/target_sub', subreddit='test_source', **NESTED)
+    mock_res = MagicMock(posts_found=True, posts=[MagicMock(permalink='/r/target_sub/comments/dup1/')])
+    with patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_res) as mock_search, \
+            patch('racb.phases.phase1.reply_to_same_content_post_comment') as mock_reply, \
+            patch('racb.phases.phase1.db.add_comment') as mock_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    assert mock_search.call_args.kwargs['existence_only'] is True
+    mock_reply.assert_not_called()
+    mock_add.assert_not_called()
+
+
+@pytest.mark.unit
+def test_sub_doesnt_exist_bot_still_answers_nested_comments(make_mock_comment):
+    comment = make_mock_comment(body='r/nonexistent_sub_xyz', subreddit='test_source', **NESTED)
+    mock_res = MagicMock(posts_found=False, unable_to_search=True, unable_to_search_reason='SUBREDDIT_DOES_NOT_EXIST')
+    with patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_res), \
+            patch('racb.phases.phase1.reply_to_nonexistent_target_subreddit_comment') as mock_reply, \
+            patch('racb.phases.phase1.db.add_comment') as mock_add:
+        phase1.handle_incoming_comment(comment)
+    mock_reply.assert_called_once_with(comment, 'nonexistent_sub_xyz')
+    mock_add.assert_not_called()
+
+
+@pytest.mark.unit
+def test_nested_recommendation_is_not_stored(make_mock_comment):
+    comment = make_mock_comment(body='r/target_sub', subreddit='test_source', **NESTED)
+    mock_res = MagicMock(posts_found=False, unable_to_search=False)
+    with patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_res), \
+            patch('racb.phases.phase1.db.add_comment') as mock_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    mock_add.assert_not_called()
+
+
+@pytest.mark.unit
+def test_top_level_comment_gets_the_full_duplicate_check(make_mock_comment):
+    comment = make_mock_comment(body='r/target_sub', subreddit='test_source')
+    mock_res = MagicMock(posts_found=False, unable_to_search=False)
+    with patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_res) as mock_search, \
+            patch('racb.phases.phase1.db.add_comment'):
+        phase1.handle_incoming_comment(comment)
+    assert mock_search.call_args.kwargs['existence_only'] is False
+
+
+@pytest.mark.unit
+def test_comment_with_extra_text_gets_no_reply(make_mock_comment):
+    comment = make_mock_comment(body='r/test_source\n\nWait...', subreddit='test_source')
+    with patch('racb.phases.phase1.reply_to_source_equals_target_comment') as mock_reply, \
+            patch('racb.phases.phase1.get_posts_with_same_content') as mock_search, \
+            patch('racb.phases.phase1.db.add_comment') as mock_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    mock_reply.assert_not_called()
+    mock_search.assert_not_called()
+    mock_add.assert_not_called()
