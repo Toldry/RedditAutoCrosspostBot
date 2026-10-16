@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Crosspost Reply Describes the Whole Repost Check:** the reply said only that the target was searched for the same URL and that the image (or video) posts made since the suggestion were compared, which left out most of what was checked. It now also says that the whole target was searched, crossposts of the post included ("other discussions"), and that the picture was also compared with the newest posts from before the suggestion (the check made when the comment was first seen) and with the target's top posts of the past year and of all time. Updated in every language.
 
+## [3.0.2] - 2026-10-16
+
+### Fixed
+- **Transparent Images in the Image Duplicate Scan:** a transparent picture was hashed by the hidden colour stored behind its see-through pixels, so two copies of the same image saved by different programs could fail to match, and palette images with partial transparency made Pillow log `UserWarning: Palette images with Transparency expressed in bytes should be converted to RGBA images`. Transparent images are now laid over a white background before hashing, which also silences the warning.
+
 ## [3.0.1] - 2026-10-16
 
 ### Fixed

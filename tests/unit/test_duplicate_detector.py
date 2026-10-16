@@ -1,9 +1,10 @@
 """Unit tests for racb.core.duplicate_detector module using self-hosted perceptual hashing."""
 
 import io
+import warnings
 from unittest.mock import patch, MagicMock
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 import imagehash
 import requests
 
@@ -66,6 +67,50 @@ def test_compute_image_hash_network_error():
     with patch('requests.get', side_effect=requests.exceptions.RequestException('Timeout')):
         h = duplicate_detector.compute_image_hash('https://i.redd.it/error.png')
         assert h is None
+
+
+def create_transparent_palette_png_bytes(hidden_color):
+    """A palette PNG of an opaque red disc on a see-through background whose stored colour is `hidden_color`.
+
+    Two palette entries are partly transparent, so Pillow keeps the transparency as bytes, the case that made
+    Pillow warn "Palette images with Transparency expressed in bytes should be converted to RGBA images".
+    """
+    img = Image.new('P', (128, 128), 0)
+    img.putpalette(list(hidden_color) + [255, 0, 0] + [0, 0, 0] * 254)
+    ImageDraw.Draw(img).ellipse((32, 32, 96, 96), fill=1)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG', transparency=bytes([0, 255, 128] + [255] * 253))
+    return buf.getvalue()
+
+
+@pytest.mark.unit
+def test_transparent_images_are_compared_as_seen_on_white():
+    on_black = create_transparent_palette_png_bytes((0, 0, 0))
+    on_white = create_transparent_palette_png_bytes((255, 255, 255))
+    flattened = Image.new('RGB', (128, 128), 'white')
+    ImageDraw.Draw(flattened).ellipse((32, 32, 96, 96), fill='red')
+    flattened_buf = io.BytesIO()
+    flattened.save(flattened_buf, format='JPEG')
+    responses = {
+        'https://i.redd.it/on_black.png': on_black,
+        'https://i.redd.it/on_white.png': on_white,
+        'https://i.redd.it/flattened.jpg': flattened_buf.getvalue(),
+    }
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        with patch('requests.get', side_effect=lambda url, **kwargs: make_http_response(responses[url])):
+            fingerprints = [duplicate_detector.compute_image_fingerprint(url) for url in responses]
+
+    assert None not in fingerprints
+    assert duplicate_detector.fingerprints_match(fingerprints[0], fingerprints[1])
+    assert duplicate_detector.fingerprints_match(fingerprints[0], fingerprints[2])
+
+
+@pytest.mark.unit
+def test_opaque_images_are_hashed_unchanged():
+    img = Image.open(io.BytesIO(create_test_image_bytes()))
+    assert duplicate_detector.flatten_transparency(img) is img
 
 
 @pytest.mark.unit
