@@ -20,6 +20,10 @@ Videos are compared the same way, through the still preview image Reddit makes f
 usually gets a different preview frame and is missed. Decoding the videos themselves would catch more, but
 is far too heavy for the 1 GB VM the bot runs on.
 
+Transparent images (PNGs, GIFs, WebPs with see-through areas) are first laid over a white background, so what
+is compared is what a viewer sees. Without that, the hidden colour stored behind the transparent pixels would
+decide the hash, and two copies of the same picture saved by different programs would not match.
+
 A gallery post counts as an image post. Its first MAX_GALLERY_IMAGES pictures are fingerprinted, and two posts
 match when any picture of one matches any picture of the other.
 
@@ -140,6 +144,18 @@ def download_image_bytes(url):
         return bytes(buffer)
 
 
+def flatten_transparency(img):
+    """Returns the image laid over a white background if it has transparent areas, else the image itself.
+
+    Hashing works on grayscale, which ignores transparency, so a transparent pixel would otherwise count as
+    whatever colour happens to be stored behind it (often black, sometimes leftovers of an edit).
+    """
+    if not img.has_transparency_data:
+        return img
+    background = Image.new('RGBA', img.size, 'white')
+    return Image.alpha_composite(background, img.convert('RGBA')).convert('RGB')
+
+
 def compute_region_hashes(img):
     """Computes a dhash for every cell of a REGION_GRID_SIZE x REGION_GRID_SIZE grid over the image."""
     side = REGION_GRID_SIZE * REGION_PIXELS
@@ -183,7 +199,8 @@ def fingerprint_image_at(url):
         if image_bytes is None:
             raise ImageUnavailable(url)
         with Image.open(io.BytesIO(image_bytes)) as img:
-            return ImageFingerprint(imagehash.dhash(img), compute_region_hashes(img))
+            flattened = flatten_transparency(img)
+            return ImageFingerprint(imagehash.dhash(flattened), compute_region_hashes(flattened))
     except ImageUnavailable:
         raise
     except Exception as e:

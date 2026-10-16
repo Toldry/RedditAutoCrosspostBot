@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Transparent Images in the Image Duplicate Scan:** a transparent picture was hashed by the hidden colour stored behind its see-through pixels, so two copies of the same image saved by different programs could fail to match, and palette images with partial transparency made Pillow log `UserWarning: Palette images with Transparency expressed in bytes should be converted to RGBA images`. Transparent images are now laid over a white background before hashing, which also silences the warning.
+
 ## [3.0.1] - 2026-10-16
 
 ### Fixed
