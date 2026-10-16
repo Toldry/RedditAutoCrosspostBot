@@ -287,6 +287,18 @@ def test_main_loop_stops_reading_the_stream_on_shutdown(make_mock_comment):
 
 
 @pytest.mark.unit
+def test_heartbeat_counts_empty_head_polls(caplog):
+    import logging
+    metrics = StreamMetrics()
+    metrics.record_head_poll(1.0)
+    metrics.record_head_poll(3.0, empty=True)
+    with caplog.at_level(logging.INFO, logger='racb.main'):
+        metrics.log_heartbeat()
+    assert 'head: 2 polls (1 empty), 2.00 s/poll' in caplog.records[-1].getMessage()
+    assert metrics.interval_empty_head_polls == 0
+
+
+@pytest.mark.unit
 def test_heartbeat_reports_reads_and_lag(caplog):
     import logging
     import time

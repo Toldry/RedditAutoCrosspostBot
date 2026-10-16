@@ -61,6 +61,7 @@ class StreamMetrics:
         self.interval_request_seconds = 0.0
         self.interval_head_polls = 0
         self.interval_head_seconds = 0.0
+        self.interval_empty_head_polls = 0
         self.interval_failed_blocks = 0
         self.interval_skipped_ids = 0
         # Creation time of the newest comment read so far, and how many IDs wait to be read
@@ -95,10 +96,13 @@ class StreamMetrics:
             self.interval_request_seconds += seconds
             self.interval_request_comments += comments_returned
 
-    def record_head_poll(self, seconds):
+    def record_head_poll(self, seconds, empty=False):
+        """Counts one head poll; `empty` if the r/all listing returned no comments."""
         with self._lock:
             self.interval_head_polls += 1
             self.interval_head_seconds += seconds
+            if empty:
+                self.interval_empty_head_polls += 1
 
     def record_failed_block(self):
         """Counts a block of comment IDs given up on after repeated errors."""
@@ -140,6 +144,7 @@ class StreamMetrics:
             self.interval_request_seconds = 0.0
             self.interval_head_polls = 0
             self.interval_head_seconds = 0.0
+            self.interval_empty_head_polls = 0
             self.interval_failed_blocks = 0
             self.interval_skipped_ids = 0
             self.last_log_time = now
@@ -157,8 +162,9 @@ class StreamMetrics:
         else:
             parts.append('reads: 0 requests')
         if self.interval_head_polls:
+            empty = f' ({self.interval_empty_head_polls:,} empty)' if self.interval_empty_head_polls else ''
             parts.append(
-                f'head: {self.interval_head_polls:,} polls, '
+                f'head: {self.interval_head_polls:,} polls{empty}, '
                 f'{self.interval_head_seconds / self.interval_head_polls:.2f} s/poll'
             )
         behind = []
