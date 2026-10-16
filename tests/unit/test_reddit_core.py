@@ -48,13 +48,37 @@ def test_instantiate_praw():
 def test_get_reddit_instance_singleton():
     with patch('racb.core.reddit._instantiate_praw') as mock_instantiate:
         mock_instantiate.side_effect = lambda username, **kwargs: MagicMock(username=username)
-        reddit.praw_instances = None  # Reset singleton cache
+        reddit.reset_thread_instances()
 
         inst1 = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)
         inst2 = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)
 
         assert inst1 is inst2
-        assert mock_instantiate.call_count == 4  # 4 bots initialized on first call
+        assert mock_instantiate.call_count == 1  # Only the account that was asked for
+        reddit.reset_thread_instances()
+
+
+@pytest.mark.unit
+def test_get_reddit_instance_is_separate_per_thread():
+    import threading
+    with patch('racb.core.reddit._instantiate_praw') as mock_instantiate:
+        mock_instantiate.side_effect = lambda username, **kwargs: MagicMock(username=username)
+        reddit.reset_thread_instances()
+        main_thread_instance = reddit.get_reddit_instance()
+        other_thread_instances = []
+
+        def use_reddit_twice():
+            other_thread_instances.append(reddit.get_reddit_instance())
+            other_thread_instances.append(reddit.get_reddit_instance())
+
+        thread = threading.Thread(target=use_reddit_twice)
+        thread.start()
+        thread.join()
+
+        assert other_thread_instances[0] is other_thread_instances[1]
+        assert other_thread_instances[0] is not main_thread_instance
+        assert reddit.get_reddit_instance() is main_thread_instance
+        reddit.reset_thread_instances()
 
 
 @pytest.mark.unit

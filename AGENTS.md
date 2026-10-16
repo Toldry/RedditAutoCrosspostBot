@@ -12,9 +12,9 @@ Welcome to the **RedditAutoCrosspostBot** repository. This document is a compreh
 
 This repository hosts a suite of 4 automated Reddit bots powered by [PRAW (Python Reddit API Wrapper)](https://praw.readthedocs.io/), backed by a PostgreSQL database and containerized with Docker / Docker Compose for deployment on free cloud VPS instances (e.g. Google Cloud Always Free or Oracle Cloud Always Free) or local hardware.
 
-All 4 bots run in **one Python process, on a single thread**. A single loop alternates between the
-`r/all` comment stream and the `schedule` jobs (inbox processing is one of them), so any slow call blocks
-everything else (see section 7).
+All 4 bots run in **one Python process, on several threads**. The main thread only reads the `r/all`
+comment stream. Phase 1 runs on a pool of worker threads, and every scheduled job (Phase 2, Phase 3, inbox,
+cleanup, ...) on a thread of its own, so a slow job no longer stops the stream (see section 7).
 
 ### Primary Bot: `AutoCrosspostBot`
 - **Goal:** Monitors Reddit comments on `r/all` for community crosspost recommendations matching `r/SomeSubreddit` or `/r/SomeSubreddit`.
@@ -111,12 +111,14 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
   - Phases 2 and 3 re-parse the target from the live comment body and reject the row
     (`TARGET_SUBREDDIT_CHANGED`) if it no longer equals the stored target, case-insensitively. This blocks
     bait-and-switch edits. Rows scraped before v2.3 have `target_subreddit = NULL` and skip this check.
-  - All of this work, including the duplicate search and image downloads, runs synchronously on the stream loop.
+  - The stream thread only runs the regex (`check_pattern`, no I/O) and queues the comment ID of a match. A
+    Phase 1 worker thread fetches the comment again through its own PRAW instance (one request) and does all
+    of this work, including the duplicate search and image downloads (section 7).
   - Auxiliary replies go through `phase1.reply_as_bot()`, which only logs when `DRY_RUN` is enabled.
   - Any error while handling one comment is caught in `main.handle_comment_safely()` and skips only that
     comment (section 7).
 - **Phase 2 ([`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py)):**
-  - Runs periodically via `schedule` (or manually via `python -m racb --only-phase2`).
+  - Runs every 20 minutes on its own thread (or manually via `python -m racb --only-phase2`).
   - Fetches unchecked rows older than `PHASE2_WAITING_PERIOD` using `get_unchecked_comments_older_than(interval)`.
   - Executes **batch fetching via `reddit.info(fullnames=chunk)`** in chunks of 100 to minimize API requests by 99%:
     - Comment availability (not deleted / removed).
@@ -152,7 +154,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     counts only the posts by date, so `RepostScan.top_posts_checked` is subtracted): `duplicate_detector.scan_subreddit_for_duplicates`
     walks the target's "new" listing back to the comment's `created_utc`, or until Reddit's listing ends
     (about 1000 posts, `REDDIT_LISTING_LIMIT`). It compares Reddit's small preview images (`PREVIEW_MIN_WIDTH`,
-    320 px), 8 downloads at a time, so even a full scan stays cheap, but it still runs on the stream loop.
+    320 px), 8 downloads at a time, so even a full scan stays cheap. It runs on the `phase3` thread, not the stream's.
     A video (`duplicate_detector.media_kind`: `is_video`, or a `v.redd.it`, YouTube or Streamable link) is
     compared through its preview frame only, so a trimmed or re-edited copy is usually missed, and a video
     without a preview is not scanned.
@@ -196,12 +198,14 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 
 | File | Purpose |
 | :--- | :--- |
-| [`src/racb/main.py`](./src/racb/main.py) | Application entry point, logging setup, stream loop, exception recovery, and `schedule` runner. |
+| [`src/racb/main.py`](./src/racb/main.py) | Application entry point, logging setup, the stream loop on the main thread, exception recovery, the job list (`build_jobs`), and graceful shutdown on SIGTERM/SIGINT. |
+| [`src/racb/workers.py`](./src/racb/workers.py) | Background threads: `PeriodicJob` (one thread per scheduled job), `Phase1Workers` (the Phase 1 thread pool fed by the stream), and `run_job_safely`. |
 | [`src/racb/__main__.py`](./src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
 | [`src/racb/__init__.py`](./src/racb/__init__.py) | Package marker; re-exports `__version__`. |
 | [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_listen_only()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
-| [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Singleton factory for PRAW instances with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check) and the bot-name constants. |
-| [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with connection retry logic and stored procedure invocation. |
+| [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Per-thread factory for PRAW instances (one per account per thread, created lazily) with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check), `TRANSIENT_NETWORK_ERRORS` and the bot-name constants. |
+| [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with one connection per thread, connection retry logic and stored procedure invocation. |
+| [`src/racb/core/shutdown.py`](./src/racb/core/shutdown.py) | The process-wide stop signal: `request_stop()`, `stop_requested()`, `wait(seconds)` (an interruptible sleep), and `fail()`, which records a thread's crash and stops the process. |
 | [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Typo suggestions: merges candidates from `known_subreddits` and `reddit.subreddits.search()`, filtered and ranked by name similarity. |
 | [`src/racb/core/known_subreddits.py`](./src/racb/core/known_subreddits.py) | Buffers subreddit names seen in the comment stream (no I/O per comment) and writes them to `known_subreddits` in one batch every 5 minutes; also the trigram lookup. |
 | [`src/racb/core/duplicate_detector.py`](./src/racb/core/duplicate_detector.py) | Self-hosted perceptual image hashing (`imagehash` / `dhash`) for visual duplicate detection in target subreddits: `scan_subreddit_for_duplicates` compares an image or video post (videos by preview frame) with the subreddit's posts of the same kind back to a given time and returns a `RepostScan`. Linked from every crosspost reply about an image or video, so it is written to be read by outsiders; its module docstring explains the method. |
@@ -227,7 +231,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`docs/logs.md`](./docs/logs.md) | How to read the bot's logs over SSH or in Google Cloud Logging, and how to turn Cloud Logging on. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1639 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/unit/`](./tests/unit/) | 1712 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -273,6 +277,7 @@ Store these in `.env` for local development or production:
 | `COMMENT_SCORE_THRESHOLD` | Integer | `1` (`.env.example`: `30`) | Minimum upvote score a comment must have to survive Phase 2 and be crossposted in Phase 3. |
 | `PHASE2_WAITING_PERIOD` | Time string | `2 hours` | Time duration before Phase 2 checks a comment (parsed via `pytimeparse`, e.g. `2 hours` or `1 day`). |
 | `PHASE3_WAITING_PERIOD` | Time string | `90 days` | Time duration before Phase 3 executes the crosspost (e.g. `3 months` or `90 days`). The public crosspost reply shows it as a localized whole number of days. |
+| `PHASE1_WORKERS` | Integer | `4` | Number of Phase 1 worker threads (at least 1). Each makes its own Reddit requests, all sharing the accounts' rate limits (section 7). |
 | `LOG_DIR` | Path | `logs` | Directory for `app.log` (relative to the CWD; `/app/logs` in Docker, mounted on volume `racb_logs`). |
 | `PASSWORD` | String | | Account password for `AutoCrosspostBot`. |
 | `APP_CLIENT_SECRET` | String | | App client secret for `AutoCrosspostBot`. |
@@ -293,8 +298,10 @@ Store these in `.env` for local development or production:
   over `.env`.
 
 ### `DEBUG=True` side effects (do not enable in production)
-- Runs Phase 2 once at startup. Cleanup and Phase 3, which write to Reddit, keep their normal schedule.
-- Errors in comment handling, scheduled jobs and the stream loop are re-raised, which crashes the process.
+- Runs Phase 2 once at startup (on its thread, while the stream starts). Cleanup and Phase 3, which write to
+  Reddit, keep their normal schedule.
+- Errors in comment handling, scheduled jobs and the stream loop are re-raised. On a worker or job thread,
+  that stops every thread (`shutdown.fail`) and `start_bot()` re-raises it, which crashes the process.
 - `add_comment` and `exec_crosspost` re-raise instead of logging.
 
 ### `LISTEN_ONLY=True` is **not** a dry run
@@ -342,7 +349,9 @@ cleanup job **still deletes** submissions. Use `DRY_RUN=True` for a fully read-o
 2. **Database Setup:**
    Ensure a local PostgreSQL instance is running and set `DATABASE_URL` in `.env`.
    When [`src/racb/core/db.py`](./src/racb/core/db.py) initializes, it automatically runs [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) to ensure tables, views, and functions exist.
-   The connection is **lazy**: it opens on first use (a Phase 1 match or a scheduled phase), not at startup.
+   The connection is **lazy** and **per thread**: each Phase 1 worker and each job opens its own on first use,
+   not at startup, so up to `PHASE1_WORKERS` + 6 connections are open (Postgres allows 100 by default).
+   The schema script runs on every new connection, one connection at a time (`db._schema_lock`).
 3. **Run the Bot:**
    ```bash
    uv run python -m racb
@@ -404,15 +413,17 @@ uv run pytest -m integration
   `racb.phases.phase1.get_posts_with_same_content` or `racb.core.db.add_comment`.
 
 ### Logging
-- Format: `YYYY-MM-DD HH:MM:SS [LEVEL   ] module.name: message`, sent to stderr and to
-  `$LOG_DIR/app.log` (rotating, 5 x 5 MB).
-- The `prawcore`, `urllib3.connectionpool` and `schedule` loggers are **disabled entirely**, which also hides prawcore's rate-limit messages.
+- Format: `YYYY-MM-DD HH:MM:SS [LEVEL   ] [thread] module.name: message`, sent to stderr and to
+  `$LOG_DIR/app.log` (rotating, 5 x 5 MB). `thread` is `MainThread` (the stream), `phase1-<n>`, or the
+  job's name (`phase2`, `phase3`, `inbox`, `cleanup`, `heartbeat`, `known-subreddits`).
+- The `prawcore` and `urllib3.connectionpool` loggers are **disabled entirely**, which also hides prawcore's rate-limit messages.
 - `[DRY RUN]` lines show writes that `DRY_RUN` suppressed. `Skipping comment ... after Reddit error` lines
   show per-comment failures (e.g. a bot banned from a subreddit) that no longer interrupt the stream.
 - Every comment a bot posts is logged after it is posted: `/u/<bot> replied to <user> suggestion (r/<source> -> r/<target>): <reply URL>`
   (Phase 1 auxiliary replies and the crosspost reply) or `/u/<bot> replied to <user> feedback (r/<subreddit>): <reply URL>` (inbox).
   A Phase 1 `Replying via ...` line without a matching `replied to` line means the reply failed.
 - A heartbeat line (`[Heartbeat] Last ~10m: scanned N comments ...`) is logged every 10 minutes by `StreamMetrics`. It is the quickest health and throughput signal.
+  It ends with `N match(es) dropped, Phase 1 queue full` when the Phase 1 workers fell behind.
 
 ### Release & Semantic Versioning Workflow
 We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). **Releases are fully automatic; nobody bumps the version by hand.**
@@ -451,7 +462,8 @@ Mechanics worth knowing:
   [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) configures `ratelimit_seconds=300` on all `praw.Reddit` instances. PRAW handles Reddit rate limit sleeps and retries natively.
   Precisely: request-rate limiting (the per-minute OAuth quota) is handled by prawcore. `ratelimit_seconds`
   only controls how long PRAW will **sleep** on a `RATELIMIT` API error ("you are doing that too much")
-  before retrying. Up to 300 s of that sleep happens on the single main thread, so the stream stalls meanwhile.
+  before retrying. Up to 300 s of that sleep happens on the thread that made the call (a Phase 1 worker or a
+  job), so only that thread stalls.
 - **PRAW delete endpoint patch:**
   [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) sets `praw.endpoints.API_PATH['del'] = 'api/del'` at import.
   On 2026-10-15 Reddit answered PRAW's default `POST /api/del/` (trailing slash) with a plain-text
@@ -517,36 +529,72 @@ Behavior to be aware of:
 
 ---
 
-## 7. Main Loop, Scheduling & Error Handling
+## 7. Threads, Scheduling & Error Handling
 
-| Job | Interval | Function |
+```mermaid
+flowchart LR
+    S["MainThread\nr/all stream"] -->|"comment ID of a\nregex match"| Q[["Phase 1 queue\n(1000 IDs)"]]
+    Q --> W["phase1-1 ... phase1-N\n(PHASE1_WORKERS)"]
+    S -->|"subreddit name\n(no I/O)"| K["known_subreddits buffer"]
+    J1["phase2"] -.-|"one lock"| J2["phase3"]
+    J3["inbox"]
+    J4["cleanup"]
+    J5["heartbeat"]
+    J6["known-subreddits"] --> K
+```
+
+| Job (thread name) | Interval | Function |
 | :--- | :--- | :--- |
-| Cleanup of negative-score submissions | 7 min | `cleanup.delete_unwanted_submissions` |
-| Heartbeat log | 10 min | `metrics.log_heartbeat` |
-| Phase 2 | 20 min | `phase2.filter_comments_from_db` |
-| Phase 3 (skipped if `LISTEN_ONLY`) | 6 min | `phase3.process_comment_entries` |
-| Inbox feedback (all 4 bots) | 10 min | `inbox.process_unread_inboxes` |
-| Write buffered known subreddits | 5 min | `known_subreddits.flush` |
+| Cleanup of negative-score submissions (`cleanup`) | 7 min | `cleanup.delete_unwanted_submissions` |
+| Heartbeat log (`heartbeat`) | 10 min | `metrics.log_heartbeat` |
+| Phase 2 (`phase2`) | 20 min | `phase2.filter_comments_from_db` |
+| Phase 3 (`phase3`, skipped if `LISTEN_ONLY`) | 6 min | `phase3.process_comment_entries` |
+| Inbox feedback, all 4 bots (`inbox`) | 10 min | `inbox.process_unread_inboxes` |
+| Write buffered known subreddits (`known-subreddits`) | 5 min | `known_subreddits.flush` |
 
-All jobs except the heartbeat are wrapped in `main.run_job_safely()`. It logs a failing job's exception
-instead of propagating it. This matters because `schedule` computes `next_run` only after a job returns
-normally, so a raising job would re-run on every loop iteration. It also calls `db.reset_connection()` on
-DB connection errors.
+Each job is a `workers.PeriodicJob` thread. It first runs one interval after startup, and each next run
+starts one interval after the previous one **ended**, so a job never overlaps itself. Phase 2 and Phase 3
+share a lock and never run at the same time, because both take rows from `scraped_comments` and Phase 3
+re-runs Phase 2's filters. Every run is wrapped in `workers.run_job_safely()`, which logs a failing job's
+exception instead of ending its thread, and calls `db.reset_connection()` on DB connection errors.
 
-`main_loop()` drains one batch from the comment stream, then calls `schedule.run_pending()`. The stream uses
-`pause_after=-1`. In PRAW this makes the generator yield `None` after **every** request and **never sleep**,
-so the loop polls continuously, throttled only by prawcore's rate limiter.
+`main_loop()` reads one batch from the comment stream. The stream uses `pause_after=-1`. In PRAW this makes
+the generator yield `None` after **every** request and **never sleep**, so the loop polls continuously,
+throttled only by prawcore's rate limiter. For each comment, the main thread only counts it, buffers its
+subreddit name and runs the regex. A match goes into the Phase 1 queue as a comment ID; when the queue is
+full, the match is dropped and counted in the heartbeat, so the stream never waits for the workers.
+
+Rules for thread safety:
+
+- **PRAW is not thread safe**, so `reddit.get_reddit_instance()` returns a separate instance per thread and
+  account. PRAW objects stay bound to the instance that fetched them: hand **IDs** to another thread, never
+  PRAW objects (a worker would make requests through the stream thread's session and rate limiter).
+- Each instance has its own prawcore rate limiter, but Reddit counts requests per account and reports the
+  shared remaining quota in every response. Each limiter paces itself on those headers, so together they
+  stay close to the quota and all wait for the reset once it is used up. They can still overshoot by a few
+  requests at once, which ends in a `TooManyRequests` that the thread backs off from (60 s).
+- **Each thread has its own database connection** (`db.get_connection()`, thread-local).
+- Module-level state written by more than one thread needs a lock (`StreamMetrics`, `known_subreddits`).
+
+**Shutdown:** SIGTERM (`docker stop`) and SIGINT set the stop signal in `racb.core.shutdown`. The stream
+loop, the Phase 1 workers and the job threads check it, every back-off waits with `shutdown.wait()`
+instead of `time.sleep()`, and Phase 2 and Phase 3 stop between entries, so an entry is never left
+crossposted but not deleted. `start_bot()` waits up to `SHUTDOWN_TIMEOUT_SECONDS` (50 s) for all threads;
+`docker-compose.yml` gives the bot `stop_grace_period: 60s`. Matches still waiting in the Phase 1 queue are
+dropped and logged. If any worker or job thread crashes (only possible with `DEBUG`, or a bug in the thread
+loop itself), `shutdown.fail()` stops every thread and `start_bot()` re-raises the error, so the process
+exits and Docker restarts it.
 
 Errors are handled in three layers:
 
 ```mermaid
 flowchart TD
-    C["phase1.handle_incoming_comment(comment)"] -->|raises| S{"handle_comment_safely()"}
-    S -->|"network error\n(ServerError, RequestException,\nTooManyRequests, requests errors)"| H
+    C["phase1.handle_incoming_comment(comment)\non a Phase 1 worker"] -->|raises| S{"handle_comment_safely()"}
+    S -->|"network error\n(ServerError, RequestException,\nTooManyRequests, requests errors)"| B["skip comment, the worker\nwaits 60 s (rate limit) or 30 s"]
     S -->|"DB connection error"| R["reset DB connection,\nskip comment"]
     S -->|"other Reddit / PRAW error\n(e.g. 403 bot banned)"| K["log INFO, skip comment"]
     S -->|"anything else"| L["log with traceback, skip comment"]
-    F["stream fetch"] -->|raises| H{"handle_exception()"}
+    F["stream fetch\non the main thread"] -->|raises| H{"handle_exception()"}
     H -->|"TooManyRequests"| W60["sleep 60 s"]
     H -->|"network error or Forbidden"| W30["sleep 30 s"]
     H -->|"DB connection error"| WDB["reset DB, sleep 30 s"]
@@ -560,7 +608,8 @@ flowchart TD
 - A stream reset uses `skip_existing=True`, so comments posted during the outage are never seen.
 
 Rule for new code (reinforcing rule 3 in section 10): catch per-item errors **inside** the per-comment or
-per-row handler. Only network-level failures should reach `handle_exception()`.
+per-row handler. Only network-level failures should reach the worker's back-off or `handle_exception()`.
+A stream back-off only pauses reading `r/all`; the workers and jobs keep running.
 
 ---
 
@@ -594,7 +643,8 @@ per-row handler. Only network-level failures should reach `handle_exception()`.
 | :--- | :--- |
 | Duplicate crossposts | Before every crosspost, Phase 3 re-runs `get_posts_with_same_content()`. That is a Reddit search for the submission URL in the target (subject to search-index lag of minutes) plus Reddit's "other discussions" of the source post, a search for the same title, and a scan of every image (or video) post the target got since the source comment was written (a live listing, so it catches a crosspost made seconds earlier, but only for **image (including gallery) and video** posts, galleries by their first 10 pictures, crossposts through their original post, videos only by preview frame, and in busy subreddits only as far back as Reddit's ~1000-post listing reaches). The remaining gap is link and text posts whose title was changed and that are not linked as "other discussions", when two rows for the same submission and target are handled in one Phase 3 run, or after a crash between `crosspost()` and the row delete. The owner considers this acceptable, and Reddit may also reject duplicates server-side (unverified). An `ALREADY_SUB`-style rejection is not in `familiar_error_types`, so it would be logged as unexpected. If the reply fails after a successful crosspost, the crosspost is reported as failed. |
 | Negative-score cleanup | Deletes `AutoCrosspostBot` submissions with `score < 0`. The owner reports that submission scores can go negative; this was not independently confirmed. |
-| Single-threaded Phase 1 | The duplicate search, up to 200 preview downloads (100 newest and 100 all-time top posts, 8 at a time, 6 s timeout each, cached) and the subreddit suggestions all run on the stream loop. A slow call delays reading `r/all`. The heartbeat's "scanned" count is the throughput signal. Phase 3's full image or video scan (up to ~1000 preview downloads, 8 at a time) also runs on that loop, once per image crosspost. |
+| Phase 1 backlog | Phase 1 (duplicate search, up to 200 preview downloads per match, subreddit suggestions) runs on `PHASE1_WORKERS` threads. If matches arrive faster than they can handle for long enough to fill the 1000-ID queue, new matches are dropped; the heartbeat counts them. Not observed; matches are a small fraction of `r/all`. |
+| Stream outages | A stream reset after a network error still uses `skip_existing=True`, so comments posted while the stream was down are never seen. Jobs no longer pause the stream, but PRAW's stream only reads the newest 100 comments per request, so if `r/all` outpaces the request rate, comments are skipped (unverified how often). |
 | Rotated reposts | Not detected as duplicates (see the image-matching note in section 5). |
 | Edited video reposts | Videos are compared by their preview frame only. A trimmed, re-cut or re-encoded copy usually has a different preview frame and is missed. |
 | Pre-v2.3 rows | Have `target_subreddit = NULL`, so the bait-and-switch check is skipped for them until they age out (at most one Phase 3 waiting period after upgrading). |

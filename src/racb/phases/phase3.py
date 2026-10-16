@@ -5,7 +5,7 @@ import time
 
 import praw
 
-from racb.core import db, reddit
+from racb.core import db, reddit, shutdown
 from racb.phases import phase2
 from racb import config, i18n
 
@@ -26,6 +26,10 @@ def process_comment_entries():
     logger.info(f'Found {len(comment_entries)} mature comment(s) older than {waiting_period_seconds}s for Phase 3')
 
     for comment_entry in comment_entries:
+        if shutdown.stop_requested():
+            # Between entries, so no entry is left crossposted but not deleted
+            logger.info('Stopping phase 3 early: shutting down')
+            return
         handle_comment(comment_entry)
         if config.is_dry_run():
             # Keep the row so it is still crossposted once DRY_RUN is turned off

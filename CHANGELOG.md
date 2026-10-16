@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Multithreaded Bot:** the bot ran on a single thread, so while Phase 2, Phase 3, the inbox pass, the cleanup or a Phase 1 duplicate search ran, nobody read the r/all comment stream, and since PRAW's stream only reads the newest 100 comments when it catches up, comments posted meanwhile were lost. Now the main thread only reads the stream, every scheduled job runs on a thread of its own, and Phase 1 runs on a pool of worker threads (`PHASE1_WORKERS`, default 4) that get matching comments through a queue. Each thread has its own PRAW instances and database connection, since neither PRAW nor a shared connection is safe across threads. Phase 2 and Phase 3 still never run at the same time. Log lines now name their thread, and the heartbeat reports matches dropped because the Phase 1 queue was full.
+- **Graceful Shutdown:** `docker stop` (SIGTERM) and Ctrl-C now stop every thread cleanly: Phase 2 and Phase 3 stop between entries instead of being killed mid-entry, and back-off waits end at once. The bot service gets `stop_grace_period: 60s` in `docker-compose.yml`, so Docker waits for it.
+- **`schedule` Dependency Removed:** the job threads replace the `schedule` library.
+
 ## [2.14.3] - 2026-10-16
 
 ### Fixed

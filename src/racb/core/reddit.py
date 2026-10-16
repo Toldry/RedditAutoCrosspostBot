@@ -1,4 +1,11 @@
-"""Maintains a singleton instance of the `praw.Reddit` class"""
+"""Maintains one `praw.Reddit` instance per bot account per thread.
+
+PRAW is not thread safe: each instance owns a `requests.Session`, an OAuth authorizer and a prawcore
+rate limiter, none of them locked. So every thread (the stream loop, each Phase 1 worker, each scheduled
+job) gets its own instances, created lazily the first time that thread asks for an account. Objects a
+PRAW call returns (comments, submissions, listings) stay bound to the instance that fetched them, so pass
+IDs, not PRAW objects, from one thread to another.
+"""
 
 __all__ = [
     'get_reddit_instance',
@@ -12,10 +19,13 @@ __all__ = [
 
 import logging
 import os
+import threading
 
 import praw
 import praw.endpoints
+import prawcore
 import dotenv
+import requests
 
 from racb.version import __version__
 
@@ -27,7 +37,17 @@ logger = logging.getLogger(__name__)
 # works either way. PRAW reads this shared dict on each call, so this covers every PRAW instance in the process.
 praw.endpoints.API_PATH['del'] = 'api/del'
 
-praw_instances = None
+# Reddit or the network failing for a while (rate limit, outage, timeout): worth retrying later
+TRANSIENT_NETWORK_ERRORS = (
+    prawcore.exceptions.ServerError,
+    prawcore.exceptions.RequestException,
+    prawcore.exceptions.TooManyRequests,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+)
+
+# Holds `praw_instances`, a dict of bot name -> praw.Reddit, separately for every thread
+_thread_state = threading.local()
 
 REDDIT_BASE_URL = 'https://reddit.com'
 
@@ -119,47 +139,49 @@ def _instantiate_praw(username, app_client_id, password, app_client_secret, vers
     return reddit
 
 
+BOT_NAMES = [AUTO_CROSSPOST_BOT_NAME, SUB_DOESNT_EXIST_BOT_NAME, SAME_SUBREDDIT_BOT_NAME, SAME_POST_BOT_NAME]
+
+
+def _thread_instances():
+    instances = getattr(_thread_state, 'praw_instances', None)
+    if instances is None:
+        instances = {}
+        _thread_state.praw_instances = instances
+    return instances
+
+
 def get_reddit_instance(username=AUTO_CROSSPOST_BOT_NAME):
-    """Returns a singleton instance of the `praw.Reddit` object"""
-    global praw_instances
-    if not praw_instances:
-        praw_instances = {}
+    """Returns the calling thread's `praw.Reddit` object for `username`, creating it on first use."""
+    instances = _thread_instances()
+    if username not in instances:
         dotenv.load_dotenv()
+        details = bot_details[username]
+        instances[username] = _instantiate_praw(
+            username=username,
+            app_client_id=details['app_client_id'],
+            password=os.environ.get(details['env_password_key']),
+            app_client_secret=os.environ.get(details['env_app_client_secret_key']),
+            version=details['version'],
+        )
+    return instances[username]
 
-        bot_names = [AUTO_CROSSPOST_BOT_NAME, SUB_DOESNT_EXIST_BOT_NAME, SAME_SUBREDDIT_BOT_NAME, SAME_POST_BOT_NAME]
-        for name in bot_names:
-            app_client_id = bot_details[name]['app_client_id']
-            password = os.environ.get(bot_details[name]['env_password_key'])
-            app_client_secret = os.environ.get(bot_details[name]['env_app_client_secret_key'])
-            version = bot_details[name]['version']
 
-            reddit_instance = _instantiate_praw(
-                username=name,
-                app_client_id=app_client_id,
-                password=password,
-                app_client_secret=app_client_secret,
-                version=version,
-            )
-            praw_instances[name] = reddit_instance
-
-    return praw_instances[username]
+def reset_thread_instances():
+    """Forgets the calling thread's PRAW instances (for tests)."""
+    _thread_state.praw_instances = None
 
 
 def authenticate_all_bots():
     """Verifies that all 4 bot accounts can successfully authenticate against the Reddit API.
 
+    This checks the calling thread's instances; other threads log in with the same credentials later.
+
     Raises:
         RuntimeError: If any bot fails authentication or user identity verification.
     """
     logger.info('Authenticating all Reddit bot accounts...')
-    bot_names = [
-        AUTO_CROSSPOST_BOT_NAME,
-        SUB_DOESNT_EXIST_BOT_NAME,
-        SAME_SUBREDDIT_BOT_NAME,
-        SAME_POST_BOT_NAME,
-    ]
     failed_bots = {}
-    for name in bot_names:
+    for name in BOT_NAMES:
         logger.info(f'Verifying authentication for /u/{name}...')
         try:
             reddit_instance = get_reddit_instance(name)

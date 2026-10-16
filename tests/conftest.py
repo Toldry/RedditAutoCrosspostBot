@@ -26,6 +26,15 @@ def pytest_configure(config):
     compile_catalogs()
 
 
+@pytest.fixture(autouse=True)
+def reset_shutdown_signal():
+    """Every test starts, and leaves, with no shutdown requested."""
+    from racb.core import shutdown
+    shutdown.reset()
+    yield
+    shutdown.reset()
+
+
 class MockRedditor:
     """Mock PRAW Redditor object."""
 

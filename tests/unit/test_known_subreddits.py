@@ -38,3 +38,18 @@ def test_buffer_is_capped():
         for name in ['a1', 'b2', 'c3']:
             known_subreddits.record(name)
     assert len(known_subreddits._pending_names) == 2
+
+
+@pytest.mark.unit
+def test_names_recorded_while_flushing_are_kept_for_the_next_flush():
+    recorded_during_write = []
+
+    def write_while_stream_records(names):
+        known_subreddits.record('askreddit')
+        recorded_during_write.append(list(names))
+
+    with patch('racb.core.known_subreddits.db.record_known_subreddits', side_effect=write_while_stream_records):
+        known_subreddits.record('pics')
+        assert known_subreddits.flush() == 1
+    assert recorded_during_write == [['pics']]
+    assert known_subreddits._pending_names == {'askreddit'}

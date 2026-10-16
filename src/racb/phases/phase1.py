@@ -14,9 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 def handle_incoming_comment(comment, metrics=None):
-    if metrics:
-        metrics.record_comment()
-
+    # The stream thread counts every scanned comment (`main.dispatch_comment`); this runs on a Phase 1
+    # worker thread, only for comments that already matched `check_pattern` there
     logger.debug(f'Handling a comment: {reddit.full_url(comment.permalink)}')
     target_subreddit = check_pattern(comment)
     if target_subreddit is None:

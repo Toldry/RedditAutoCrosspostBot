@@ -6,7 +6,7 @@ import prawcore
 
 from racb import config
 from racb.constants import is_crosspost_blocked
-from racb.core import db, reddit, duplicate_detector
+from racb.core import db, reddit, duplicate_detector, shutdown
 from racb.phases import phase1
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,9 @@ def filter_comments_from_db(verbose=False):
             logger.error(f'Error fetching batch comment info: {e}')
 
         for cid, ce in id_to_entry.items():
+            if shutdown.stop_requested():
+                logger.info('Stopping phase 2 early: shutting down')
+                return
             comment = fetched_comments.get(cid)
             result = run_filters(ce, comment=comment)
 

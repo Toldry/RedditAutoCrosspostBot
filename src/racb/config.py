@@ -94,3 +94,17 @@ def phase3_waiting_period_seconds():
 
 def comment_score_threshold():
     return int(os.environ.get('COMMENT_SCORE_THRESHOLD', '1'))
+
+
+PHASE1_WORKERS_DEFAULT = 4
+
+
+def phase1_worker_count():
+    """Number of threads that run Phase 1 on matching stream comments (at least 1)."""
+    raw_value = os.environ.get('PHASE1_WORKERS', str(PHASE1_WORKERS_DEFAULT))
+    try:
+        count = int(raw_value)
+    except ValueError:
+        logger.warning(f'Could not parse PHASE1_WORKERS={raw_value!r} as a number; using {PHASE1_WORKERS_DEFAULT}')
+        return PHASE1_WORKERS_DEFAULT
+    return max(1, count)
