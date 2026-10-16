@@ -198,16 +198,6 @@ def main():
     if config.is_dry_run():
         logger.info('DRY_RUN is enabled: no replies, crossposts or deletions will be made')
 
-    # LISTEN_ONLY=True kept Phase 3 from crossposting. Ignoring it would start crossposting, so refuse to run.
-    listen_only = config.removed_listen_only_value()
-    if listen_only:
-        logger.critical(
-            'Startup failed: LISTEN_ONLY was removed. To keep AutoCrosspostBot from crossposting, '
-            'replace it with AUTO_CROSSPOST_BOT_ENABLED=False in .env (see .env.example).'
-        )
-        sys.exit(1)
-    if listen_only is False:
-        logger.warning('LISTEN_ONLY was removed and is ignored; delete it from .env')
     log_disabled_bots()
 
     try:

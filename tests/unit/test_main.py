@@ -217,33 +217,6 @@ def test_build_jobs_skips_the_writing_jobs_of_disabled_bots():
 
 
 @pytest.mark.unit
-def test_listen_only_true_stops_startup():
-    from racb.main import main
-    with patch('racb.main.configure_logging'), \
-         patch('racb.core.reddit.authenticate_all_bots') as mock_auth, \
-         patch('racb.main.start_bot') as mock_start, \
-         patch('sys.argv', ['racb']), \
-         patch.dict('os.environ', {'LISTEN_ONLY': 'True'}), \
-         pytest.raises(SystemExit) as excinfo:
-        main()
-    assert excinfo.value.code == 1
-    mock_auth.assert_not_called()
-    mock_start.assert_not_called()
-
-
-@pytest.mark.unit
-def test_listen_only_false_is_ignored():
-    from racb.main import main
-    with patch('racb.main.configure_logging'), \
-         patch('racb.core.reddit.authenticate_all_bots'), \
-         patch('racb.main.start_bot') as mock_start, \
-         patch('sys.argv', ['racb']), \
-         patch.dict('os.environ', {'LISTEN_ONLY': 'False'}):
-        main()
-    mock_start.assert_called_once()
-
-
-@pytest.mark.unit
 def test_process_one_refuses_when_autocrosspostbot_is_disabled():
     from racb.main import main
     with patch('racb.main.configure_logging'), \

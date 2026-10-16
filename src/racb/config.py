@@ -65,13 +65,6 @@ def is_bot_enabled(bot_name):
     return env_bool(BOT_ENABLED_KEYS[bot_name], True)
 
 
-def removed_listen_only_value():
-    """Returns the value of the removed LISTEN_ONLY setting (True/False), or None if it is not set."""
-    if os.environ.get('LISTEN_ONLY') is None:
-        return None
-    return env_bool('LISTEN_ONLY', False)
-
-
 def parse_duration(text):
     """Parses a human-readable duration into seconds.
 

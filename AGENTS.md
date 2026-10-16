@@ -231,7 +231,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`docs/logs.md`](./docs/logs.md) | How to read the bot's logs over SSH or in Google Cloud Logging, and how to turn Cloud Logging on. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1722 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/unit/`](./tests/unit/) | 1720 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -313,9 +313,6 @@ Store these in `.env` for local development or production:
   With all four off, only the stream, Phase 1's filtering, the database inserts, Phase 2 and the
   known-subreddits job run. All 4 accounts still need valid credentials, since startup authenticates them all.
 - `DRY_RUN=True` keeps every bot running but logs each write instead of making it.
-- `LISTEN_ONLY` was replaced by these switches. `LISTEN_ONLY=True` makes startup fail with a message
-  pointing to `AUTO_CROSSPOST_BOT_ENABLED=False`, so an old `.env` cannot silently start crossposting;
-  `LISTEN_ONLY=False` only logs a warning.
 
 ---
 
