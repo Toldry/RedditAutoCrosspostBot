@@ -174,7 +174,7 @@ def is_banned_from_subreddit(reddit_instance, subreddit_name):
     try:
         return reddit_instance.subreddit(subreddit_name).user_is_banned is True
     except (praw.exceptions.PRAWException, prawcore.exceptions.PrawcoreException) as e:
-        logger.info(f'Could not check whether the bot is banned from r/{subreddit_name}: {e}')
+        logger.warning(f'Could not check whether the bot is banned from r/{subreddit_name}: {e}')
         return False
 
 
