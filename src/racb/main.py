@@ -145,7 +145,7 @@ def init_comment_stream():
 def build_jobs():
     """Returns the scheduled jobs, each to run on its own thread."""
     # Phase 2 and Phase 3 both take rows from scraped_comments, and Phase 3 re-runs Phase 2's filters,
-    # so they never run at the same time, as in the single-threaded loop
+    # so they never run at the same time
     scraped_comments_lock = threading.Lock()
     debug = env_bool('DEBUG', False)
     jobs = [

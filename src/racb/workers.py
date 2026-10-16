@@ -1,7 +1,7 @@
 """Background threads: the scheduled jobs and the Phase 1 worker pool.
 
-The main thread only reads the r/all comment stream (see `main.py`). Everything slow runs here, so a long
-Phase 3 run, an inbox pass or a Phase 1 duplicate search no longer stops the stream from reading.
+The main thread only reads the r/all comment stream (see `main.py`). Everything slow runs here, because
+PRAW's stream only catches up on the newest 100 comments: any pause in reading it loses comments.
 Each thread gets its own PRAW instances (`reddit.get_reddit_instance`) and database connection
 (`db.get_connection`) the first time it uses them.
 """
@@ -141,7 +141,7 @@ class Phase1Workers:
                 except reddit.TRANSIENT_NETWORK_ERRORS as e:
                     if config.is_debug():
                         raise
-                    # The comment is skipped, as when the single-threaded loop rebuilt the stream
+                    # The comment is skipped, not retried: the back-off below may outlast its relevance
                     logger.info(f'Skipping comment {comment_id} after network error')
                     if back_off_after_network_error(e, thread_name):
                         return

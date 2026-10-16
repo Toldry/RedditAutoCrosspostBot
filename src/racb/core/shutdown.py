@@ -32,7 +32,7 @@ def fail(error, thread_name):
     """Records an error that escaped a worker or job thread and stops the process.
 
     Only the first error is kept; `main.start_bot()` re-raises it once every thread has stopped,
-    so the process exits non-zero and Docker restarts it, as a crash of the single-threaded loop did.
+    so the process exits non-zero and Docker restarts it.
     """
     global _fatal_error
     with _fatal_error_lock:
