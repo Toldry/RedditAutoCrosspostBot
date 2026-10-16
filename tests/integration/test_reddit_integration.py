@@ -99,6 +99,19 @@ def test_live_main_startup_flow(monkeypatch):
         mock_start_bot.assert_called_once()
 
 
+def fetch_head_with_retries(attempts=6, pause_seconds=5):
+    """Like comment_reader.fetch_head, but tries again while Reddit returns an empty r/all listing.
+
+    The bot itself just skips such a poll (CommentReader.poll_head); the test needs a head to start from.
+    """
+    for _ in range(attempts):
+        head = comment_reader.fetch_head()
+        if head is not None:
+            return head
+        time.sleep(pause_seconds)
+    pytest.fail(f'The r/all comment listing was empty {attempts} times in a row')
+
+
 @pytest.mark.integration
 def test_live_comment_reader_reads_recent_comments_by_id():
     """Reads 4 blocks of comment IDs just below r/all's newest comment, one per bot account.
@@ -108,7 +121,7 @@ def test_live_comment_reader_reads_recent_comments_by_id():
     that would read nothing.
     """
     block_count = len(reddit.BOT_NAMES)
-    first_block = comment_reader.fetch_head() - 10 * comment_reader.BLOCK_SIZE
+    first_block = fetch_head_with_retries() - 10 * comment_reader.BLOCK_SIZE
     comments = []
     for index, bot_name in enumerate(reddit.BOT_NAMES):
         comments += comment_reader.fetch_block(bot_name, first_block + index * comment_reader.BLOCK_SIZE)
