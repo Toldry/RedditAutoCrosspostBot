@@ -2,34 +2,30 @@
 
 import pytest
 
-from scripts.release_level import bump_level, unreleased_has_entries
+from scripts.release_level import bump_level, has_pending_fragments
 
 pytestmark = pytest.mark.unit
 
-CHANGELOG_HEADER = '# Changelog\n\nIntro text.\n\n'
+
+def test_fragment_is_releasable(tmp_path):
+    (tmp_path / 'README.md').write_text('How to write a fragment.\n')
+    (tmp_path / '+something.fixed.md').write_text('**Something:** fixed.\n')
+    assert has_pending_fragments(tmp_path)
 
 
-def test_unreleased_with_entries_is_releasable():
-    changelog = CHANGELOG_HEADER + '## [Unreleased]\n\n### Fixed\n- Something.\n\n## [2.3.0] - 2026-10-15\n\n- Old.\n'
-    assert unreleased_has_entries(changelog)
+def test_readme_alone_is_not_releasable(tmp_path):
+    (tmp_path / 'README.md').write_text('How to write a fragment.\n')
+    assert not has_pending_fragments(tmp_path)
 
 
-def test_empty_unreleased_is_not_releasable():
-    changelog = CHANGELOG_HEADER + '## [Unreleased]\n\n## [2.3.0] - 2026-10-15\n\n### Fixed\n- Old.\n'
-    assert not unreleased_has_entries(changelog)
+def test_dotfiles_and_subdirectories_are_not_fragments(tmp_path):
+    (tmp_path / '.DS_Store').write_bytes(b'')
+    (tmp_path / 'nested').mkdir()
+    assert not has_pending_fragments(tmp_path)
 
 
-def test_empty_unreleased_at_end_of_file_is_not_releasable():
-    assert not unreleased_has_entries(CHANGELOG_HEADER + '## [Unreleased]\n\n')
-
-
-def test_missing_unreleased_heading_is_not_releasable():
-    assert not unreleased_has_entries(CHANGELOG_HEADER + '## [2.3.0] - 2026-10-15\n\n- Old.\n')
-
-
-def test_subsection_heading_does_not_end_unreleased_section():
-    changelog = CHANGELOG_HEADER + '## [Unreleased]\n\n### Added\n- New thing.\n'
-    assert unreleased_has_entries(changelog)
+def test_missing_fragment_directory_is_not_releasable(tmp_path):
+    assert not has_pending_fragments(tmp_path / 'changelog.d')
 
 
 @pytest.mark.parametrize('messages, expected', [

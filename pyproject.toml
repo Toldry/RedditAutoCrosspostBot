@@ -29,6 +29,7 @@ dev = [
     "bump-my-version>=1.5.1",
     "pytest>=9.1.1",
     "pytest-mock>=3.16.0",
+    "towncrier>=26.9.0",
 ]
 
 # Compiles src/racb/locales/*/LC_MESSAGES/messages.po to messages.mo. The .mo files are not committed:
@@ -47,3 +48,44 @@ path = "src/racb/version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/racb"]
+
+# Changelog fragments: every PR adds changelog.d/+<slug>.<type>.md instead of editing CHANGELOG.md, so
+# parallel PRs never conflict. The CI release job compiles them into CHANGELOG.md (see changelog.d/README.md).
+[tool.towncrier]
+directory = "changelog.d"
+filename = "CHANGELOG.md"
+start_string = "<!-- towncrier release notes start -->\n"
+title_format = "## [{version}] - {project_date}"
+issue_format = "[#{issue}](https://github.com/Toldry/RedditAutoCrosspostBot/pull/{issue})"
+ignore = ["README.md"]
+
+# Keep a Changelog's sections, in its order
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
