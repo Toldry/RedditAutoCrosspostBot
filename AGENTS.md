@@ -449,9 +449,11 @@ Mechanics worth knowing:
   before retrying. Up to 300 s of that sleep happens on the single main thread, so the stream stalls meanwhile.
 - **PRAW delete endpoint patch:**
   [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) sets `praw.endpoints.API_PATH['del'] = 'api/del'` at import.
-  Reddit answers PRAW's default `POST /api/del/` (trailing slash) with a plain-text `404 page not found`,
-  so `Submission.delete()` and `Comment.delete()` always failed. Keep the patch until PRAW changes its path.
-  A plain-text `404 page not found` body on any other endpoint suggests the same trailing-slash problem.
+  On 2026-10-15 Reddit answered PRAW's default `POST /api/del/` (trailing slash) with a plain-text
+  `404 page not found` for every item, while `POST /api/del` worked. By 2026-10-16 both paths worked again
+  (tested live on the bot's profile and in r/racb_test_1), so it was probably temporary on Reddit's side.
+  The patch is harmless and kept as a safeguard. If deletes 404 again, compare both paths with
+  `/api/del/` vs `/api/del` before assuming anything else is wrong.
 - **PostgreSQL Stored Procedures:**
   Database interactions are routed through PL/pgSQL functions (`insert_scraped_comment`, `get_comments_older_than`, `get_unchecked_comments_older_than`, `get_oldest_scraped_comment`, `delete_scraped_comment`, `set_comment_checked`). Any schema or query modifications must be updated in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql) and reflected in [`src/racb/core/db.py`](./src/racb/core/db.py).
 - **Batch Comment Processing in Phase 2:**
