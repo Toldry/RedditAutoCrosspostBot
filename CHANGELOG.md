@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.1] - 2026-10-16
+
 ### Changed
 - **Single-Entry Runs in the README:** the README now documents `--process-one`, with commands for a local run, inside the Docker stack, and from your own computer over SSH to the VM.
 
