@@ -6,7 +6,7 @@ import prawcore
 
 from racb import config
 from racb.constants import is_crosspost_blocked
-from racb.core import db, reddit, duplicate_detector
+from racb.core import db, reddit, duplicate_detector, shutdown
 from racb.phases import phase1
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = 100
 
 
-def filter_comments_from_db(verbose=False):
+def filter_comments_from_db():
     logger.info('Running phase 2 comment filter pass...')
     waiting_period_seconds = config.phase2_waiting_period_seconds()
     comment_entries = db.get_unchecked_comments_older_than(waiting_period_seconds)
@@ -43,12 +43,11 @@ def filter_comments_from_db(verbose=False):
             logger.error(f'Error fetching batch comment info: {e}')
 
         for cid, ce in id_to_entry.items():
+            if shutdown.stop_requested():
+                logger.info('Stopping phase 2 early: shutting down')
+                return
             comment = fetched_comments.get(cid)
             result = run_filters(ce, comment=comment)
-
-            if verbose:
-                score = result.comment.score if result.comment else 'NA'
-                logger.info(f'Passed filter={result.passes_filter}. Score={score}. Permalink={reddit.full_url(ce["permalink"])}')
 
             if result.passes_filter:
                 db.set_comment_checked(ce)

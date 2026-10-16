@@ -2,6 +2,7 @@
 
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 
@@ -13,6 +14,9 @@ from racb.config import env_bool
 logger = logging.getLogger(__name__)
 
 SQL_FILE_PATH = Path(__file__).resolve().parent.parent / 'sql' / 'instantiate_db.sql'
+
+# Errors after which a connection is unusable and must be replaced
+CONNECTION_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
 
 
 def _mask_db_url(url_str):
@@ -92,27 +96,35 @@ def get_db_connection():
             time.sleep(2)
 
 
-_conn = None
+# psycopg2 lets threads share a connection, but their statements then run one at a time and one thread's
+# broken connection breaks them all. So every thread keeps its own connection here, as `_thread_state.conn`.
+_thread_state = threading.local()
+
+# Running the schema script from two connections at once can fail (concurrent CREATE OR REPLACE FUNCTION
+# raises "tuple concurrently updated"), so new connections run it one at a time
+_schema_lock = threading.Lock()
 
 
 def get_connection():
-    """Returns a cached PostgreSQL database connection, establishing it if necessary."""
-    global _conn
-    if _conn is None or getattr(_conn, 'closed', False):
-        _conn = get_db_connection()
-        instantiate_database(_conn)
-    return _conn
+    """Returns the calling thread's PostgreSQL connection, establishing it if necessary."""
+    conn = getattr(_thread_state, 'conn', None)
+    if conn is None or getattr(conn, 'closed', False):
+        conn = get_db_connection()
+        with _schema_lock:
+            instantiate_database(conn)
+        _thread_state.conn = conn
+    return conn
 
 
 def reset_connection():
-    """Discards the cached connection so the next call reconnects (used after connection-level errors)."""
-    global _conn
-    if _conn is not None:
+    """Discards the calling thread's connection so its next call reconnects (used after connection-level errors)."""
+    conn = getattr(_thread_state, 'conn', None)
+    if conn is not None:
         try:
-            _conn.close()
+            conn.close()
         except Exception:
             pass
-    _conn = None
+    _thread_state.conn = None
 
 
 def add_comment(comment, target_subreddit):

@@ -51,8 +51,18 @@ def is_dry_run():
     return env_bool('DRY_RUN', False)
 
 
-def is_listen_only():
-    return env_bool('LISTEN_ONLY', False)
+# Each bot account's on/off switch, keyed by its Reddit username (as in `reddit.bot_details`). A disabled bot
+# never comments, posts or deletes. Unlike DRY_RUN it does not even log what it would have written.
+BOT_ENABLED_KEYS = {
+    'AutoCrosspostBot': 'AUTO_CROSSPOST_BOT_ENABLED',
+    'sub_doesnt_exist_bot': 'SUB_DOESNT_EXIST_BOT_ENABLED',
+    'same_subreddit_bot': 'SAME_SUBREDDIT_BOT_ENABLED',
+    'same_post_bot': 'SAME_POST_BOT_ENABLED',
+}
+
+
+def is_bot_enabled(bot_name):
+    return env_bool(BOT_ENABLED_KEYS[bot_name], True)
 
 
 def parse_duration(text):
@@ -94,3 +104,17 @@ def phase3_waiting_period_seconds():
 
 def comment_score_threshold():
     return int(os.environ.get('COMMENT_SCORE_THRESHOLD', '1'))
+
+
+PHASE1_WORKERS_DEFAULT = 4
+
+
+def phase1_worker_count():
+    """Number of threads that run Phase 1 on matching stream comments (at least 1)."""
+    raw_value = os.environ.get('PHASE1_WORKERS', str(PHASE1_WORKERS_DEFAULT))
+    try:
+        count = int(raw_value)
+    except ValueError:
+        logger.warning(f'Could not parse PHASE1_WORKERS={raw_value!r} as a number; using {PHASE1_WORKERS_DEFAULT}')
+        return PHASE1_WORKERS_DEFAULT
+    return max(1, count)

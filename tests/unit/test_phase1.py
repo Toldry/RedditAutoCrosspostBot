@@ -92,6 +92,45 @@ def test_handle_incoming_comment_routes_nonexistent_sub(make_mock_comment):
 
 
 @pytest.mark.unit
+def test_disabled_same_subreddit_bot_does_not_reply(make_mock_comment):
+    comment = make_mock_comment(body='r/test_source', subreddit='test_source')
+    with patch.dict('os.environ', {'SAME_SUBREDDIT_BOT_ENABLED': 'false'}), \
+         patch('racb.phases.phase1.reply_to_source_equals_target_comment') as mock_reply, \
+         patch('racb.phases.phase1.db.add_comment') as mock_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    mock_reply.assert_not_called()
+    mock_add.assert_not_called()
+
+
+@pytest.mark.unit
+def test_disabled_same_post_bot_does_not_reply(make_mock_comment):
+    comment = make_mock_comment(body='r/target_sub', subreddit='test_source')
+    mock_res = MagicMock(posts_found=True, posts=[MagicMock(permalink='/r/target_sub/comments/dup1/')])
+    with patch.dict('os.environ', {'SAME_POST_BOT_ENABLED': 'false'}), \
+         patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_res), \
+         patch('racb.phases.phase1.reply_to_same_content_post_comment') as mock_reply, \
+         patch('racb.phases.phase1.db.add_comment') as mock_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    mock_reply.assert_not_called()
+    mock_add.assert_not_called()
+
+
+@pytest.mark.unit
+def test_disabled_sub_doesnt_exist_bot_does_not_look_up_suggestions(make_mock_comment):
+    comment = make_mock_comment(body='r/nonexistent_sub_xyz', subreddit='test_source')
+    mock_res = MagicMock(posts_found=False, unable_to_search=True, unable_to_search_reason='SUBREDDIT_DOES_NOT_EXIST')
+    with patch.dict('os.environ', {'SUB_DOESNT_EXIST_BOT_ENABLED': 'false'}), \
+         patch('racb.phases.phase1.get_posts_with_same_content', return_value=mock_res), \
+         patch('racb.phases.phase1.sub_search.get_matches') as mock_matches, \
+         patch('racb.phases.phase1.reply_as_bot') as mock_reply, \
+         patch('racb.phases.phase1.db.add_comment') as mock_add:
+        assert phase1.handle_incoming_comment(comment) is None
+    mock_matches.assert_not_called()
+    mock_reply.assert_not_called()
+    mock_add.assert_not_called()
+
+
+@pytest.mark.unit
 def test_handle_incoming_comment_adds_qualified_recommendation(make_mock_comment):
     comment = make_mock_comment(body='r/target_sub', subreddit='test_source')
     mock_res = MagicMock()
