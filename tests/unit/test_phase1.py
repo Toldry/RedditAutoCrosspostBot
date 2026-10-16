@@ -400,6 +400,6 @@ def test_reply_as_bot_logs_the_suggestion_and_the_full_url_of_the_reply(make_moc
         mock_get_comment.return_value.reply.return_value = posted_reply
         assert phase1.reply_as_bot(comment, 'text', 'same_post_bot', 'pics') is posted_reply
     assert (
-        '/u/same_post_bot replied to suggester suggestion (r/funny -> r/pics): '
+        '/u/same_post_bot replied to /u/suggester suggestion (r/funny -> r/pics): '
         'https://reddit.com/r/funny/comments/abc/title/ghi/'
     ) in caplog.text

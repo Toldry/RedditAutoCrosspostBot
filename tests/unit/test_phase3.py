@@ -231,6 +231,6 @@ def test_reply_to_crosspost_logs_the_suggestion_and_the_full_url_of_the_reply(ma
     with caplog.at_level('INFO'):
         phase3.reply_to_crosspost(comment, cross_post, 'pics')
     assert (
-        '/u/AutoCrosspostBot replied to suggester suggestion (r/test_source -> r/pics): '
+        '/u/AutoCrosspostBot replied to /u/suggester suggestion (r/test_source -> r/pics): '
         'https://reddit.com/r/pics/comments/xyz/title/reply1/'
     ) in caplog.text
