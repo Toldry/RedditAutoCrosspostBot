@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Gallery Posts in the Image Duplicate Scan:** gallery posts were not treated as image posts, so the scan skipped them, never compared with them, and left them out of the "I also looked through all N image posts" count under a crosspost. A gallery now counts as an image post: up to its first 10 pictures are fingerprinted, and it matches when any of its pictures matches. A gallery source post (or a crosspost of a gallery) is now scanned too.
+- **Unreadable Previews:** when a post's preview image could not be downloaded or read, the post was silently left out of the scan and of the count. The full image is now tried instead, and a scan that still could not read some posts logs a `WARNING` with how many.
+
 ## [2.14.2] - 2026-10-16
 
 ### Changed
