@@ -3,7 +3,7 @@
 The wording depends on:
 * the target subreddit's locale (one representative subreddit per locale, LOCALE_SUBREDDITS);
 * whether the source comment's author still exists (/u/name, or "the user who commented");
-* the waiting period, whose day count picks a plural form (1, 2, 5, 21 and 90 days cover every form of every
+* the source comment's age in days, whose count picks a plural form (1, 2, 5, 21 and 90 days cover every form of every
   locale, including the Hebrew dual and the Russian 1/21 vs 2-4 vs 5+ split);
 * the media duplicate scan: none (neither an image nor a video post), or, for an image post and for a video
   post (MEDIA_KINDS), each of MEDIA_SCANS: complete with 0, 1, 2, 5 or 21 posts of that kind checked, or cut

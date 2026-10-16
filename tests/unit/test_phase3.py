@@ -91,6 +91,20 @@ def test_reply_to_crosspost_formats_waiting_period(make_mock_comment):
 
 @pytest.mark.unit
 @pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
+def test_reply_to_crosspost_uses_actual_comment_age(make_mock_comment, target_subreddit):
+    # --process-one crossposts before the waiting period is over, so the reply must not claim it passed
+    comment = make_mock_comment(subreddit='test_source')
+    comment.created_utc = time.time() - 12 * 86400
+    cross_post = MagicMock()
+    with patch.dict('os.environ', {'PHASE3_WAITING_PERIOD': '90 days'}):
+        phase3.reply_to_crosspost(comment, cross_post, target_subreddit)
+    reply_text = cross_post.reply.call_args.args[0]
+    assert i18n.format_duration_in_days(12 * 86400, target_subreddit) in reply_text
+    assert '90' not in reply_text
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('target_subreddit', ['pics', 'ich_iel', 'moi_dlvv', 'yo_elvr', 'israel', 'pikabu', 'totallynotrobots'])
 def test_reply_to_crosspost_asks_for_bad_bot_feedback_in_its_language(make_mock_comment, target_subreddit):
     comment = make_mock_comment(subreddit='test_source')
     cross_post = MagicMock()
