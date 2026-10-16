@@ -409,12 +409,13 @@ def test_live_duplicate_detector_scans_gallery_posts():
             (image_post, TEST_TARGET_SUBREDDIT, gallery_submission.id),
             (gallery, TEST_SOURCE_SUBREDDIT, image_submission.id),
         ):
+            # Reddit's "new" listing can take a while to show a post made seconds ago, so keep asking
             scan = None
-            for attempt in range(3):
+            for attempt in range(10):
                 scan = duplicate_detector.scan_subreddit_for_duplicates(scanned, subreddit_name, limit=15)
                 if scan and expected_id in [duplicate['post_id'] for duplicate in scan.duplicates]:
                     break
-                time.sleep(2.0)
+                time.sleep(3.0)
             assert scan is not None, f'{scanned.url} was not scanned'
             assert expected_id in [duplicate['post_id'] for duplicate in scan.duplicates], (
                 f'r/{subreddit_name} post {expected_id} not found as a duplicate of {scanned.url}'
@@ -434,9 +435,11 @@ def find_crosspost(reddit_instance, is_wanted, listing_limit=1000):
     """
     from racb.core import duplicate_detector
 
+    # post_attribute, not getattr: PRAW answers a field a listed post lacks by downloading the post, and
+    # one of those downloads can hit a post the bot may not read (HTTP 403)
     wanted = [
         post for post in reddit_instance.subreddit('all').new(limit=listing_limit)
-        if getattr(post, 'crosspost_parent_list', None) and is_wanted(post)
+        if duplicate_detector.post_attribute(post, 'crosspost_parent_list') and is_wanted(post)
     ]
     differing = [post for post in wanted if post.url != duplicate_detector.media_url(post)]
     return (differing or wanted or [None])[0]

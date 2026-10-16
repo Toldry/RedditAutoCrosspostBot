@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Flaky Live Tests:** the crosspost integration test looked for crossposts on r/all with `getattr`, so PRAW downloaded every listed post that was not a crosspost, and one of them answering HTTP 403 failed the run. It now reads only the fields Reddit sent with the listing, like the duplicate scan. The gallery scan test also waits longer (up to 30 s instead of 6 s) for Reddit's "new" listing to show the post it just made.
+
 ## [3.0.0] - 2026-10-16
 
 ### Changed
