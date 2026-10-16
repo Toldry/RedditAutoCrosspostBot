@@ -611,3 +611,43 @@ def test_crosspost_reads_the_first_parent_when_none_is_named():
     crosspost = make_crosspost('x', {'name': 't3_orig', 'url': 'https://i.redd.it/orig.png'})
     crosspost.crosspost_parent = None
     assert duplicate_detector.media_url(crosspost) == 'https://i.redd.it/orig.png'
+
+
+def listed_submission(**fields):
+    """A real PRAW Submission as a listing creates it: holding the fields Reddit sent, not marked fetched."""
+    from praw.models import Submission
+    return Submission(MagicMock(), _data={'created_utc': 500, **fields})
+
+
+@pytest.mark.unit
+def test_reading_listed_posts_never_asks_reddit_for_more():
+    """Reading a field a listed post lacks must not fetch the post: that was one request per scanned post."""
+    from praw.models import Submission
+    posts = [
+        listed_submission(id='img', url='https://i.redd.it/a.png', is_video=False),
+        listed_submission(id='link', url='https://example.com/article', is_video=False),
+        listed_submission(id='xpost', url='/r/source/comments/orig/title/', is_video=False,
+                          crosspost_parent='t3_orig',
+                          crosspost_parent_list=[{'name': 't3_orig', 'url': 'https://i.redd.it/orig.png'}]),
+    ]
+    with patch.object(Submission, '_fetch', side_effect=AssertionError('fetched a listed post')):
+        assert [duplicate_detector.media_kind(post) for post in posts] == [
+            duplicate_detector.IMAGE, None, duplicate_detector.IMAGE,
+        ]
+        scan, _ = scan_listing(posts)
+    assert scan.posts_checked == 2
+
+
+@pytest.mark.unit
+def test_a_post_known_only_by_its_id_is_fetched_once():
+    from praw.models import Submission
+    lazy = Submission(MagicMock(), id='lazy')
+
+    def fetch(self):
+        self.__dict__.update({'created_utc': 500, 'url': 'https://i.redd.it/lazy.png', 'is_video': False})
+        self._fetched = True
+
+    with patch.object(Submission, '_fetch', autospec=True, side_effect=fetch) as mock_fetch:
+        assert duplicate_detector.media_kind(lazy) == duplicate_detector.IMAGE
+        assert duplicate_detector.media_url(lazy) == 'https://i.redd.it/lazy.png'
+    mock_fetch.assert_called_once()
