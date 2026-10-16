@@ -104,9 +104,10 @@ def test_reply_to_crosspost_asks_for_bad_bot_feedback_in_its_language(make_mock_
         assert removed_footnote not in reply_text
 
 
-def make_media_scan(posts_checked=0, complete=True, oldest_post_utc=None):
+def make_media_scan(posts_checked=0, complete=True, oldest_post_utc=None, top_posts_checked=0):
     return duplicate_detector.RepostScan(
         posts_checked=posts_checked, complete=complete, oldest_post_utc=oldest_post_utc,
+        top_posts_checked=top_posts_checked,
     )
 
 
@@ -213,3 +214,13 @@ def test_process_oldest_entry_reports_empty_table():
          patch('racb.phases.phase3.handle_comment') as mock_handle:
         assert phase3.process_oldest_entry() is False
     mock_handle.assert_not_called()
+
+
+@pytest.mark.unit
+def test_image_scan_sentence_counts_only_posts_since_the_comment(make_mock_comment):
+    comment = make_mock_comment(subreddit='test_source')
+    comment.created_utc = time.time() - 90 * 86400
+    sentence = phase3.describe_media_scan(make_media_scan(150, top_posts_checked=130), comment, 'pics')
+    assert '20' in sentence
+    assert '150' not in sentence
+    assert phase3.describe_media_scan(make_media_scan(30, top_posts_checked=30), comment, 'pics') == ''

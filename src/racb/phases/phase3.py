@@ -148,7 +148,8 @@ def describe_media_scan(media_scan, source_comment, target_subreddit):
     if media_scan is None:
         return ''
     media = media_scan.media.upper()  # IMAGE or VIDEO, as in the message keys
-    count = media_scan.posts_checked
+    # Top posts are compared too, but the sentence is about the posts made since the comment was written
+    count = media_scan.posts_checked - media_scan.top_posts_checked
     if not count:
         # Nothing to compare with: too rare to be worth its own sentence
         return ''

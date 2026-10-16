@@ -3,9 +3,10 @@
 import logging
 import re
 
+import praw
 import prawcore
 
-from racb.constants import SUB_BLACKLIST
+from racb.constants import is_crosspost_blocked
 from racb.core import db, reddit, duplicate_detector, sub_search
 from racb import config, i18n
 
@@ -28,7 +29,7 @@ def handle_incoming_comment(comment, metrics=None):
         return
 
     source_subreddit = comment.subreddit.display_name.lower()
-    if target_subreddit.lower() in SUB_BLACKLIST or source_subreddit in SUB_BLACKLIST:
+    if is_crosspost_blocked(source_subreddit, target_subreddit):
         return
 
     if target_subreddit.lower() == source_subreddit:
@@ -97,12 +98,17 @@ def check_pattern(comment):
 
 def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
                                 media_scan_limit=duplicate_detector.QUICK_SCAN_NEWEST_LIMIT,
-                                media_scan_top_limit=duplicate_detector.QUICK_SCAN_TOP_LIMIT):
+                                media_scan_top_limit=duplicate_detector.QUICK_SCAN_TOP_LIMIT,
+                                media_scan_top_time_filters=('all',), search_titles=False):
     """Looks for posts in `subreddit` that link to the same URL or, for an image or video post, look the same.
 
+    Also counts as the same content: a post in `subreddit` that Reddit lists among the submission's "other
+    discussions" (a crosspost of it, or a post of the same link), and, with `search_titles`, a post with the same
+    title (`find_posts_with_same_title`).
+
     The picture comparison reads at most `media_scan_limit` of the newest posts, stopping at the first one older
-    than `media_scan_since` (a Unix timestamp), plus the `media_scan_top_limit` top posts of all time. Its outcome is kept in `media_scan` (None if nothing was
-    compared).
+    than `media_scan_since` (a Unix timestamp), plus the `media_scan_top_limit` top posts of each period in
+    `media_scan_top_time_filters`. Its outcome is kept in `media_scan` (None if nothing was compared).
     """
     class Result:
         posts_found = False
@@ -152,15 +158,75 @@ def get_posts_with_same_content(comment, subreddit, media_scan_since=None,
         result.posts = submissions
         return result
 
+    other_discussions = find_other_discussions(comment.submission, subreddit)
+    if other_discussions:
+        result.posts_found = True
+        result.posts = other_discussions
+        return result
+
+    if search_titles:
+        posts_with_same_title = find_posts_with_same_title(comment.submission, subreddit)
+        if posts_with_same_title:
+            result.posts_found = True
+            result.posts = posts_with_same_title
+            return result
+
     result.media_scan = duplicate_detector.scan_subreddit_for_duplicates(
         comment.submission, subreddit, posted_after=media_scan_since, limit=media_scan_limit,
-        top_limit=media_scan_top_limit,
+        top_limit=media_scan_top_limit, top_time_filters=media_scan_top_time_filters,
     )
     if result.media_scan and result.media_scan.duplicates:
         result.posts_found = True
         result.posts = [duplicate['post'] for duplicate in result.media_scan.duplicates]
 
     return result
+
+
+def find_other_discussions(submission, subreddit):
+    """Returns the posts in `subreddit` that Reddit lists under the submission's "other discussions".
+
+    Those are crossposts of the submission and posts of the same link, found with one API call. A failed call
+    finds nothing, so the other checks still run.
+    """
+    try:
+        return [
+            post for post in submission.duplicates(limit=100)
+            if post.subreddit.display_name.lower() == subreddit.lower()
+        ]
+    except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+        logger.warning(f'Could not list the other discussions of {reddit.full_url(submission.permalink)}: {e!r}')
+        return []
+
+
+# Shorter titles ("My cat", "Found this") are too common to say that two posts are the same
+MIN_TITLE_SEARCH_WORDS = 4
+TITLE_SEARCH_LIMIT = 25
+
+
+def normalize_title(title):
+    """Lowercases a title and keeps only its words, so punctuation and spacing do not matter."""
+    return ' '.join(re.findall(r'\w+', title.lower()))
+
+
+def find_posts_with_same_title(submission, subreddit):
+    """Returns the posts in `subreddit` whose title equals the submission's, ignoring case and punctuation.
+
+    Catches reposts that keep the title, including videos and text posts, which the picture comparison misses.
+    Titles shorter than MIN_TITLE_SEARCH_WORDS words are not searched. A failed search finds nothing.
+    """
+    title = normalize_title(submission.title)
+    if len(title.split()) < MIN_TITLE_SEARCH_WORDS:
+        return []
+    title_without_quotes = submission.title.replace('"', ' ')
+    query = f'title:"{title_without_quotes}"'
+    try:
+        results = list(reddit.get_reddit_instance().subreddit(subreddit).search(
+            query=query, sort='relevance', time_filter='all', limit=TITLE_SEARCH_LIMIT,
+        ))
+    except (prawcore.exceptions.PrawcoreException, praw.exceptions.PRAWException) as e:
+        logger.warning(f'Could not search r/{subreddit} for the title {submission.title!r}: {e!r}')
+        return []
+    return [post for post in results if post.id != submission.id and normalize_title(post.title) == title]
 
 
 def reply_to_source_equals_target_comment(source_comment):
