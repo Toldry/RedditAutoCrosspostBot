@@ -5,6 +5,7 @@ import os
 import tempfile
 import time
 import uuid
+from urllib.parse import urlparse
 import pytest
 import prawcore
 from praw.models import PostMedia
@@ -358,3 +359,106 @@ def test_live_duplicate_detector_query():
 
 
 
+@pytest.mark.integration
+def test_live_duplicate_detector_scans_gallery_posts():
+    """An image post and a gallery holding the same picture are found as duplicates of each other, both ways."""
+    from PIL import Image
+    from racb.core import duplicate_detector
+
+    r = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)
+    source_sub = r.subreddit(TEST_SOURCE_SUBREDDIT)
+    target_sub = r.subreddit(TEST_TARGET_SUBREDDIT)
+
+    asset_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'test_sample.png')
+    image_dir = tempfile.TemporaryDirectory()
+    shared_path = os.path.join(image_dir.name, 'shared.png')
+    other_path = os.path.join(image_dir.name, 'other.png')
+    with Image.open(asset_path) as asset:
+        asset.convert('RGB').save(shared_path)  # Opaque, see test_live_duplicate_detector_query
+    # Random noise looks nothing like the asset, so only the shared picture can match
+    Image.frombytes('RGB', (256, 256), os.urandom(256 * 256 * 3)).save(other_path)
+
+    gallery_submission = None
+    image_submission = None
+    try:
+        # The shared picture second, so a match proves pictures after the first are compared
+        gallery_submission = track(target_sub.submit(
+            title=f'[Test Gallery] {uuid.uuid4().hex[:8]}',
+            gallery=[PostMedia(other_path), PostMedia(shared_path)],
+            timeout=25,
+        ))
+        image_submission = track(source_sub.submit(
+            title=f'[Test Gallery Picture] {uuid.uuid4().hex[:8]}',
+            image=PostMedia(shared_path),
+            timeout=25,
+        ))
+
+        # Reddit fills in a gallery's media_metadata once it has processed the pictures
+        gallery = None
+        for attempt in range(10):
+            gallery = r.submission(id=gallery_submission.id)
+            if len(duplicate_detector.gallery_image_urls(gallery)) == 2:
+                break
+            time.sleep(3.0)
+        assert duplicate_detector.media_kind(gallery) == duplicate_detector.IMAGE
+        assert len(duplicate_detector.gallery_image_urls(gallery)) == 2
+        assert len(duplicate_detector.fingerprint_post(gallery)) == 2
+
+        image_post = r.submission(id=image_submission.id)
+        for scanned, subreddit_name, expected_id in (
+            (image_post, TEST_TARGET_SUBREDDIT, gallery_submission.id),
+            (gallery, TEST_SOURCE_SUBREDDIT, image_submission.id),
+        ):
+            scan = None
+            for attempt in range(3):
+                scan = duplicate_detector.scan_subreddit_for_duplicates(scanned, subreddit_name, limit=15)
+                if scan and expected_id in [duplicate['post_id'] for duplicate in scan.duplicates]:
+                    break
+                time.sleep(2.0)
+            assert scan is not None, f'{scanned.url} was not scanned'
+            assert expected_id in [duplicate['post_id'] for duplicate in scan.duplicates], (
+                f'r/{subreddit_name} post {expected_id} not found as a duplicate of {scanned.url}'
+            )
+
+    finally:
+        image_dir.cleanup()
+        cleanup_reddit_objects(image_submission, gallery_submission)
+
+
+def find_crosspost(reddit_instance, is_wanted, listing_limit=1000):
+    """Returns a crosspost from r/all's "new" listing that satisfies `is_wanted`, or None.
+
+    Prefers one whose own `url` is not the original's media URL (e.g. the original's permalink), the case the
+    duplicate detector used to miss. The test subreddits are private, and Reddit refuses crossposts out of
+    private subreddits, so the tests cannot make their own crossposts; public ones on r/all are common enough.
+    """
+    from racb.core import duplicate_detector
+
+    wanted = [
+        post for post in reddit_instance.subreddit('all').new(limit=listing_limit)
+        if getattr(post, 'crosspost_parent_list', None) and is_wanted(post)
+    ]
+    differing = [post for post in wanted if post.url != duplicate_detector.media_url(post)]
+    return (differing or wanted or [None])[0]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('original_kind', ['image', 'gallery'])
+def test_live_duplicate_detector_reads_crossposts_through_the_original(original_kind):
+    """A live crosspost of an image (or gallery) post is an image post, and its picture(s) can be fingerprinted."""
+    from racb.core import duplicate_detector
+
+    def is_wanted(post):
+        original = duplicate_detector.crosspost_parent(post)
+        if original_kind == 'gallery':
+            return original.get('is_gallery') is True
+        return original.get('is_gallery') is not True and urlparse(original.get('url') or '').netloc == 'i.redd.it'
+
+    r = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)
+    crosspost = find_crosspost(r, is_wanted)
+    if crosspost is None:
+        pytest.skip(f'No crosspost of a public {original_kind} post among the newest posts of r/all')
+
+    logger.info(f'Checking crosspost {crosspost.permalink} (url {crosspost.url})')
+    assert duplicate_detector.media_kind(crosspost) == duplicate_detector.IMAGE
+    assert duplicate_detector.fingerprint_post(crosspost), f'Could not read the picture of {crosspost.permalink}'

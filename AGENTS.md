@@ -397,7 +397,9 @@ uv run pytest -m integration
   when they pass. The job's last step, `scripts/delete_test_artifacts.py --strict`, runs even after failed or
   cancelled tests and also gates the deploy. Pull requests never run them.
 - The integration tests call the reply and crosspost helpers **directly**. They do not exercise detection
-  (`get_posts_with_same_content`, `handle_incoming_comment`) against live Reddit, apart from the image-hash test.
+  (`get_posts_with_same_content`, `handle_incoming_comment`) against live Reddit, apart from the image-hash tests. Those also scan a gallery
+  post, and read real public crossposts from r/all (the test subreddits are private, so the tests cannot
+  make crossposts of their own).
 - Unit tests mock PRAW objects with `tests/conftest.py`. Patch at the import site actually used, e.g.
   `racb.phases.phase1.get_posts_with_same_content` or `racb.core.db.add_comment`.
 
