@@ -287,12 +287,10 @@ def test_main_loop_stops_reading_the_stream_on_shutdown(make_mock_comment):
 
 
 @pytest.mark.unit
-def test_heartbeat_reports_reads_lag_and_cpu(caplog):
+def test_heartbeat_reports_reads_and_lag(caplog):
     import logging
     import time
     metrics = StreamMetrics()
-    metrics.cpu_usage = MagicMock()
-    metrics.cpu_usage.sample.return_value = (3.25, 1.5)
     metrics.record_request(2.0, 100)
     metrics.record_request(1.0, 80)
     metrics.record_head_poll(4.0)
@@ -305,8 +303,7 @@ def test_heartbeat_reports_reads_lag_and_cpu(caplog):
     assert 'reads: 2 requests, 90.0 comments/request, 1.50 s/request' in message
     assert 'head: 1 polls, 4.00 s/poll' in message
     assert 'behind: 12 s, 1,234 IDs' in message
-    assert '1 ID block(s) failed' in message
-    assert message.endswith('CPU: 3.2% of a core, steal 1.5%')
+    assert message.endswith('1 ID block(s) failed')
     assert metrics.interval_requests == 0
     assert metrics.interval_failed_blocks == 0
 

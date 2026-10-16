@@ -210,7 +210,6 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | :--- | :--- |
 | [`src/racb/main.py`](./src/racb/main.py) | Application entry point, logging setup, `StreamMetrics` (the heartbeat), `run_stream` (starts the comment reader, or the listing stream loop with `STREAM_SOURCE=listing`), exception recovery, the job list (`build_jobs`), and graceful shutdown on SIGTERM/SIGINT. |
 | [`src/racb/comment_reader.py`](./src/racb/comment_reader.py) | `CommentReader`: reads every new comment by blocks of 100 consecutive IDs on `STREAM_READERS` threads spread over the 4 accounts, and saves its position (`stream_cursors`) so restarts resume. Its module docstring explains the method. |
-| [`src/racb/core/cpu_usage.py`](./src/racb/core/cpu_usage.py) | Process CPU time and VM steal time (`/proc/stat`) between heartbeats. |
 | [`src/racb/workers.py`](./src/racb/workers.py) | Background threads: `PeriodicJob` (one thread per scheduled job), `Phase1Workers` (the Phase 1 thread pool fed by the stream), and `run_job_safely`. |
 | [`src/racb/__main__.py`](./src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
 | [`src/racb/__init__.py`](./src/racb/__init__.py) | Package marker; re-exports `__version__`. |
@@ -235,6 +234,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether `changelog.d/` holds fragments. |
 | [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run`, `--limit N` (`0` means all) and `--strict` (exit code 1 if a bot could not be checked or a test item could not be deleted). Slow; for manual use. |
 | [`scripts/delete_test_artifacts.py`](./scripts/delete_test_artifacts.py) | Deletes only the posts and comments the integration tests recorded in their manifest (`$RACB_TEST_ARTIFACTS_FILE`, default `racb-test-artifacts.jsonl` in the temp directory), as the bot that wrote each one, then removes the manifest. Supports `--dry-run`, `--manifest PATH` and `--strict`. The last step of CI's `integration-tests` job. |
+| [`scripts/verify_comment_ids.py`](./scripts/verify_comment_ids.py) | Read-only live check of what `comment_reader.py` assumes: comment IDs follow creation time, 100-ID blocks come back mostly full with the fields the r/all filter reads, how many IDs Reddit hands out per second, and what each request costs (with a rough egress estimate). Needs only `racb.core.reddit`; its docstring shows how to pipe it into the bot container on the VM. |
 | [`scripts/redeploy.sh`](./scripts/redeploy.sh) | Runs **on the VM**: resets the checkout to a commit of `origin/master` (argument, `SSH_ORIGINAL_COMMAND`, or the latest), runs `docker compose up --detach --build`, and fails if the bot is not running 30 s later. The CI `deploy` job's SSH key is pinned to it. Refuses to run on a dirty or diverged checkout. |
 | [`scripts/authorize_deploy_key.sh`](./scripts/authorize_deploy_key.sh) | Runs **on the VM** once: adds the CI deploy key to `~/.ssh/authorized_keys` as a forced command for `redeploy.sh` and prints the host key. |
 | [`scripts/setup_auto_deploy.sh`](./scripts/setup_auto_deploy.sh) | One-time setup of automatic deployment, run in Cloud Shell: service account, Workload Identity Federation, IAP firewall rule, deploy key, GitHub variables. See [`docs/auto-deploy.md`](./docs/auto-deploy.md). |
@@ -447,14 +447,13 @@ uv run pytest -m integration
 - A heartbeat line (`[Heartbeat] Last ~10m: scanned N comments ...`) is logged every 10 minutes by `StreamMetrics`. It is the quickest health and throughput signal.
   It says `N match(es) dropped, Phase 1 queue full` when the Phase 1 workers fell behind. Besides that,
   only two lines are logged per backlog: when the queue fills and when it has room again.
-  Its second half says how comments were read and what it cost, for example
-  `reads: 412 requests, 87.3 comments/request, 0.95 s/request | head: 160 polls, 1.70 s/poll | behind: 9 s, 340 IDs | CPU: 4.1% of a core, steal 0.6%`:
+  Its second half says how comments were read, for example
+  `reads: 412 requests, 87.3 comments/request, 0.95 s/request | head: 50 polls, 1.70 s/poll | behind: 9 s, 340 IDs`:
   - `reads`: ID blocks (or listing batches) fetched, and how many comments each returned (all of them, before
     the r/all filter). With `STREAM_SOURCE=listing`, about 100 comments/request means the listing returned
     full pages, so the bot was falling behind r/all.
   - `behind`: age of the newest comment read, and (`ids` only) how many IDs wait to be read. Growing values
     mean the readers do not keep up; `N ID block(s) failed` and `N IDs skipped` count comments given up on.
-  - `CPU`: the process's CPU time as a share of one core, and the VM's steal time (section 8).
 
 ### Release & Semantic Versioning Workflow
 We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). **Releases are fully automatic; nobody bumps the version by hand.**
@@ -695,13 +694,12 @@ A back-off on the main thread only pauses finding new comments; the readers, wor
   the image contains `.env`. They `git reset --hard` the VM checkout, so `scripts/redeploy.sh` refuses to run
   when tracked files were edited on the VM. Keep `redeploy.sh`'s body inside `main()`: the reset rewrites the
   running script.
-- **CPU on the Always Free e2-micro:** the free tier covers the instance itself, not a CPU budget, so CPU use
-  is not billed; the VM gets about a quarter of a core over time and is throttled beyond that. The heartbeat's
-  `CPU:` part shows both sides: the process's share of one core (sustained values near 25% mean the bot uses
-  what the VM gets) and steal (the hypervisor holding the VM back). What the free tier does limit is network
-  egress, 1 GB a month (https://cloud.google.com/free/docs/free-cloud-features#compute); downloads from Reddit
-  are ingress, but every request and its TCP acknowledgements go out. Check the VM's network egress in Cloud
-  Monitoring after a change that adds requests.
+- **Always Free limits on the e2-micro** (https://cloud.google.com/free/docs/free-cloud-features#compute):
+  instance hours, 30 GB-months of standard disk, and 1 GB a month of outbound data transfer. CPU use is not
+  among them, so it costs nothing; an e2-micro that needs more than its share is only slowed down. Egress is
+  the limit to watch: downloads from Reddit are inbound, but every request and its TCP acknowledgements go out.
+  Check the VM's network egress in Cloud Monitoring after a change that adds requests
+  (`scripts/verify_comment_ids.py` prints a rough estimate for the comment reader).
 - Python versions: `requires-python = ">=3.11"`. The Docker image, CI and `.python-version` use 3.11, and the
   unit tests also pass on 3.13. 3.10 is not supported.
 - Mermaid diagrams: GitHub's renderer rejects unquoted labels that contain parentheses, e.g.

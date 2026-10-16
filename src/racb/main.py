@@ -17,7 +17,6 @@ from racb import config, i18n
 from racb.config import env_bool
 from racb.comment_reader import CommentReader
 from racb.core import db, known_subreddits, reddit, shutdown
-from racb.core.cpu_usage import CpuUsage
 from racb.phases import phase1, phase2, phase3, inbox, cleanup
 from racb.workers import PeriodicJob, Phase1Workers
 
@@ -44,8 +43,8 @@ class StreamMetrics:
     resets the counters, so every access holds a lock.
 
     Besides the counts, the heartbeat says how the comments were read (requests, comments per request,
-    seconds per request), how far behind the newest comment the bot is, and how much CPU it used. That tells
-    whether the bot keeps up with Reddit, and whether the VM's CPU is the limit (see `cpu_usage`).
+    seconds per request) and how far behind the newest comment the bot is, which tells whether it keeps up
+    with Reddit.
     """
 
     def __init__(self):
@@ -67,7 +66,6 @@ class StreamMetrics:
         # Creation time of the newest comment read so far, and how many IDs wait to be read
         self.newest_created_utc = None
         self.lag_ids = None
-        self.cpu_usage = CpuUsage()
         self.last_log_time = time.time()
 
     def record_comment(self):
@@ -148,7 +146,7 @@ class StreamMetrics:
         logger.info(message)
 
     def _reading_summary(self, now):
-        """The heartbeat's second half: how comments were read, how far behind, and CPU use."""
+        """The heartbeat's second half: how comments were read, and how far behind."""
         parts = []
         if self.interval_requests:
             parts.append(
@@ -174,11 +172,6 @@ class StreamMetrics:
             parts.append(f'{self.interval_failed_blocks} ID block(s) failed')
         if self.interval_skipped_ids:
             parts.append(f'{self.interval_skipped_ids:,} IDs skipped')
-        process_percent, steal_percent = self.cpu_usage.sample()
-        cpu = f'CPU: {process_percent:.1f}% of a core'
-        if steal_percent is not None:
-            cpu += f', steal {steal_percent:.1f}%'
-        parts.append(cpu)
         return ' | ' + ' | '.join(parts)
 
 
