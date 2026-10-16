@@ -85,6 +85,11 @@ docker compose exec bot python -m racb --process-one                 # crosspost
 docker compose exec -e DRY_RUN=True bot python -m racb --process-one # only log the crosspost
 ```
 
+`exec` runs inside the bot's container, so if the bot restarts (it crashed, or a deploy replaced it), Docker kills
+the run mid-way without a message and the exit code is 137. Check `docker compose logs --tail 80 bot` for why
+the bot stopped. `docker compose run --rm bot python -m racb --process-one` runs it in a container of its own
+instead, which a bot restart does not touch.
+
 From your own computer, through SSH to the VM (same command in bash and PowerShell; use your VM name and
 zone, see [`docs/logs.md`](./docs/logs.md)). `-T` is needed because the SSH command runs without a terminal:
 ```bash

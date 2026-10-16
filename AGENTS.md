@@ -402,7 +402,8 @@ Store these in `.env` for local development or production:
    the scheduled run, the row is deleted afterwards whether or not it was crossposted, unless `DRY_RUN` is on,
    so repeated runs walk through the table oldest first. Exit code 1 means the table is empty.
    Under Docker Compose, inside the running bot container: `docker compose exec bot python -m racb --process-one`
-   (add `-e DRY_RUN=True` after `exec` for a dry run).
+   (add `-e DRY_RUN=True` after `exec` for a dry run). A restart of the bot container SIGKILLs it silently
+   (exit code 137); `docker compose run --rm bot python -m racb --process-one` runs it in its own container.
    `--process-one` starts nothing else (no stream, jobs or worker threads) and authenticates only
    `AutoCrosspostBot`, the one account Phase 3 uses, so the other 3 need no valid credentials for it. It exits
    with code 2 when `AUTO_CROSSPOST_BOT_ENABLED` is false. Every other invocation except `--help` first runs
