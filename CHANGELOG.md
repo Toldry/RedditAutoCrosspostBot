@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.1.0] - 2026-10-16
+
+### Added
+
+- **Every New Comment, Read by ID:** the bot read r/all through its comment listing, 100 comments per request and one request at a time, which saw about 850 comments a minute by day and missed most of r/all. It now reads every new comment by blocks of 100 consecutive comment IDs on `STREAM_READERS` threads (default 4) spread over the 4 bot accounts, keeping only what r/all would show. `STREAM_SOURCE=listing` restores the old way.
+- **No Comments Skipped on Restarts:** the comment reader saves its position in the database (`stream_cursors`) every 30 seconds and at shutdown, so a restart or redeploy resumes where it stopped instead of skipping what was posted meanwhile (up to about 200,000 comment IDs back). With `STREAM_SOURCE=listing`, a stream error resumes after the newest comment seen instead of skipping ahead.
+- **Reading Figures in the Heartbeat:** each heartbeat now also says how many requests read comments, how many comments each returned and how long each took, and how far behind the newest comment the bot is, so you can tell whether it keeps up with Reddit.
+
+
 ## [3.0.5] - 2026-10-16
 
 ### Fixed

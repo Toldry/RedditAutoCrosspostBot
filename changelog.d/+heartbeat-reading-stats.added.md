@@ -1,1 +1,0 @@
-**Reading Figures in the Heartbeat:** each heartbeat now also says how many requests read comments, how many comments each returned and how long each took, and how far behind the newest comment the bot is, so you can tell whether it keeps up with Reddit.
