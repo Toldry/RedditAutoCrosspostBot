@@ -60,11 +60,11 @@ class PeriodicJob(threading.Thread):
 
     def run(self):
         try:
-            if not self.run_at_start and shutdown.wait(self.interval_seconds):
+            if not self.run_at_start and shutdown.stop_requested_within(self.interval_seconds):
                 return
             while not shutdown.stop_requested():
                 self.run_once()
-                if shutdown.wait(self.interval_seconds):
+                if shutdown.stop_requested_within(self.interval_seconds):
                     return
         except BaseException as e:
             shutdown.fail(e, self.name)
@@ -90,7 +90,7 @@ def back_off_after_network_error(error, thread_name):
     else:
         delay = NETWORK_RETRY_DELAY_SECONDS
         logger.info(f'{thread_name}: network error {error!r}. Waiting {delay}s.')
-    return shutdown.wait(delay)
+    return shutdown.stop_requested_within(delay)
 
 
 class Phase1Workers:

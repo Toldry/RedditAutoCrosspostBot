@@ -288,19 +288,19 @@ def handle_exception(e):
     if debug:
         return should_raise
 
-    # shutdown.wait() instead of time.sleep(), so a shutdown does not wait out the back-off
+    # shutdown.stop_requested_within() instead of time.sleep(), so a shutdown does not wait out the back-off
     if isinstance(e, prawcore.exceptions.TooManyRequests):
         logger.warning(f'Rate limited by Reddit ({e}). Waiting {TOO_MANY_REQUESTS_DELAY_SECONDS}s and retrying.')
-        shutdown.wait(TOO_MANY_REQUESTS_DELAY_SECONDS)
+        shutdown.stop_requested_within(TOO_MANY_REQUESTS_DELAY_SECONDS)
         should_raise = False
     elif isinstance(e, TRANSIENT_NETWORK_ERRORS + (prawcore.exceptions.Forbidden,)):
         logger.info(f'Encountered network error {e!r}. Waiting {NETWORK_RETRY_DELAY_SECONDS}s and retrying.')
-        shutdown.wait(NETWORK_RETRY_DELAY_SECONDS)
+        shutdown.stop_requested_within(NETWORK_RETRY_DELAY_SECONDS)
         should_raise = False
     elif isinstance(e, DATABASE_CONNECTION_ERRORS):
         logger.warning(f'Database connection error {e!r}. Reconnecting in {NETWORK_RETRY_DELAY_SECONDS}s.')
         db.reset_connection()
-        shutdown.wait(NETWORK_RETRY_DELAY_SECONDS)
+        shutdown.stop_requested_within(NETWORK_RETRY_DELAY_SECONDS)
         should_raise = False
     elif isinstance(e, praw.exceptions.RedditAPIException):
         error_types = []

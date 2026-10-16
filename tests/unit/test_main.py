@@ -33,7 +33,7 @@ def test_stream_metrics():
 @pytest.mark.unit
 def test_handle_exception_server_error():
     exc = prawcore.exceptions.ServerError(MagicMock())
-    with patch('racb.main.shutdown.wait'):
+    with patch('racb.main.shutdown.stop_requested_within'):
         with patch('racb.main.env_bool', return_value=False):
             should_raise = handle_exception(exc)
             assert should_raise is False
@@ -87,7 +87,8 @@ def test_main_startup_auth_failure_exits():
 @pytest.mark.unit
 def test_handle_exception_matches_subclasses_and_rate_limits():
     too_many_requests = prawcore.exceptions.TooManyRequests(MagicMock())
-    with patch('racb.main.shutdown.wait') as mock_sleep, patch('racb.main.env_bool', return_value=False):
+    with patch('racb.main.shutdown.stop_requested_within') as mock_sleep, \
+         patch('racb.main.env_bool', return_value=False):
         assert handle_exception(too_many_requests) is False
         mock_sleep.assert_called_once()
 
@@ -95,7 +96,7 @@ def test_handle_exception_matches_subclasses_and_rate_limits():
 @pytest.mark.unit
 def test_handle_exception_resets_database_on_connection_error():
     import psycopg2
-    with patch('racb.main.shutdown.wait'), patch('racb.main.env_bool', return_value=False), \
+    with patch('racb.main.shutdown.stop_requested_within'), patch('racb.main.env_bool', return_value=False), \
          patch('racb.main.db.reset_connection') as mock_reset:
         assert handle_exception(psycopg2.OperationalError('server closed the connection')) is False
         mock_reset.assert_called_once()

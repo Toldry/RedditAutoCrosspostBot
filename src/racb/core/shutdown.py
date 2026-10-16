@@ -1,8 +1,8 @@
 """Process-wide shutdown signal shared by the stream loop, the Phase 1 workers and the scheduled jobs.
 
 A SIGTERM (`docker stop`), a SIGINT (Ctrl-C) or a fatal error on any thread calls `request_stop()`.
-Every long wait goes through `wait()` instead of `time.sleep()`, and long loops (Phase 2, Phase 3)
-check `stop_requested()` between entries, so all threads wind down within a few seconds.
+Every long wait goes through `stop_requested_within()` instead of `time.sleep()`, and long loops
+(Phase 2, Phase 3) check `stop_requested()` between entries, so all threads wind down within a few seconds.
 """
 
 import logging
@@ -23,8 +23,12 @@ def stop_requested():
     return _stop_event.is_set()
 
 
-def wait(seconds):
-    """Sleeps for `seconds`, waking early on shutdown. Returns True if a shutdown was requested."""
+def stop_requested_within(seconds):
+    """Sleeps for up to `seconds` and returns True as soon as a shutdown is requested (at once if it already was).
+
+    Returns False if the time ran out first. Use it as an interruptible sleep:
+    `if shutdown.stop_requested_within(interval): return`.
+    """
     return _stop_event.wait(seconds)
 
 

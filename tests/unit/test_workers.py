@@ -142,7 +142,7 @@ def test_phase1_worker_backs_off_after_a_network_error_and_keeps_going():
             raise prawcore.exceptions.TooManyRequests(MagicMock())
         handled.append(comment_id)
 
-    with patch('racb.workers.shutdown.wait', return_value=False) as mock_wait, \
+    with patch('racb.workers.shutdown.stop_requested_within', return_value=False) as mock_wait, \
          patch.dict('os.environ', {'DEBUG': 'false'}):
         workers = Phase1Workers(handle, worker_count=1).start()
         workers.submit('rate-limited')

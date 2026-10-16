@@ -205,7 +205,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_listen_only()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
 | [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Per-thread factory for PRAW instances (one per account per thread, created lazily) with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check), `TRANSIENT_NETWORK_ERRORS` and the bot-name constants. |
 | [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with one connection per thread, connection retry logic and stored procedure invocation. |
-| [`src/racb/core/shutdown.py`](./src/racb/core/shutdown.py) | The process-wide stop signal: `request_stop()`, `stop_requested()`, `wait(seconds)` (an interruptible sleep), and `fail()`, which records a thread's crash and stops the process. |
+| [`src/racb/core/shutdown.py`](./src/racb/core/shutdown.py) | The process-wide stop signal: `request_stop()`, `stop_requested()`, `stop_requested_within(seconds)` (an interruptible sleep that returns True on shutdown), and `fail()`, which records a thread's crash and stops the process. |
 | [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Typo suggestions: merges candidates from `known_subreddits` and `reddit.subreddits.search()`, filtered and ranked by name similarity. |
 | [`src/racb/core/known_subreddits.py`](./src/racb/core/known_subreddits.py) | Buffers subreddit names seen in the comment stream (no I/O per comment) and writes them to `known_subreddits` in one batch every 5 minutes; also the trigram lookup. |
 | [`src/racb/core/duplicate_detector.py`](./src/racb/core/duplicate_detector.py) | Self-hosted perceptual image hashing (`imagehash` / `dhash`) for visual duplicate detection in target subreddits: `scan_subreddit_for_duplicates` compares an image or video post (videos by preview frame) with the subreddit's posts of the same kind back to a given time and returns a `RepostScan`. Linked from every crosspost reply about an image or video, so it is written to be read by outsiders; its module docstring explains the method. |
@@ -577,7 +577,7 @@ Rules for thread safety:
 - Module-level state written by more than one thread needs a lock (`StreamMetrics`, `known_subreddits`).
 
 **Shutdown:** SIGTERM (`docker stop`) and SIGINT set the stop signal in `racb.core.shutdown`. The stream
-loop, the Phase 1 workers and the job threads check it, every back-off waits with `shutdown.wait()`
+loop, the Phase 1 workers and the job threads check it, every back-off waits with `shutdown.stop_requested_within()`
 instead of `time.sleep()`, and Phase 2 and Phase 3 stop between entries, so an entry is never left
 crossposted but not deleted. `start_bot()` waits up to `SHUTDOWN_TIMEOUT_SECONDS` (50 s) for all threads;
 `docker-compose.yml` gives the bot `stop_grace_period: 60s`. Matches still waiting in the Phase 1 queue are
