@@ -1,7 +1,7 @@
 """Background threads: the scheduled jobs and the Phase 1 worker pool.
 
-The main thread only reads the r/all comment stream (see `main.py`). Everything slow runs here, because
-PRAW's stream only catches up on the newest 100 comments: any pause in reading it loses comments.
+The main thread and the comment reader threads only read new comments (see `main.py` and
+`comment_reader.py`). Everything slow runs here, so reading never waits for it.
 Each thread gets its own PRAW instances (`reddit.get_reddit_instance`) and database connection
 (`db.get_connection`) the first time it uses them.
 """
@@ -103,16 +103,17 @@ def back_off_after_network_error(error):
 class Phase1Workers:
     """A pool of threads that run `handle_comment_id(comment_id)` for matching stream comments.
 
-    The stream thread calls `submit()` with comment IDs, not PRAW objects: a comment from the stream is
-    bound to the stream thread's PRAW instance, so each worker fetches it again through its own.
+    The stream or reader threads call `submit()` with comment IDs, not PRAW objects: a comment they read
+    is bound to their own PRAW instance, so each worker fetches it again through its own.
     """
 
     def __init__(self, handle_comment_id, worker_count, metrics=None, queue_size=PHASE1_QUEUE_SIZE):
         self.handle_comment_id = handle_comment_id
         self.metrics = metrics
         self.queue = queue.Queue(maxsize=queue_size)
-        # Matches dropped since the queue last had room. Only the stream thread calls submit(), so no lock.
+        # Matches dropped since the queue last had room. Several reader threads call submit(), hence the lock.
         self.dropped_since_full = 0
+        self._dropped_lock = threading.Lock()
         self.threads = [
             threading.Thread(target=self.work, name=f'phase1-{number}', daemon=True)
             for number in range(1, worker_count + 1)
@@ -129,15 +130,21 @@ class Phase1Workers:
             self.queue.put_nowait(comment_id)
         except queue.Full:
             # Logged once when the queue fills and once when it has room again; the heartbeat counts drops
-            if self.dropped_since_full == 0:
-                logger.warning(f'Phase 1 queue is full ({self.queue.maxsize}); dropping matches until it has room')
-            self.dropped_since_full += 1
+            with self._dropped_lock:
+                if self.dropped_since_full == 0:
+                    logger.warning(
+                        f'Phase 1 queue is full ({self.queue.maxsize}); dropping matches until it has room'
+                    )
+                self.dropped_since_full += 1
             if self.metrics:
                 self.metrics.record_dropped()
             return False
-        if self.dropped_since_full:
-            logger.warning(f'Phase 1 queue has room again; dropped {self.dropped_since_full} match(es) meanwhile')
-            self.dropped_since_full = 0
+        with self._dropped_lock:
+            if self.dropped_since_full:
+                logger.warning(
+                    f'Phase 1 queue has room again; dropped {self.dropped_since_full} match(es) meanwhile'
+                )
+                self.dropped_since_full = 0
         return True
 
     def pending(self):

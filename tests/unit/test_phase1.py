@@ -56,6 +56,28 @@ def test_title_contains_prohibited_phrases(make_mock_comment, make_mock_submissi
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize('fields, hidden', [
+    ({}, False),
+    ({'over_18': True}, True),
+    ({'quarantine': True}, True),
+])
+def test_is_hidden_from_r_all_reads_the_submission(make_mock_comment, make_mock_submission, fields, hidden):
+    submission = make_mock_submission(over_18=fields.get('over_18', False))
+    if 'quarantine' in fields:
+        submission.quarantine = fields['quarantine']
+    assert phase1.is_hidden_from_r_all(make_mock_comment(submission=submission)) is hidden
+
+
+@pytest.mark.unit
+def test_handle_incoming_comment_ignores_nsfw_posts(make_mock_comment, make_mock_submission):
+    comment = make_mock_comment(body='r/test_source', subreddit='test_source',
+                                submission=make_mock_submission(over_18=True))
+    with patch('racb.phases.phase1.reply_to_source_equals_target_comment') as mock_reply:
+        assert phase1.handle_incoming_comment(comment) is None
+        mock_reply.assert_not_called()
+
+
+@pytest.mark.unit
 def test_is_subreddit_name_length_valid():
     assert phase1.is_subreddit_name_length_valid('abc') is True
     assert phase1.is_subreddit_name_length_valid('a' * 24) is True

@@ -24,6 +24,10 @@ def handle_incoming_comment(comment, metrics=None):
     if is_mod_post(comment):
         return
 
+    if is_hidden_from_r_all(comment):
+        logger.debug(f'Ignoring a comment on an NSFW or quarantined post: {reddit.full_url(comment.permalink)}')
+        return
+
     if title_contains_prohibited_phrases(comment):
         return
 
@@ -82,6 +86,16 @@ def handle_incoming_comment(comment, metrics=None):
 
 def is_mod_post(comment):
     return comment.distinguished == 'moderator'
+
+
+def is_hidden_from_r_all(comment):
+    """Whether the comment's post is NSFW or quarantined, which r/all never shows.
+
+    The comment reader cannot tell (`/api/info` comments have neither field), so this reads the submission,
+    which the title check fetches anyway.
+    """
+    submission = comment.submission
+    return bool(getattr(submission, 'over_18', False) or getattr(submission, 'quarantine', False))
 
 
 def is_top_level_comment(comment):

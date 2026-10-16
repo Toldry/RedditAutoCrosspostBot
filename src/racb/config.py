@@ -118,3 +118,33 @@ def phase1_worker_count():
         logger.warning(f'Could not parse PHASE1_WORKERS={raw_value!r} as a number; using {PHASE1_WORKERS_DEFAULT}')
         return PHASE1_WORKERS_DEFAULT
     return max(1, count)
+
+
+# Where the bot reads new comments from (see racb.comment_reader):
+# - 'ids': every new comment on Reddit, by ID range, on STREAM_READERS threads (the default)
+# - 'listing': PRAW's stream of the r/all comment listing, one request at a time (the pre-3.1 way)
+STREAM_SOURCES = ('ids', 'listing')
+STREAM_SOURCE_DEFAULT = 'ids'
+
+
+def stream_source():
+    """Returns 'ids' or 'listing', from STREAM_SOURCE."""
+    value = os.environ.get('STREAM_SOURCE', STREAM_SOURCE_DEFAULT).strip().lower()
+    if value not in STREAM_SOURCES:
+        logger.warning(f'Unknown STREAM_SOURCE={value!r}; using {STREAM_SOURCE_DEFAULT!r}')
+        return STREAM_SOURCE_DEFAULT
+    return value
+
+
+STREAM_READERS_DEFAULT = 4
+
+
+def stream_reader_count():
+    """Number of threads that fetch comment ID blocks when STREAM_SOURCE is 'ids' (at least 1)."""
+    raw_value = os.environ.get('STREAM_READERS', str(STREAM_READERS_DEFAULT))
+    try:
+        count = int(raw_value)
+    except ValueError:
+        logger.warning(f'Could not parse STREAM_READERS={raw_value!r} as a number; using {STREAM_READERS_DEFAULT}')
+        return STREAM_READERS_DEFAULT
+    return max(1, count)

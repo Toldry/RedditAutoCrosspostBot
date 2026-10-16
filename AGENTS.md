@@ -12,9 +12,10 @@ Welcome to the **RedditAutoCrosspostBot** repository. This document is a compreh
 
 This repository hosts a suite of 4 automated Reddit bots powered by [PRAW (Python Reddit API Wrapper)](https://praw.readthedocs.io/), backed by a PostgreSQL database and containerized with Docker / Docker Compose for deployment on free cloud VPS instances (e.g. Google Cloud Always Free or Oracle Cloud Always Free) or local hardware.
 
-All 4 bots run in **one Python process, on several threads**. The main thread only reads the `r/all`
-comment stream. Phase 1 runs on a pool of worker threads, and every scheduled job (Phase 2, Phase 3, inbox,
-cleanup, ...) on a thread of its own, so a slow job never pauses the stream (see section 7).
+All 4 bots run in **one Python process, on several threads**. New comments are read by ID on a few
+reader threads (`comment_reader.py`, section 7), with the main thread tracking the newest comment ID.
+Phase 1 runs on a pool of worker threads, and every scheduled job (Phase 2, Phase 3, inbox, cleanup, ...)
+on a thread of its own, so a slow job never pauses reading.
 
 ### Primary Bot: `AutoCrosspostBot`
 - **Goal:** Monitors Reddit comments on `r/all` for community crosspost recommendations matching `r/SomeSubreddit` or `/r/SomeSubreddit`.
@@ -89,7 +90,9 @@ flowchart TD
     R -->|No| X1["ignore"]
     R -->|Yes| M{"distinguished ==\n'moderator'?"}
     M -->|Yes| X2["ignore"]
-    M -->|No| T{"Submission title contains\nsub/subs/subreddit/subreddits?"}
+    M -->|No| NS{"Submission NSFW\nor quarantined?"}
+    NS -->|Yes| X6["ignore"]
+    NS -->|No| T{"Submission title contains\nsub/subs/subreddit/subreddits?"}
     T -->|Yes| X3["ignore"]
     T -->|No| BL{"Source or target in\nSUB_BLACKLIST?\n(case-insensitive)"}
     BL -->|Yes| X4["ignore"]
@@ -113,13 +116,21 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 
 ### Phase Details
 - **Phase 1 ([`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py)):**
-  - Continuous streaming from `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)`.
+  - Continuous reading of every new comment by ID (`comment_reader.CommentReader`, the default,
+    `STREAM_SOURCE=ids`): blocks of 100 consecutive comment IDs fetched with `reddit.info()` on
+    `STREAM_READERS` threads, keeping only what r/all could show (`is_shown_on_r_all`: not private or on a user
+    profile). `/api/info` comments have no `over_18` or `quarantine` field, so Phase 1 drops NSFW and
+    quarantined ones by their submission (`phase1.is_hidden_from_r_all`, no extra request). The head poll
+    asks the listing for 25 comments and takes the newest, because `limit=1` sometimes returns none. Subreddits that opted out of r/all cannot be told apart, so their comments
+    are read too. `STREAM_SOURCE=listing` instead reads
+    `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)` one request at a time, which
+    sees only a fraction of r/all (section 9).
   - Filters: Discards moderator comments, submissions with meta-phrases (`sub`, `subreddit`), and blacklisted subreddits ([`src/racb/constants.py`](./src/racb/constants.py), compared case-insensitively by `is_crosspost_blocked`). Non-top-level comments (`comment.parent_id != comment.link_id`) can only get a `sub_doesnt_exist_bot` reply and are never stored (see the note in section 1).
   - Qualified suggestions are stored via stored procedure `insert_scraped_comment(permalink, target_subreddit)`.
   - Phases 2 and 3 re-parse the target from the live comment body and reject the row
     (`TARGET_SUBREDDIT_CHANGED`) if it no longer equals the stored target, case-insensitively. This blocks
     bait-and-switch edits. Rows scraped before v2.3 have `target_subreddit = NULL` and skip this check.
-  - The stream thread only runs the regex (`check_pattern`, no I/O) and queues the comment ID of a match. A
+  - The reader threads (or the stream thread) only run the regex (`check_pattern`, no I/O) and queue the comment ID of a match. A
     Phase 1 worker thread fetches the comment again through its own PRAW instance (one request) and does all
     of this work, including the duplicate search and image downloads (section 7).
   - Auxiliary replies go through `phase1.reply_as_bot()`, which only logs when `DRY_RUN` is enabled.
@@ -209,7 +220,8 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 
 | File | Purpose |
 | :--- | :--- |
-| [`src/racb/main.py`](./src/racb/main.py) | Application entry point, logging setup, the stream loop on the main thread, exception recovery, the job list (`build_jobs`), and graceful shutdown on SIGTERM/SIGINT. |
+| [`src/racb/main.py`](./src/racb/main.py) | Application entry point, logging setup, `StreamMetrics` (the heartbeat), `run_stream` (starts the comment reader, or the listing stream loop with `STREAM_SOURCE=listing`), exception recovery, the job list (`build_jobs`), and graceful shutdown on SIGTERM/SIGINT. |
+| [`src/racb/comment_reader.py`](./src/racb/comment_reader.py) | `CommentReader`: reads every new comment by blocks of 100 consecutive IDs on `STREAM_READERS` threads spread over the 4 accounts, and saves its position (`stream_cursors`) so restarts resume. Its module docstring explains the method. |
 | [`src/racb/workers.py`](./src/racb/workers.py) | Background threads: `PeriodicJob` (one thread per scheduled job), `Phase1Workers` (the Phase 1 thread pool fed by the stream), and `run_job_safely`. |
 | [`src/racb/__main__.py`](./src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
 | [`src/racb/__init__.py`](./src/racb/__init__.py) | Package marker; re-exports `__version__`. |
@@ -234,6 +246,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether `changelog.d/` holds fragments. |
 | [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run`, `--limit N` (`0` means all) and `--strict` (exit code 1 if a bot could not be checked or a test item could not be deleted). Slow; for manual use. |
 | [`scripts/delete_test_artifacts.py`](./scripts/delete_test_artifacts.py) | Deletes only the posts and comments the integration tests recorded in their manifest (`$RACB_TEST_ARTIFACTS_FILE`, default `racb-test-artifacts.jsonl` in the temp directory), as the bot that wrote each one, then removes the manifest. Supports `--dry-run`, `--manifest PATH` and `--strict`. The last step of CI's `integration-tests` job. |
+| [`scripts/verify_comment_ids.py`](./scripts/verify_comment_ids.py) | Read-only live check of what `comment_reader.py` assumes: comment IDs follow creation time, 100-ID blocks come back mostly full with the fields the r/all filter reads, how many IDs Reddit hands out per second, and what each request costs (with a rough egress estimate). Needs only `racb.core.reddit`; its docstring shows how to pipe it into the bot container on the VM. |
 | [`scripts/redeploy.sh`](./scripts/redeploy.sh) | Runs **on the VM**: resets the checkout to a commit of `origin/master` (argument, `SSH_ORIGINAL_COMMAND`, or the latest), runs `docker compose up --detach --build`, and fails if the bot is not running 30 s later. The CI `deploy` job's SSH key is pinned to it. Refuses to run on a dirty or diverged checkout. |
 | [`scripts/authorize_deploy_key.sh`](./scripts/authorize_deploy_key.sh) | Runs **on the VM** once: adds the CI deploy key to `~/.ssh/authorized_keys` as a forced command for `redeploy.sh` and prints the host key. |
 | [`scripts/setup_auto_deploy.sh`](./scripts/setup_auto_deploy.sh) | One-time setup of automatic deployment, run in Cloud Shell: service account, Workload Identity Federation, IAP firewall rule, deploy key, GitHub variables. See [`docs/auto-deploy.md`](./docs/auto-deploy.md). |
@@ -294,6 +307,8 @@ Store these in `.env` for local development or production:
 | `PHASE2_WAITING_PERIOD` | Time string | `2 hours` | Time duration before Phase 2 checks a comment (parsed via `pytimeparse`, e.g. `2 hours` or `1 day`). |
 | `PHASE3_WAITING_PERIOD` | Time string | `90 days` | Time duration before Phase 3 executes the crosspost (e.g. `3 months` or `90 days`). The public crosspost reply shows it as a localized whole number of days. |
 | `PHASE1_WORKERS` | Integer | `4` | Number of Phase 1 worker threads (at least 1). Each makes its own Reddit requests, all sharing the accounts' rate limits (section 7). |
+| `STREAM_SOURCE` | `ids` / `listing` | `ids` | How new comments are read: `ids` reads every comment by ID range (`comment_reader.py`), `listing` reads PRAW's r/all comment stream one request at a time (the pre-3.1 way, kept as a fallback). An unknown value logs a WARNING and uses `ids`. |
+| `STREAM_READERS` | Integer | `4` | With `STREAM_SOURCE=ids`: threads fetching ID blocks (at least 1), taking turns between the 4 accounts. Raising it only helps if the heartbeat's `behind:` keeps growing; requests per minute are set by how fast Reddit gets new comments, not by this. |
 | `LOG_DIR` | Path | `logs` | Directory for `app.log` (relative to the CWD; `/app/logs` in Docker, mounted on volume `racb_logs`). |
 | `PASSWORD` | String | | Account password for `AutoCrosspostBot`. |
 | `APP_CLIENT_SECRET` | String | | App client secret for `AutoCrosspostBot`. |
@@ -432,8 +447,9 @@ uv run pytest -m integration
 
 ### Logging
 - Format: `YYYY-MM-DD HH:MM:SS [LEVEL   ] [thread] module.name: message`, sent to stderr and to
-  `$LOG_DIR/app.log` (rotating, 5 x 5 MB). `thread` is `MainThread` (the stream), `phase1-<n>`, or the
-  job's name (`phase2`, `phase3`, `inbox`, `cleanup`, `heartbeat`, `known-subreddits`).
+  `$LOG_DIR/app.log` (rotating, 5 x 5 MB). `thread` is `MainThread` (head polls, or the listing stream),
+  `reader-<n>` (comment ID blocks), `phase1-<n>`, or the job's name (`phase2`, `phase3`, `inbox`, `cleanup`,
+  `heartbeat`, `known-subreddits`).
 - The `prawcore` and `urllib3.connectionpool` loggers are **disabled entirely**, which also hides prawcore's rate-limit messages.
 - `[DRY RUN]` lines show writes that `DRY_RUN` suppressed. `Skipping comment ... after Reddit error` lines
   show per-comment failures (e.g. a bot banned from a subreddit) that no longer interrupt the stream.
@@ -441,8 +457,15 @@ uv run pytest -m integration
   (Phase 1 auxiliary replies and the crosspost reply) or `/u/<bot> replied to <user> feedback (r/<subreddit>): <reply URL>` (inbox).
   A Phase 1 `Replying via ...` line without a matching `replied to` line means the reply failed.
 - A heartbeat line (`[Heartbeat] Last ~10m: scanned N comments ...`) is logged every 10 minutes by `StreamMetrics`. It is the quickest health and throughput signal.
-  It ends with `N match(es) dropped, Phase 1 queue full` when the Phase 1 workers fell behind. Besides that,
+  It says `N match(es) dropped, Phase 1 queue full` when the Phase 1 workers fell behind. Besides that,
   only two lines are logged per backlog: when the queue fills and when it has room again.
+  Its second half says how comments were read, for example
+  `reads: 412 requests, 87.3 comments/request, 0.95 s/request | head: 50 polls, 1.70 s/poll | behind: 9 s, 340 IDs`:
+  - `reads`: ID blocks (or listing batches) fetched, and how many comments each returned (all of them, before
+    the r/all filter). With `STREAM_SOURCE=listing`, about 100 comments/request means the listing returned
+    full pages, so the bot was falling behind r/all.
+  - `behind`: age of the newest comment read, and (`ids` only) how many IDs wait to be read. Growing values
+    mean the readers do not keep up; `N ID block(s) failed` and `N IDs skipped` count comments given up on.
 
 ### Release & Semantic Versioning Workflow
 We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/). **Releases are fully automatic; nobody bumps the version by hand.**
@@ -533,6 +556,8 @@ Defined in [`src/racb/sql/instantiate_db.sql`](./src/racb/sql/instantiate_db.sql
 | `known_subreddits` | `name_lower VARCHAR(32) PK`, `display_name VARCHAR(32) NOT NULL`, `last_seen TIMESTAMP NOT NULL`. GIN trigram index `idx_known_subreddits_name_trgm` on `name_lower`. Every subreddit (except `u_` profiles) the stream has seen a comment in; rows are never deleted, so a later-banned subreddit stays (its suggestion line then says so). |
 | `record_known_subreddits(text[])` | Upserts a batch of names, refreshing `display_name` and `last_seen`. |
 | `find_similar_subreddits(varchar, int)` | `(display_name, similarity)` for names matching `name_lower % lower(query)` (trigram similarity ≥ `pg_trgm.similarity_threshold`, default 0.3), most similar first. |
+| `stream_cursors` | `name VARCHAR(32) PK`, `next_comment_id BIGINT NOT NULL`, `done_blocks BIGINT[] NOT NULL`, `updated_at TIMESTAMP NOT NULL`. Where `comment_reader` stopped (row `comments`): every comment ID (base 36 as a number) below `next_comment_id` was read, and so were the 100-ID blocks starting at each of `done_blocks`. |
+| `save_stream_cursor(varchar, bigint, bigint[])` / `get_stream_cursor(varchar)` | Upsert / read one cursor; `get` returns no row if none is saved. |
 
 Behavior to be aware of:
 - The script runs `CREATE EXTENSION IF NOT EXISTS pg_trgm` inside a `DO` block that only warns on failure.
@@ -561,7 +586,10 @@ Behavior to be aware of:
 
 ```mermaid
 flowchart LR
-    S["MainThread\nr/all stream"] -->|"comment ID of a\nregex match"| Q[["Phase 1 queue\n(1000 IDs)"]]
+    M["MainThread\npolls the newest comment ID"] -->|"blocks of\n100 IDs"| BQ[["block queue"]]
+    M -.->|"every 30 s\nand at shutdown"| C[("stream_cursors")]
+    BQ --> S["reader-1 ... reader-N\n(STREAM_READERS,\n4 accounts in turn)"]
+    S -->|"comment ID of a\nregex match"| Q[["Phase 1 queue\n(1000 IDs)"]]
     Q --> W["phase1-1 ... phase1-N\n(PHASE1_WORKERS)"]
     S -->|"subreddit name\n(no I/O)"| K["known_subreddits buffer"]
     J1["phase2"] -.-|"one lock"| J2["phase3"]
@@ -586,11 +614,28 @@ share a lock and never run at the same time, because both take rows from `scrape
 re-runs Phase 2's filters. Every run is wrapped in `workers.run_job_safely()`, which logs a failing job's
 exception instead of ending its thread, and calls `db.reset_connection()` on DB connection errors.
 
-`main_loop()` reads one batch from the comment stream. The stream uses `pause_after=-1`. In PRAW this makes
-the generator yield `None` after **every** request and **never sleep**, so the loop polls continuously,
-throttled only by prawcore's rate limiter. For each comment, the main thread only counts it, buffers its
-subreddit name and runs the regex. A match goes into the Phase 1 queue as a comment ID; when the queue is
-full, the match is dropped and counted in the heartbeat, so the stream never waits for the workers.
+**Reading comments (`STREAM_SOURCE=ids`, `comment_reader.CommentReader`).** Reddit numbers comments in
+base 36, in order across the whole site. The main thread asks the r/all listing for its newest comment
+(one request, then a 10 s pause, which only delays reading, never skips anything) and queues every complete block of 100 IDs up to it. Each `reader-<n>`
+thread takes a block, fetches it with `reddit.info(fullnames=...)` (one request, as its account) and passes
+each comment r/all would show to `main.dispatch_comment`, several threads at once. So requests per minute
+follow Reddit's comment rate (about one per 100 new comments), whatever `STREAM_READERS` is. A block that
+fails with a network error is retried after the usual back-off, up to 3 tries, then given up on and counted.
+
+The reader saves its position every 30 s and at shutdown: the lowest ID not read yet (the watermark), and
+the blocks already done above it, so a restart neither skips nor re-reads them. A restart more than
+`MAX_BACKLOG_IDS` (200,000, about half an hour at a guessed 100 comments a second) behind starts at the newest comment instead, and so does
+a running reader that falls that far behind (the skipped IDs are logged and counted).
+
+**Reading comments (`STREAM_SOURCE=listing`).** `main_loop()` reads one batch from PRAW's comment stream. The
+stream uses `pause_after=-1`. In PRAW this makes the generator yield `None` after **every** request and
+**never sleep**, so the loop polls continuously, throttled only by prawcore's rate limiter. After a stream
+error, the new stream continues after the newest comment seen (`continue_after_id`); after a restart it
+starts with `skip_existing=True`.
+
+Either way, for each comment the reading thread only counts it, buffers its subreddit name and runs the
+regex. A match goes into the Phase 1 queue as a comment ID; when the queue is full, the match is dropped and
+counted in the heartbeat, so reading never waits for the workers.
 
 Rules for thread safety:
 
@@ -602,10 +647,11 @@ Rules for thread safety:
   stay close to the quota and all wait for the reset once it is used up. They can still overshoot by a few
   requests at once, which ends in a `TooManyRequests` that the thread backs off from (60 s).
 - **Each thread has its own database connection** (`db.get_connection()`, thread-local).
-- Module-level state written by more than one thread needs a lock (`StreamMetrics`, `known_subreddits`).
+- Module-level state written by more than one thread needs a lock (`StreamMetrics`, `known_subreddits`,
+  `Phase1Workers.submit`, `CommentReader`'s block bookkeeping).
 
-**Shutdown:** SIGTERM (`docker stop`) and SIGINT set the stop signal in `racb.core.shutdown`. The stream
-loop, the Phase 1 workers and the job threads check it, every back-off waits with `shutdown.stop_requested_within()`
+**Shutdown:** SIGTERM (`docker stop`) and SIGINT set the stop signal in `racb.core.shutdown`. The main
+thread, the reader threads, the Phase 1 workers and the job threads check it, every back-off waits with `shutdown.stop_requested_within()`
 instead of `time.sleep()`, and Phase 2 and Phase 3 stop between entries, so an entry is never left
 crossposted but not deleted. `start_bot()` waits up to `SHUTDOWN_TIMEOUT_SECONDS` (50 s) for all threads;
 `docker-compose.yml` gives the bot `stop_grace_period: 60s`. Matches still waiting in the Phase 1 queue are
@@ -622,22 +668,24 @@ flowchart TD
     S -->|"DB connection error"| R["reset DB connection,\nskip comment"]
     S -->|"other Reddit / PRAW error\n(e.g. 403 bot banned)"| K["log INFO, skip comment"]
     S -->|"anything else"| L["log with traceback, skip comment"]
-    F["stream fetch\non the main thread"] -->|raises| H{"handle_exception()"}
+    F["head poll or listing fetch\non the main thread"] -->|raises| H{"handle_exception()"}
     H -->|"TooManyRequests"| W60["sleep 60 s"]
     H -->|"network error or Forbidden"| W30["sleep 30 s"]
     H -->|"DB connection error"| WDB["reset DB, sleep 30 s"]
     H -->|"graceful RedditAPIException"| N["no sleep"]
-    W60 & W30 & WDB & N --> RS["re-create stream\n(skip_existing=True)"]
+    W60 & W30 & WDB & N --> RS["poll again (ids), or re-create\nthe stream after the newest\ncomment seen (listing)"]
     H -->|"anything else"| X["crash; Docker restarts"]
 ```
 
 - Matching uses `isinstance`, so subclasses are covered.
 - With `DEBUG=True`, every layer re-raises.
-- A stream reset uses `skip_existing=True`, so comments posted during the outage are never seen.
+- A failing head poll only stops new blocks from being queued; the readers finish the ones queued and the
+  next poll catches up, so nothing is lost. Reader threads back off from their own errors
+  (`workers.back_off_after_network_error`) and retry the block.
 
 Rule for new code (reinforcing rule 3 in section 10): catch per-item errors **inside** the per-comment or
 per-row handler. Only network-level failures should reach the worker's back-off or `handle_exception()`.
-A stream back-off only pauses reading `r/all`; the workers and jobs keep running.
+A back-off on the main thread only pauses finding new comments; the readers, workers and jobs keep running.
 
 ---
 
@@ -658,6 +706,12 @@ A stream back-off only pauses reading `r/all`; the workers and jobs keep running
   the image contains `.env`. They `git reset --hard` the VM checkout, so `scripts/redeploy.sh` refuses to run
   when tracked files were edited on the VM. Keep `redeploy.sh`'s body inside `main()`: the reset rewrites the
   running script.
+- **Always Free limits on the e2-micro** (https://cloud.google.com/free/docs/free-cloud-features#compute):
+  instance hours, 30 GB-months of standard disk, and 1 GB a month of outbound data transfer. CPU use is not
+  among them, so it costs nothing; an e2-micro that needs more than its share is only slowed down. Egress is
+  the limit to watch: downloads from Reddit are inbound, but every request and its TCP acknowledgements go out.
+  Check the VM's network egress in Cloud Monitoring after a change that adds requests
+  (`scripts/verify_comment_ids.py` prints a rough estimate for the comment reader).
 - Python versions: `requires-python = ">=3.11"`. The Docker image, CI and `.python-version` use 3.11, and the
   unit tests also pass on 3.13. 3.10 is not supported.
 - Mermaid diagrams: GitHub's renderer rejects unquoted labels that contain parentheses, e.g.
@@ -672,7 +726,9 @@ A stream back-off only pauses reading `r/all`; the workers and jobs keep running
 | Duplicate crossposts | Before every crosspost, Phase 3 re-runs `get_posts_with_same_content()`. That is a Reddit search for the submission URL in the target (subject to search-index lag of minutes) plus Reddit's "other discussions" of the source post, a search for the same title, and a scan of every image (or video) post the target got since the source comment was written (a live listing, so it catches a crosspost made seconds earlier, but only for **image (including gallery) and video** posts, galleries by their first 10 pictures, crossposts through their original post, videos only by preview frame, and in busy subreddits only as far back as Reddit's ~1000-post listing reaches). The remaining gap is link and text posts whose title was changed and that are not linked as "other discussions", when two rows for the same submission and target are handled in one Phase 3 run, or after a crash between `crosspost()` and the row delete. The owner considers this acceptable, and Reddit may also reject duplicates server-side (unverified). An `ALREADY_SUB`-style rejection is not in `familiar_error_types`, so it would be logged as unexpected. If the reply fails after a successful crosspost, the crosspost is reported as failed. |
 | Negative-score cleanup | Deletes `AutoCrosspostBot` submissions with `score < 0`. The owner reports that submission scores can go negative; this was not independently confirmed. |
 | Phase 1 backlog | Phase 1 (duplicate search, up to 200 preview downloads per match, subreddit suggestions) runs on `PHASE1_WORKERS` threads. If matches arrive faster than they can handle for long enough to fill the 1000-ID queue, new matches are dropped; the heartbeat counts them. Not observed; matches are a small fraction of `r/all`. |
-| Stream outages | A stream reset after a network error still uses `skip_existing=True`, so comments posted while the stream was down are never seen. Jobs never pause the stream, but PRAW's stream only reads the newest 100 comments per request, so if `r/all` outpaces the request rate, comments are skipped (unverified how often). |
+| Comment coverage | `STREAM_SOURCE=listing` reads at most 100 comments per request, one request at a time. On 2026-10-15/16 that was about 850 comments a minute by day and up to 2,500 at night, when Reddit answered faster, so it missed most of r/all. The `ids` reader was written for that; it relies on Reddit numbering comments in order site-wide, which `test_live_comment_reader_reads_recent_comments_by_id` checks before every deploy, and its real coverage is still to be confirmed from the heartbeat. |
+| Re-reads after a crash | The comment cursor is saved every 30 s and at shutdown. After a crash or `kill -9`, up to 30 s of comments are read again, so an auxiliary bot could reply twice to a comment from those seconds. |
+| Opted-out subreddits | `/api/info` does not say whether a subreddit opted out of r/all, so the `ids` reader also reads comments in subreddits that did (private and profile comments are dropped by the reader, NSFW and quarantined ones by Phase 1). |
 | Rotated reposts | Not detected as duplicates (see the image-matching note in section 5). |
 | Edited video reposts | Videos are compared by their preview frame only. A trimmed, re-cut or re-encoded copy usually has a different preview frame and is missed. |
 | Pre-v2.3 rows | Have `target_subreddit = NULL`, so the bait-and-switch check is skipped for them until they age out (at most one Phase 3 waiting period after upgrading). |
