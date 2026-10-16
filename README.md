@@ -70,6 +70,28 @@ A password-protected, read-only web viewer ([pgweb](https://github.com/sosedoff/
 It is never exposed to the internet; you open it through an SSH tunnel. See
 [`docs/db-viewer.md`](./docs/db-viewer.md).
 
+### 6. Process a Single Entry (Production Testing)
+`--process-one` runs Phase 3 (the final checks, the crosspost and its reply) on the oldest row in the
+`scraped_comments` table only, and exits. Use it to test the bot in production one crosspost at a time:
+
+* The row is processed even if it is not due yet, but it still has to pass every Phase 2 filter.
+* The row is deleted afterwards whether or not it was crossposted, so repeated runs walk through the table
+  oldest first. With `DRY_RUN=True` nothing is posted or deleted; the bot only logs what it would do.
+* Exit code 1 means the table is empty (or a bot account failed to log in).
+
+Inside the running Docker stack, from the checkout directory (on the VM, `/opt/RedditAutoCrosspostBot`):
+```bash
+docker compose exec bot python -m racb --process-one                 # crosspost the oldest row
+docker compose exec -e DRY_RUN=True bot python -m racb --process-one # only log the crosspost
+```
+
+From your own computer, through SSH to the VM (same command in bash and PowerShell; use your VM name and
+zone, see [`docs/logs.md`](./docs/logs.md)). `-T` is needed because the SSH command runs without a terminal:
+```bash
+gcloud compute ssh reddit-crosspost-bot --zone us-central1-a --command "cd /opt/RedditAutoCrosspostBot && docker compose exec -T -e DRY_RUN=True bot python -m racb --process-one"
+```
+Drop `-e DRY_RUN=True` to crosspost for real.
+
 ---
 
 ## Local Development (Without Docker)
@@ -89,9 +111,13 @@ cp .env.example .env
 uv run python -m racb
 ```
 
-To test in production one entry at a time, `uv run python -m racb --process-one` runs the final checks and
-the crosspost for the oldest row in the database only, and exits. Add `DRY_RUN=True` to only log what it
-would do. See section 5 of [`AGENTS.md`](./AGENTS.md) for details.
+To test one entry at a time, see [Process a Single Entry](#6-process-a-single-entry-production-testing). Without Docker:
+```bash
+uv run python -m racb --process-one                 # crosspost the oldest row and exit
+DRY_RUN=True uv run python -m racb --process-one    # same checks, but only log the crosspost
+```
+In PowerShell, set the variable first: `$env:DRY_RUN='True'; uv run python -m racb --process-one`
+(it stays set for the rest of the session; `Remove-Item Env:DRY_RUN` clears it).
 
 `uv run` uses `.venv` without activating it. To use plain `python`, `pytest` etc. directly, activate it first:
 ```bash
