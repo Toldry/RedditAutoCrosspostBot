@@ -22,8 +22,9 @@ jobs:
       - run: uv run pytest
 
   # Releases every push to master that passed the tests: picks the bump from the Conventional
-  # Commit types since the last tag (scripts/release_level.py), then bump-my-version moves
-  # CHANGELOG.md's [Unreleased] entries into a dated section, commits and tags. Nobody bumps by hand.
+  # Commit types since the last tag (scripts/release_level.py), towncrier compiles the changelog.d/
+  # fragments into a dated CHANGELOG.md section and deletes them, then bump-my-version commits and tags.
+  # Nobody bumps by hand.
   release:
     needs: unit-tests
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -56,7 +57,11 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          uv run bump-my-version bump ${{ steps.level.outputs.level }}
+          new_version="$(uv run bump-my-version show --increment ${{ steps.level.outputs.level }} new_version)"
+          # Writes the release section and stages it together with the deleted fragments
+          uv run towncrier build --version "$new_version" --yes
+          # --allow-dirty: the release commit must also carry towncrier's staged changes
+          uv run bump-my-version bump --allow-dirty ${{ steps.level.outputs.level }}
           git push --follow-tags origin HEAD:master
       # What deploy may ship: only the commit this run tested, or the release commit made right on top
       # of it. If master moved on meanwhile, the newer push's own run tests and deploys it instead.

@@ -4,7 +4,7 @@
 Run by the `release` job in .github/workflows/tests.yml after every push to master. Prints
 `major`, `minor`, `patch` or `none`:
 
-- `none` when CHANGELOG.md has nothing under `## [Unreleased]` (nothing to release).
+- `none` when `changelog.d/` holds no changelog fragments (nothing to release).
 - `major` when a commit since the last `v*` tag is a breaking Conventional Commit
   (`feat!: ...`, `fix(scope)!: ...`, or a `BREAKING CHANGE:` footer).
 - `minor` when one is a `feat`.
@@ -17,9 +17,10 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CHANGELOG_PATH = PROJECT_ROOT / 'CHANGELOG.md'
-
-UNRELEASED_HEADING = '## [Unreleased]'
+# Where every PR adds its changelog fragment; towncrier compiles them into CHANGELOG.md at release
+FRAGMENT_DIRECTORY = PROJECT_ROOT / 'changelog.d'
+# Files in FRAGMENT_DIRECTORY that are not fragments (keep in sync with `ignore` in pyproject.toml)
+NON_FRAGMENT_FILES = {'README.md'}
 # `type(scope)!: subject`; the scope and the `!` are optional
 CONVENTIONAL_SUBJECT = re.compile(r'^(?P<type>[a-zA-Z]+)(\([^)]*\))?(?P<breaking>!)?:')
 BREAKING_FOOTER = re.compile(r'^BREAKING[ -]CHANGE:', re.MULTILINE)
@@ -27,13 +28,18 @@ BREAKING_FOOTER = re.compile(r'^BREAKING[ -]CHANGE:', re.MULTILINE)
 RELEASE_COMMIT_PREFIX = 'chore(release):'
 
 
-def unreleased_has_entries(changelog_text: str) -> bool:
-    """Return True if anything but blank lines sits between `## [Unreleased]` and the next heading."""
-    _, found, after_heading = changelog_text.partition(UNRELEASED_HEADING)
-    if not found:
+def has_pending_fragments(fragment_directory: Path) -> bool:
+    """Return True if the directory holds a changelog fragment that no release has compiled yet.
+
+    The fragment names are not checked here: `towncrier build` refuses an invalid one, and a unit test
+    (tests/unit/test_changelog_fragments.py) catches it before merge.
+    """
+    if not fragment_directory.is_dir():
         return False
-    unreleased_section = re.split(r'^## ', after_heading, maxsplit=1, flags=re.MULTILINE)[0]
-    return unreleased_section.strip() != ''
+    return any(
+        path.is_file() and path.name not in NON_FRAGMENT_FILES and not path.name.startswith('.')
+        for path in fragment_directory.iterdir()
+    )
 
 
 def bump_level(commit_messages: list[str]) -> str:
@@ -65,7 +71,7 @@ def commit_messages_since_last_release() -> list[str]:
 
 
 def main() -> int:
-    if not unreleased_has_entries(CHANGELOG_PATH.read_text(encoding='utf-8')):
+    if not has_pending_fragments(FRAGMENT_DIRECTORY):
         print('none')
         return 0
     print(bump_level(commit_messages_since_last_release()))

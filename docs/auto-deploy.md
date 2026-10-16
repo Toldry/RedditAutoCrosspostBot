@@ -237,7 +237,7 @@ gh variable set AUTO_DEPLOY --repo Toldry/RedditAutoCrosspostBot --body true
 
 ### Step 5: Test it
 
-1. Push any commit to `master` (a CHANGELOG or docs edit is enough), or merge a pull request.
+1. Push any commit to `master` (a docs edit is enough), or merge a pull request.
 2. Open the run under **Actions** (https://github.com/Toldry/RedditAutoCrosspostBot/actions). After
    `unit-tests`, `release` and `integration-tests` (its last step should log
    `=== Summary: Successfully deleted ...`), the `deploy` job should end with

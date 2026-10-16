@@ -223,7 +223,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`src/racb/locales/`](./src/racb/locales/) | gettext catalogs: `<locale>/LC_MESSAGES/messages.po` (edited) and `messages.mo` (compiled, git-ignored: the Dockerfile and `tests/conftest.py` build them). Locales: `en` (source text), `es`, `de`, `fr`, `he`, `ru`, and `en@totallynotrobots`, an English variant using the gettext `@modifier` syntax. |
 | [`src/racb/locales/subreddits.toml`](./src/racb/locales/subreddits.toml) | Which locale each subreddit gets (`locale = [subreddits]`, case-insensitive). Unlisted subreddits get English. |
 | [`src/racb/version.py`](./src/racb/version.py) | Application version definition (`__version__`). |
-| [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether CHANGELOG `[Unreleased]` has entries. |
+| [`scripts/release_level.py`](./scripts/release_level.py) | Used by the CI `release` job: prints `major`, `minor`, `patch` or `none` from the Conventional Commits since the last `v*` tag and whether `changelog.d/` holds fragments. |
 | [`scripts/cleanup_test_history.py`](./scripts/cleanup_test_history.py) | Deletes integration-test posts and comments from all 4 bot accounts. Supports `--dry-run`, `--limit N` (`0` means all) and `--strict` (exit code 1 if a bot could not be checked or a test item could not be deleted). Slow; for manual use. |
 | [`scripts/delete_test_artifacts.py`](./scripts/delete_test_artifacts.py) | Deletes only the posts and comments the integration tests recorded in their manifest (`$RACB_TEST_ARTIFACTS_FILE`, default `racb-test-artifacts.jsonl` in the temp directory), as the bot that wrote each one, then removes the manifest. Supports `--dry-run`, `--manifest PATH` and `--strict`. The last step of CI's `integration-tests` job. |
 | [`scripts/redeploy.sh`](./scripts/redeploy.sh) | Runs **on the VM**: resets the checkout to a commit of `origin/master` (argument, `SSH_ORIGINAL_COMMAND`, or the latest), runs `docker compose up --detach --build`, and fails if the bot is not running 30 s later. The CI `deploy` job's SSH key is pinned to it. Refuses to run on a dirty or diverged checkout. |
@@ -234,7 +234,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`docs/logs.md`](./docs/logs.md) | How to read the bot's logs over SSH or in Google Cloud Logging, and how to turn Cloud Logging on. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1727 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/unit/`](./tests/unit/) | 1700+ mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -248,7 +248,9 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`docker-compose.gcp.yml`](./docker-compose.gcp.yml) | Override for the GCP VM only, enabled by `COMPOSE_FILE` in its `.env`: sends the bot's output to Cloud Logging with Docker's `gcplogs` driver. See [`docs/logs.md`](./docs/logs.md). |
 | [`.bumpversion.toml`](./.bumpversion.toml) | Configuration for `bump-my-version`, which the CI `release` job runs. |
 | [`.gitignore`](./.gitignore) | Ignores **all dotfiles** (`.*`) except an explicit allowlist. See section 8. |
-| [`CHANGELOG.md`](./CHANGELOG.md) | Release history following Keep a Changelog. |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Release history following Keep a Changelog. Written only by the CI `release` job; PRs never edit it (section 5). |
+| [`changelog.d/`](./changelog.d/) | Changelog fragments, one file per change, waiting for the next release. Naming and format in its [`README.md`](./changelog.d/README.md); checked by `tests/unit/test_changelog_fragments.py`. |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Short guide for human contributors: setup, tests, commit titles, changelog fragments. |
 | [`.env.example`](./.env.example) | Environment variable template. |
 | [`pyproject.toml`](./pyproject.toml) | Project metadata for uv and hatchling: `requires-python = ">=3.11"`, runtime dependencies with lower bounds (PRAW and prawcore also capped below their next major), and the `dev` dependency group (`bump-my-version`, `pytest`, `pytest-mock`). The version is read dynamically from `src/racb/version.py`. |
 | [`uv.lock`](./uv.lock) | Cross-platform lockfile: the exact version and hashes of **every** package, including transitive ones (numpy, scipy, ...). Generated by `uv lock`; never edit it by hand. |
@@ -439,16 +441,18 @@ We follow [Semantic Versioning (SemVer)](https://semver.org/) and [Keep a Change
 
 After every push to `master`, once the unit tests pass, the `release` job in
 [`.github/workflows/tests.yml`](./.github/workflows/tests.yml):
-1. runs [`scripts/release_level.py`](./scripts/release_level.py), which prints `none` if CHANGELOG
-   `## [Unreleased]` is empty, otherwise the bump implied by the commits since the last `v*` tag
+1. runs [`scripts/release_level.py`](./scripts/release_level.py), which prints `none` if
+   [`changelog.d/`](./changelog.d/) holds no fragments, otherwise the bump implied by the commits since the last `v*` tag
    (merge commits and earlier release commits are ignored):
    - `major`: a breaking Conventional Commit, `type!: ...` / `type(scope)!: ...` or a `BREAKING CHANGE:` footer
    - `minor`: a `feat` commit
    - `patch`: anything else, including commits that are not Conventional Commits
-2. runs `uv run bump-my-version bump <level>`, which updates [`src/racb/version.py`](./src/racb/version.py)
-   and [`CHANGELOG.md`](./CHANGELOG.md), makes a `chore(release): bump version X -> Y` commit as
-   `github-actions[bot]`, and an annotated `vX.Y.Z` tag;
-3. pushes both to `master` (`git push --follow-tags`).
+2. runs `towncrier build --version <new version>` (the version from `bump-my-version show`), which writes a
+   `## [X.Y.Z] - YYYY-MM-DD` section into [`CHANGELOG.md`](./CHANGELOG.md) and `git rm`s the fragments;
+3. runs `uv run bump-my-version bump --allow-dirty <level>`, which updates
+   [`src/racb/version.py`](./src/racb/version.py), makes a `chore(release): bump version X -> Y` commit as
+   `github-actions[bot]` (including towncrier's staged changes), and an annotated `vX.Y.Z` tag;
+4. pushes both to `master` (`git push --follow-tags`).
 
 Mechanics worth knowing:
 - Write Conventional Commit subjects (`feat:`, `fix:`, `docs:`, ...) on feature branches; they decide
@@ -459,10 +463,14 @@ Mechanics worth knowing:
   release commit cannot start another release (and its tests do not re-run).
 - It needs `master` to accept pushes from GitHub Actions. If branch protection is ever enabled, allow
   `github-actions[bot]` to bypass it, or the job fails.
-- To preview locally: `uv run bump-my-version bump patch --dry-run --verbose` (clean working tree required).
-- The CHANGELOG edit is a plain string replacement: `## [Unreleased]` becomes `## [Unreleased]` followed
-  by `## [X.Y.Z] - YYYY-MM-DD`. Whatever sat under Unreleased moves into the new version, so the
-  `## [Unreleased]` heading must exist exactly once.
+- To preview locally: `uv run towncrier build --draft --version X.Y.Z` (the next CHANGELOG section) and
+  `uv run bump-my-version bump patch --dry-run --verbose` (clean working tree required).
+- towncrier inserts each release right below the `<!-- towncrier release notes start -->` line in
+  CHANGELOG.md, so that line must stay. Its settings (directory, heading format, the six Keep a Changelog
+  types) are under `[tool.towncrier]` in `pyproject.toml`.
+- PRs edit `changelog.d/`, never CHANGELOG.md, and each fragment is a new file, so merging one PR cannot
+  conflict with another's changelog entry. For the same reason, do not put counts that every PR changes
+  (like the exact number of unit tests) in shared docs.
 - The version also appears in every PRAW User-Agent (`linux:<bot>:v<version> (by /u/orqa)`) and in the
   image downloader's User-Agent (`RACB/<version> (+github URL)`).
 
@@ -670,7 +678,7 @@ A stream back-off only pauses reading `r/all`; the workers and jobs keep running
 2. **Follow Existing Style:** Use clean, standard Python style matching the codebase (PEP 8 conventions, explicit error handling with `prawcore.exceptions` and `praw.exceptions.RedditAPIException`).
 3. **Graceful Reddit Exception Handling:** Any newly introduced Reddit API calls must handle potential exceptions (`Forbidden`, `ServerError`, `RedditAPIException`, sub bans, locked threads, deleted comments) without crashing the main loop.
 4. **Localization Awareness:** When adding or modifying bot comments, update the `.po` catalog of every locale under [`src/racb/locales/`](./src/racb/locales/) (message ids are symbolic keys; `en` holds the source text, and an empty `msgstr` falls back to English, but a unit test requires every locale to translate every key). Do not commit `.mo` files: they are git-ignored, the Dockerfile compiles them into the image, and `tests/conftest.py` recompiles them before every test run. To run the bot locally outside Docker, run `uv run pybabel compile -d src/racb/locales` first; the bot refuses to start if a catalog is not compiled. Counts use plural forms (`ngettext`, plural id `<KEY>_PLURAL`). To add a locale, create its `.po` (e.g. `uv run pybabel init -i src/racb/locales/en/LC_MESSAGES/messages.po -d src/racb/locales -l <locale>`) and list its subreddits in [`subreddits.toml`](./src/racb/locales/subreddits.toml).
-5. **Mandatory Changelog Updates, No Manual Version Bumps:** Every code, configuration, or infrastructure change MUST add an entry to [`CHANGELOG.md`](./CHANGELOG.md) under `## [Unreleased]` in the same branch. **Never bump the version or create a tag yourself**, on a feature branch or on `master`: the CI `release` job does it after merge (section 5). Parallel branches would otherwise claim the same version number. Use Conventional Commit subjects, since they choose the bump (`feat` minor, `!` major, anything else patch).
+5. **Mandatory Changelog Fragments, No Manual Version Bumps:** Every code, configuration, or infrastructure change MUST add a changelog fragment, a new file `changelog.d/+<slug>.<type>.md` (`<type>` is `added`, `changed`, `deprecated`, `removed`, `fixed` or `security`), in the same branch; see [`changelog.d/README.md`](./changelog.d/README.md) for the format. **Never edit [`CHANGELOG.md`](./CHANGELOG.md) directly**: the CI `release` job compiles the fragments into it, and direct edits are what made every merge conflict with every other open PR. A change with nothing worth telling users or deployers (a test or docs fix) needs none, but then its merge makes no release. **Never bump the version or create a tag yourself**, on a feature branch or on `master`: the CI `release` job does it after merge (section 5). Parallel branches would otherwise claim the same version number. Use Conventional Commit subjects, since they choose the bump (`feat` minor, `!` major, anything else patch).
 6. **Never run live integration tests casually:** plain `pytest` runs only unit tests. `pytest -m integration` posts publicly as the real bot accounts.
 7. **Keep section 9 current:** when you fix a known defect, delete its row; when you find a new one, add it.
 8. **Read configuration through `src/racb/config.py`:** do not add new `os.environ` reads or boolean/duration parsers elsewhere.

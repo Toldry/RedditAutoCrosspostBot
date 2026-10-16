@@ -167,10 +167,11 @@ to `master` also run the live integration tests, delete the posts they created, 
 ### Versioning & Releases
 Releases adhere to [Semantic Versioning](https://semver.org/) and are automatic: after the tests pass on
 `master`, the `release` job in [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) bumps the
-version with `bump-my-version`, moves the `## [Unreleased]` entries of [`CHANGELOG.md`](./CHANGELOG.md) into a
-dated section, and pushes a `vX.Y.Z` tag. A `feat` commit makes a minor release, a breaking one (`feat!:` or a
-`BREAKING CHANGE:` footer) a major release, and anything else a patch release. Pull requests only add
-CHANGELOG entries; they never change the version.
+version with `bump-my-version`, compiles the changelog fragments in [`changelog.d/`](./changelog.d/) into a
+dated section of [`CHANGELOG.md`](./CHANGELOG.md) with towncrier, and pushes a `vX.Y.Z` tag. A `feat` commit
+makes a minor release, a breaking one (`feat!:` or a `BREAKING CHANGE:` footer) a major release, and anything
+else a patch release. Pull requests only add a fragment; they never edit CHANGELOG.md or change the version.
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ---
 
