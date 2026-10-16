@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-10-16
+
 ### Added
 - **Reply Logging:** every comment a bot posts is now logged after it is posted, with the new comment's full URL: `/u/<bot> replied to <user> suggestion (r/<source> -> r/<target>): <reply URL>` for replies about a subreddit suggestion, and `/u/<bot> replied to <user> feedback (r/<subreddit>): <reply URL>` for answers to "good bot"/"bad bot". Before, the explanatory reply under each crosspost and the replies to "good bot"/"bad bot" feedback were not logged at all, and the Phase 1 auxiliary replies were only announced before posting, without the reply's own URL.
 
