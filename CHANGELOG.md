@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Banned From the Target Subreddit:** when `AutoCrosspostBot` was banned from the target subreddit, Phase 3 still ran the full duplicate scan, and the crosspost then failed with `SUBREDDIT_NOTALLOWED_BANNED`, logged as an unexpected `ERROR` with a traceback. Phases 2 and 3 now check the subreddit's `user_is_banned` before the duplicate scan and drop the row (`BANNED_FROM_TARGET_SUBREDDIT`), and a crosspost rejected with `SUBREDDIT_NOTALLOWED_BANNED` is logged as a graceful rejection.
+
 ## [2.14.1] - 2026-10-16
 
 ### Changed

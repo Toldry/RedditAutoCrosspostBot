@@ -196,6 +196,7 @@ def handle_crosspost_exception(e, comment, target_subreddit):
         'NO_CROSSPOSTS',
         'INVALID_CROSSPOST_THING',
         'SUBREDDIT_NOTALLOWED',
+        'SUBREDDIT_NOTALLOWED_BANNED',
         'NO_IMAGES',
         'NO_LINKS',
         'NO_SELFS',

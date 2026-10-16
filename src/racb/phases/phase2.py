@@ -128,6 +128,11 @@ def run_filters(comment_entry, comment=None, full_media_scan=False):
         result.reason = 'CROSSPOST_BLOCKED'
         return result
 
+    # Checked before the duplicate scan, which can take many requests, since the crosspost would be rejected anyway
+    if is_banned_from_subreddit(comment._reddit, target_subreddit):
+        result.reason = 'BANNED_FROM_TARGET_SUBREDDIT'
+        return result
+
     source_problem = get_source_submission_problem(comment.submission)
     if source_problem:
         result.reason = source_problem
@@ -158,6 +163,19 @@ def run_filters(comment_entry, comment=None, full_media_scan=False):
 
     result.passes_filter = True
     return result
+
+
+def is_banned_from_subreddit(reddit_instance, subreddit_name):
+    """Returns True if the bot account of `reddit_instance` is banned from posting in the subreddit.
+
+    Reddit tells a logged-in account this in the subreddit's `user_is_banned`. If the subreddit cannot be
+    read (private, banned, or a failed request), this returns False and the later steps report the reason.
+    """
+    try:
+        return reddit_instance.subreddit(subreddit_name).user_is_banned is True
+    except (praw.exceptions.PRAWException, prawcore.exceptions.PrawcoreException) as e:
+        logger.info(f'Could not check whether the bot is banned from r/{subreddit_name}: {e}')
+        return False
 
 
 def get_source_submission_problem(submission):

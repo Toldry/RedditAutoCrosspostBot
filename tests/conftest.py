@@ -111,6 +111,9 @@ class MockComment:
         self.distinguished = distinguished
         self.submission = submission or MockSubmission(subreddit=subreddit)
         self.reply = MagicMock()
+        # The PRAW instance that fetched the comment; its subreddits report no ban unless a test sets one
+        self._reddit = MagicMock()
+        self._reddit.subreddit.return_value.user_is_banned = False
 
 
 @pytest.fixture
