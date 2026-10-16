@@ -15,7 +15,9 @@ import os
 
 import praw
 import praw.endpoints
+import prawcore
 import dotenv
+import requests
 
 from racb.version import __version__
 
@@ -26,6 +28,15 @@ logger = logging.getLogger(__name__)
 # worked again, so it was probably a temporary Reddit-side problem. The slash-less path is kept because it
 # works either way. PRAW reads this shared dict on each call, so this covers every PRAW instance in the process.
 praw.endpoints.API_PATH['del'] = 'api/del'
+
+# Reddit or the network failing for a while (rate limit, outage, timeout): worth retrying later
+TRANSIENT_NETWORK_ERRORS = (
+    prawcore.exceptions.ServerError,
+    prawcore.exceptions.RequestException,
+    prawcore.exceptions.TooManyRequests,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+)
 
 praw_instances = None
 

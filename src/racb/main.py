@@ -10,7 +10,6 @@ import time
 import praw
 import prawcore
 import psycopg2
-import requests
 import schedule
 
 from racb.version import __version__
@@ -25,13 +24,7 @@ NETWORK_RETRY_DELAY_SECONDS = 30
 TOO_MANY_REQUESTS_DELAY_SECONDS = 60
 
 # Network-level failures: back off, then rebuild the stream
-TRANSIENT_NETWORK_ERRORS = (
-    prawcore.exceptions.ServerError,
-    prawcore.exceptions.RequestException,
-    prawcore.exceptions.TooManyRequests,
-    requests.exceptions.ConnectionError,
-    requests.exceptions.Timeout,
-)
+TRANSIENT_NETWORK_ERRORS = reddit.TRANSIENT_NETWORK_ERRORS
 DATABASE_CONNECTION_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
 
 

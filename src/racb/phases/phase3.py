@@ -26,7 +26,9 @@ def process_comment_entries():
     logger.info(f'Found {len(comment_entries)} mature comment(s) older than {waiting_period_seconds}s for Phase 3')
 
     for comment_entry in comment_entries:
-        handle_comment(comment_entry)
+        if not handle_comment_or_defer(comment_entry):
+            # Reddit is rate limiting or failing; the rest of the batch would fail the same way
+            break
         if config.is_dry_run():
             # Keep the row so it is still crossposted once DRY_RUN is turned off
             continue
@@ -47,12 +49,31 @@ def process_oldest_entry():
         return False
     logger.info(f'Processing the oldest entry (id={comment_entry["id"]}, scraped at {comment_entry["scraped_time"]})')
 
-    handle_comment(comment_entry)
+    if not handle_comment_or_defer(comment_entry):
+        return True
     if config.is_dry_run():
         logger.info(f'[DRY RUN] Keeping entry id={comment_entry["id"]} in the database')
     else:
         db.delete_comment(comment_entry)
         logger.info(f'Deleted entry id={comment_entry["id"]} from the database')
+    return True
+
+
+def handle_comment_or_defer(comment_entry):
+    """Runs handle_comment, unless Reddit is rate limiting or failing: then logs it and returns False.
+
+    The row is then kept, so a later run tries it again, instead of the whole run crashing.
+    """
+    try:
+        handle_comment(comment_entry)
+    except reddit.TRANSIENT_NETWORK_ERRORS as e:
+        if config.is_debug():
+            raise
+        logger.warning(
+            f'Reddit could not be reached while processing entry id={comment_entry["id"]} ({e!r}); '
+            'keeping it for the next run'
+        )
+        return False
     return True
 
 

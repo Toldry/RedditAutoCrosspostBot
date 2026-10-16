@@ -54,6 +54,7 @@ import praw
 import prawcore
 import requests
 from PIL import Image
+from praw.models.reddit.base import RedditBase
 
 from racb.core.reddit import get_reddit_instance
 from racb.version import __version__
@@ -214,6 +215,22 @@ def fingerprints_match(fingerprint_a, fingerprint_b, hash_threshold=DEFAULT_HASH
 
 # --- Posts -------------------------------------------------------------------------------------------------
 
+def post_attribute(submission, name):
+    """Returns one of a post's fields, or None if Reddit did not send it, without asking Reddit for it.
+
+    A PRAW post read from a listing holds every field Reddit sent for it, but reading a field it lacks (such as
+    `crosspost_parent_list`, which only crossposts have) makes PRAW download the whole post again: one request
+    per post, so a scan of 1000 posts would run into Reddit's rate limit. So the fields are read from the
+    post's own `__dict__`. A post created from just its id (like a comment's `submission`) holds no fields yet;
+    it is fetched once.
+    """
+    if not isinstance(submission, RedditBase):
+        return getattr(submission, name, None)  # A plain object, as in the unit tests
+    if not submission._fetched and 'created_utc' not in vars(submission):
+        submission._fetch()
+    return vars(submission).get(name)
+
+
 def media_field(submission, name):
     """Returns a field describing a post's media, read from the original post when `submission` is a crosspost.
 
@@ -225,18 +242,18 @@ def media_field(submission, name):
     parent = crosspost_parent(submission)
     if parent is not None:
         return parent.get(name)
-    return getattr(submission, name, None)
+    return post_attribute(submission, name)
 
 
 def crosspost_parent(submission):
     """Returns the original post's fields (a dict) when `submission` is a crosspost, else None."""
-    parents = getattr(submission, 'crosspost_parent_list', None)
+    parents = post_attribute(submission, 'crosspost_parent_list')
     if not isinstance(parents, list):
         return None
     parents = [parent for parent in parents if isinstance(parent, dict)]
     if not parents:
         return None
-    parent_name = getattr(submission, 'crosspost_parent', None)
+    parent_name = post_attribute(submission, 'crosspost_parent')
     named = [parent for parent in parents if parent_name is not None and parent.get('name') == parent_name]
     return (named or parents)[0]
 
@@ -405,7 +422,7 @@ def scan_subreddit_for_duplicates(submission, subreddit_name, posted_after=None,
 
     candidates = []
     for post in posts:
-        created_utc = getattr(post, 'created_utc', None)
+        created_utc = post_attribute(post, 'created_utc')
         if posted_after is not None and created_utc is not None and created_utc < posted_after:
             scan.complete = True
             break
