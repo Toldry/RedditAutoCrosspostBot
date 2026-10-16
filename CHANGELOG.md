@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-16
+
 ### Changed
 - **Per-Bot Switches Replace `LISTEN_ONLY`:** each bot account can now be turned off on its own with `AUTO_CROSSPOST_BOT_ENABLED`, `SUB_DOESNT_EXIST_BOT_ENABLED`, `SAME_SUBREDDIT_BOT_ENABLED` and `SAME_POST_BOT_ENABLED` (all `True` by default). A disabled bot never comments, posts or deletes, and its inbox is left unread; turning off `AutoCrosspostBot` also stops crossposting and the negative-score cleanup. With all four off, the bot only reads r/all and stores matching comments. `LISTEN_ONLY` is removed and ignored: an old `.env` with `LISTEN_ONLY=True` must switch to `AUTO_CROSSPOST_BOT_ENABLED=False`, or the bot starts crossposting.
 - **Leaner `--process-one`:** it now authenticates only `AutoCrosspostBot`, the one account Phase 3 uses, and skips everything else at startup, so it no longer needs working credentials for the other 3 bots.
