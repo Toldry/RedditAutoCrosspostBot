@@ -121,7 +121,8 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     `STREAM_READERS` threads, keeping only what r/all could show (`is_shown_on_r_all`: not private or on a user
     profile). `/api/info` comments have no `over_18` or `quarantine` field, so Phase 1 drops NSFW and
     quarantined ones by their submission (`phase1.is_hidden_from_r_all`, no extra request). The head poll
-    asks the listing for 25 comments and takes the newest, because `limit=1` sometimes returns none. Subreddits that opted out of r/all cannot be told apart, so their comments
+    asks the listing for 25 comments and takes the newest, because `limit=1` sometimes returns none. An empty
+    listing anyway only skips that poll (one WARNING per streak); the next poll catches up. Subreddits that opted out of r/all cannot be told apart, so their comments
     are read too. `STREAM_SOURCE=listing` instead reads
     `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)` one request at a time, which
     sees only a fraction of r/all (section 9).

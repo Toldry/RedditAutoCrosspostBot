@@ -102,10 +102,13 @@ def is_shown_on_r_all(comment):
 
 
 def fetch_head():
-    """Returns the number of the newest comment on r/all (one request, as /u/AutoCrosspostBot)."""
+    """Returns the number of the newest comment on r/all (one request, as /u/AutoCrosspostBot).
+
+    Returns None if the listing came back empty, which Reddit sometimes does even with HEAD_LISTING_LIMIT.
+    """
     newest = list(reddit.get_reddit_instance().subreddit('all').comments(limit=HEAD_LISTING_LIMIT))
     if not newest:
-        raise RuntimeError('The r/all comment listing returned no comments')
+        return None
     return max(comment_id_to_number(comment.id) for comment in newest)
 
 
@@ -138,6 +141,8 @@ class CommentReader:
         self.in_flight = set()
         self.done_above = set()
         self.last_saved = time.monotonic()
+        # Head polls in a row that got an empty listing, so a long streak is logged once, not every poll
+        self.empty_head_polls = 0
         # Readers take turns between the accounts, so each account's rate limit carries a share
         self.threads = [
             threading.Thread(
@@ -176,6 +181,15 @@ class CommentReader:
         head = self.fetch_head()
         if self.metrics:
             self.metrics.record_head_poll(time.monotonic() - started)
+        if head is None:
+            # Nothing is lost: the next poll queues every block up to the head it finds
+            self.empty_head_polls += 1
+            if self.empty_head_polls == 1:
+                logger.warning('The r/all comment listing returned no comments; trying again at the next poll')
+            return
+        if self.empty_head_polls:
+            logger.info(f'The r/all comment listing has comments again after {self.empty_head_polls} empty poll(s)')
+            self.empty_head_polls = 0
         with self._lock:
             if self.next_id is None:
                 self._choose_start(head)
