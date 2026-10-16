@@ -36,6 +36,9 @@ services:
       dockerfile: Dockerfile
     container_name: racb
     restart: unless-stopped
+    # Time for the bot to finish the job and Phase 1 work in progress on `docker stop` (main.SHUTDOWN_TIMEOUT_SECONDS
+    # is 50 s) before Docker kills it. Docker's default is 10 s.
+    stop_grace_period: 60s
     logging: *local-logging
     depends_on:
       db:

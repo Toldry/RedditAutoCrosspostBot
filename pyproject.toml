@@ -19,7 +19,6 @@ dependencies = [
     "python-dotenv>=1.2.4",
     "pytimeparse>=1.1.9",
     "requests>=2.34.2",
-    "schedule>=1.2.2",
     "urllib3>=2.8.0",
 ]
 

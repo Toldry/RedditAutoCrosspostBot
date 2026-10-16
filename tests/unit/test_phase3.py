@@ -89,6 +89,23 @@ def test_process_comment_entries_keeps_rows_in_dry_run():
 
 
 @pytest.mark.unit
+def test_process_comment_entries_stops_between_entries_on_shutdown():
+    from racb.core import shutdown
+    entries = [
+        {'id': 1, 'permalink': '/r/a/comments/1/t/c/', 'target_subreddit': 'b'},
+        {'id': 2, 'permalink': '/r/a/comments/2/t/d/', 'target_subreddit': 'b'},
+    ]
+    with patch.dict('os.environ', {'DRY_RUN': 'false'}), \
+         patch('racb.phases.phase3.db.get_comments_older_than', return_value=entries), \
+         patch('racb.phases.phase3.handle_comment', side_effect=lambda entry: shutdown.request_stop()) as mock_handle, \
+         patch('racb.phases.phase3.db.delete_comment') as mock_delete:
+        phase3.process_comment_entries()
+    # The entry in progress is finished, including its row delete; the next one is left for the next run
+    mock_handle.assert_called_once_with(entries[0])
+    mock_delete.assert_called_once_with(entries[0])
+
+
+@pytest.mark.unit
 def test_reply_to_crosspost_formats_waiting_period(make_mock_comment):
     comment = make_mock_comment(subreddit='test_source')
     cross_post = MagicMock()

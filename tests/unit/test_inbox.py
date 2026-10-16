@@ -117,6 +117,21 @@ def test_feedback_is_marked_read_with_the_receiving_bots_instance():
     other_reddit.inbox.mark_read.assert_not_called()
 
 
+@pytest.mark.unit
+def test_disabled_bots_inboxes_are_not_read():
+    instances = {name: MagicMock() for name in inbox.BOT_NAMES}
+    for instance in instances.values():
+        instance.inbox.unread.return_value = []
+    with patch('racb.phases.inbox.get_reddit_instance', side_effect=instances.__getitem__), \
+         patch.dict('os.environ', {'SAME_POST_BOT_ENABLED': 'false'}):
+        inbox.process_unread_inboxes()
+    for name, instance in instances.items():
+        if name == 'same_post_bot':
+            instance.inbox.unread.assert_not_called()
+        else:
+            instance.inbox.unread.assert_called_once()
+
+
 def _feedback_comment(comment_id, body, created_utc=100.0, parent=None):
     comment = MagicMock(spec=praw.models.Comment)
     comment.id = comment_id

@@ -65,3 +65,22 @@ def test_db_operations(make_mock_comment):
         mock_cursor.fetchone.return_value = {'id': 42, 'permalink': '/r/test/'}
         assert db.get_oldest_comment()['id'] == 42
         mock_cursor.callproc.assert_called_with('get_oldest_scraped_comment')
+
+
+@pytest.mark.unit
+def test_each_thread_gets_its_own_connection():
+    import threading
+    with patch('racb.core.db.get_db_connection', side_effect=lambda: MagicMock(closed=False)), \
+         patch('racb.core.db.instantiate_database') as mock_instantiate:
+        db.reset_connection()
+        main_thread_connection = db.get_connection()
+        assert db.get_connection() is main_thread_connection
+        other_thread_connections = []
+        thread = threading.Thread(target=lambda: other_thread_connections.append(db.get_connection()))
+        thread.start()
+        thread.join()
+        assert other_thread_connections[0] is not main_thread_connection
+        assert mock_instantiate.call_count == 2
+        db.reset_connection()
+        assert db.get_connection() is not main_thread_connection
+        db.reset_connection()

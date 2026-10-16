@@ -34,8 +34,13 @@ BOT_NAMES = [
 
 
 def process_unread_inboxes(limit=100):
-    """Scheduled job: evaluates unread inbox items of all 4 bots (each footer invites feedback)."""
+    """Scheduled job: evaluates unread inbox items of the enabled bots (each footer invites feedback).
+
+    A disabled bot's inbox is not read at all, so its feedback stays unread.
+    """
     for bot_name in BOT_NAMES:
+        if not config.is_bot_enabled(bot_name):
+            continue
         reddit_instance = get_reddit_instance(bot_name)
         try:
             unread_items = list(reddit_instance.inbox.unread(limit=limit))

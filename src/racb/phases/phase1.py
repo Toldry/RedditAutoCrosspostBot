@@ -14,9 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 def handle_incoming_comment(comment, metrics=None):
-    if metrics:
-        metrics.record_comment()
-
+    # The stream thread counts every scanned comment (`main.dispatch_comment`); this runs on a Phase 1
+    # worker thread, only for comments that already matched `check_pattern` there
     logger.debug(f'Handling a comment: {reddit.full_url(comment.permalink)}')
     target_subreddit = check_pattern(comment)
     if target_subreddit is None:
@@ -33,6 +32,9 @@ def handle_incoming_comment(comment, metrics=None):
         return
 
     if target_subreddit.lower() == source_subreddit:
+        if not config.is_bot_enabled(reddit.SAME_SUBREDDIT_BOT_NAME):
+            logger.info(f'Found "same subreddit" comment ({reddit.full_url(comment.permalink)}); same_subreddit_bot is disabled.')
+            return None
         logger.info(f'Found "same subreddit" comment ({reddit.full_url(comment.permalink)}). Replying via same_subreddit_bot.')
         reply = reply_to_source_equals_target_comment(comment)
         if metrics:
@@ -41,6 +43,9 @@ def handle_incoming_comment(comment, metrics=None):
 
     result_obj = get_posts_with_same_content(comment, target_subreddit)
     if result_obj.posts_found:
+        if not config.is_bot_enabled(reddit.SAME_POST_BOT_NAME):
+            logger.info(f'Found post with duplicate content in r/{target_subreddit} ({reddit.full_url(comment.permalink)}); same_post_bot is disabled.')
+            return None
         logger.info(f'Found post with duplicate content in r/{target_subreddit} ({reddit.full_url(comment.permalink)}). Replying via same_post_bot.')
         post_with_same_content = result_obj.posts[0]
         reply = reply_to_same_content_post_comment(comment, target_subreddit, post_with_same_content)
@@ -48,6 +53,10 @@ def handle_incoming_comment(comment, metrics=None):
             metrics.record_aux()
         return reply
     elif result_obj.unable_to_search and result_obj.unable_to_search_reason == 'SUBREDDIT_DOES_NOT_EXIST':
+        if not config.is_bot_enabled(reddit.SUB_DOESNT_EXIST_BOT_NAME):
+            # Checked before the reply is built, since its subreddit suggestions cost requests
+            logger.info(f'Found reference to non-existent subreddit r/{target_subreddit} ({reddit.full_url(comment.permalink)}); sub_doesnt_exist_bot is disabled.')
+            return None
         logger.info(f'Found reference to non-existent subreddit r/{target_subreddit} ({reddit.full_url(comment.permalink)}). Replying via sub_doesnt_exist_bot.')
         reply = reply_to_nonexistent_target_subreddit_comment(comment, target_subreddit)
         if metrics:
