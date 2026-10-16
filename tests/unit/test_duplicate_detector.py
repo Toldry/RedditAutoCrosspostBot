@@ -442,3 +442,172 @@ def test_failed_downloads_are_retried_instead_of_cached():
         assert duplicate_detector.compute_image_fingerprint(url) is not None
         assert duplicate_detector.compute_image_fingerprint(url) is not None
     assert mock_get.call_count == 2  # The failure was retried; the success was cached
+
+
+def make_noise_image(seed):
+    """A random 64x64 grayscale image; two different seeds give fingerprints far apart."""
+    import random
+    generator = random.Random(seed)
+    img = Image.new('L', (64, 64))
+    img.putdata([generator.randrange(256) for _ in range(64 * 64)])
+    return img.convert('RGB')
+
+
+def make_gallery_post(post_id, image_names, created_utc=500):
+    """A gallery post whose pictures have 320-wide previews at https://preview.redd.it/<name>.jpg."""
+    post = make_post(post_id, f'https://www.reddit.com/gallery/{post_id}', created_utc)
+    post.is_video = False
+    post.is_gallery = True
+    post.gallery_data = {'items': [{'media_id': name} for name in image_names]}
+    post.media_metadata = {
+        name: {
+            'status': 'valid',
+            'e': 'Image',
+            'p': [
+                {'x': 108, 'u': f'https://preview.redd.it/{name}.jpg?width=108&amp;s=1'},
+                {'x': 320, 'u': f'https://preview.redd.it/{name}.jpg?width=320&amp;s=2'},
+            ],
+            's': {'x': 1080, 'u': f'https://i.redd.it/{name}.jpg'},
+        }
+        for name in image_names
+    }
+    return post
+
+
+def gallery_preview(name):
+    return f'https://preview.redd.it/{name}.jpg?width=320&s=2'
+
+
+@pytest.mark.unit
+def test_gallery_posts_are_image_posts():
+    gallery = make_gallery_post('g', ['a', 'b'])
+    assert duplicate_detector.media_kind(gallery) == duplicate_detector.IMAGE
+    assert duplicate_detector.gallery_image_urls(gallery) == [gallery_preview('a'), gallery_preview('b')]
+
+
+@pytest.mark.unit
+def test_crosspost_of_a_gallery_is_an_image_post():
+    crosspost = make_post('x', '/r/source/comments/g/title/', created_utc=0)
+    crosspost.is_gallery = None
+    gallery = make_gallery_post('g', ['a'])
+    crosspost.crosspost_parent_list = [{
+        'is_gallery': True, 'media_metadata': gallery.media_metadata, 'gallery_data': gallery.gallery_data,
+    }]
+    assert duplicate_detector.gallery_image_urls(crosspost) == [gallery_preview('a')]
+
+
+@pytest.mark.unit
+def test_gallery_pictures_are_capped():
+    names = [f'n{i}' for i in range(duplicate_detector.MAX_GALLERY_IMAGES + 5)]
+    urls = duplicate_detector.gallery_image_urls(make_gallery_post('g', names))
+    assert len(urls) == duplicate_detector.MAX_GALLERY_IMAGES
+
+
+@pytest.mark.unit
+def test_scan_counts_galleries_and_matches_any_of_their_pictures():
+    red, blue = png_bytes(make_noise_image(10)), png_bytes(make_noise_image(11))
+    images = {
+        'https://i.redd.it/source.png': png_bytes(make_noise_image(1)),
+        gallery_preview('match_a'): red,
+        gallery_preview('match_b'): png_bytes(make_noise_image(1)),
+        gallery_preview('other_a'): red,
+        gallery_preview('other_b'): blue,
+    }
+    posts = [
+        make_gallery_post('has_copy', ['match_a', 'match_b']),
+        make_gallery_post('different', ['other_a', 'other_b']),
+    ]
+    scan, _ = scan_listing(posts, image_bytes_by_url=images)
+    assert scan.posts_checked == 2
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['has_copy']
+
+
+@pytest.mark.unit
+def test_scan_from_a_gallery_post():
+    images = {
+        gallery_preview('src_a'): png_bytes(make_noise_image(12)),
+        gallery_preview('src_b'): png_bytes(make_noise_image(2)),
+        'https://i.redd.it/copy.png': png_bytes(make_noise_image(2)),
+        'https://i.redd.it/other.png': png_bytes(make_noise_image(3)),
+    }
+    posts = [
+        make_post('copy', 'https://i.redd.it/copy.png', created_utc=500),
+        make_post('other', 'https://i.redd.it/other.png', created_utc=400),
+    ]
+    scan, _ = scan_listing(posts, image_bytes_by_url=images, source=make_gallery_post('source', ['src_a', 'src_b']))
+    assert scan.posts_checked == 2
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['copy']
+
+
+@pytest.mark.unit
+def test_scan_falls_back_to_the_full_image_when_the_preview_cannot_be_read():
+    resolutions = [{'url': 'https://preview.redd.it/a.png?width=320&amp;s=2', 'width': 320}]
+    posts = [make_post('p', 'https://i.redd.it/a.png', created_utc=500, preview_resolutions=resolutions)]
+    scan, downloaded_urls = scan_listing(
+        posts, image_bytes_by_url={'https://preview.redd.it/a.png?width=320&s=2': b'not an image'},
+    )
+    assert 'https://i.redd.it/a.png' in downloaded_urls
+    assert scan.posts_checked == 1
+
+
+def make_crosspost(post_id, original_fields, created_utc=500):
+    """A crosspost as Reddit lists it: its url is the original's permalink, its media fields are on the original."""
+    crosspost = make_post(post_id, '/r/source/comments/orig/title/', created_utc)
+    crosspost.is_video = False
+    crosspost.is_gallery = None
+    crosspost.crosspost_parent_list = [original_fields]
+    return crosspost
+
+
+@pytest.mark.unit
+def test_crosspost_of_an_image_is_compared_through_the_original_image():
+    crosspost = make_crosspost('x', {
+        'url': 'https://i.redd.it/orig.jpeg',
+        'is_video': False,
+        'preview': {'images': [{'resolutions': [
+            {'url': 'https://preview.redd.it/orig.jpeg?width=320&amp;s=2', 'width': 320},
+        ]}]},
+    })
+    assert duplicate_detector.media_kind(crosspost) == duplicate_detector.IMAGE
+    images = {
+        'https://i.redd.it/source.png': png_bytes(make_noise_image(20)),
+        'https://preview.redd.it/orig.jpeg?width=320&s=2': png_bytes(make_noise_image(20)),
+    }
+    scan, _ = scan_listing([crosspost], image_bytes_by_url=images)
+    assert scan.posts_checked == 1
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['x']
+
+
+@pytest.mark.unit
+def test_crosspost_of_a_video_is_a_video_post():
+    crosspost = make_crosspost('x', {'url': 'https://v.redd.it/abc', 'is_video': True})
+    assert duplicate_detector.media_kind(crosspost) == duplicate_detector.VIDEO
+
+
+@pytest.mark.unit
+def test_crosspost_of_a_text_post_is_not_compared():
+    crosspost = make_crosspost('x', {'url': 'https://www.reddit.com/r/source/comments/orig/title/'})
+    assert duplicate_detector.media_kind(crosspost) is None
+
+
+@pytest.mark.unit
+def test_crosspost_whose_original_was_deleted_uses_its_own_fields():
+    crosspost = make_crosspost('x', {})
+    crosspost.crosspost_parent_list = []
+    crosspost.url = 'https://i.redd.it/kept.png'
+    assert duplicate_detector.media_kind(crosspost) == duplicate_detector.IMAGE
+
+
+@pytest.mark.unit
+def test_crosspost_reads_the_parent_that_crosspost_parent_names():
+    crosspost = make_crosspost('x', {'name': 't3_middle', 'url': 'https://example.com/article'})
+    crosspost.crosspost_parent_list.append({'name': 't3_orig', 'url': 'https://i.redd.it/orig.png'})
+    crosspost.crosspost_parent = 't3_orig'
+    assert duplicate_detector.media_url(crosspost) == 'https://i.redd.it/orig.png'
+
+
+@pytest.mark.unit
+def test_crosspost_reads_the_first_parent_when_none_is_named():
+    crosspost = make_crosspost('x', {'name': 't3_orig', 'url': 'https://i.redd.it/orig.png'})
+    crosspost.crosspost_parent = None
+    assert duplicate_detector.media_url(crosspost) == 'https://i.redd.it/orig.png'
