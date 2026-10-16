@@ -236,7 +236,7 @@ def reply_to_source_equals_target_comment(source_comment):
         source_subreddit,
         bot_name=reddit.SAME_SUBREDDIT_BOT_NAME,
     )
-    return reply_as_bot(source_comment, text, reddit.SAME_SUBREDDIT_BOT_NAME)
+    return reply_as_bot(source_comment, text, reddit.SAME_SUBREDDIT_BOT_NAME, source_subreddit)
 
 
 def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subreddit):
@@ -272,7 +272,7 @@ def reply_to_nonexistent_target_subreddit_comment(source_comment, target_subredd
 
     _, suffix_text = i18n.lookup_in_languages(i18n.SUFFIX_KEY, [language])
     text += i18n.format_suffix(suffix_text, reddit.SUB_DOESNT_EXIST_BOT_NAME)
-    return reply_as_bot(source_comment, text, reddit.SUB_DOESNT_EXIST_BOT_NAME)
+    return reply_as_bot(source_comment, text, reddit.SUB_DOESNT_EXIST_BOT_NAME, target_subreddit)
 
 
 def is_subreddit_name_length_valid(subreddit_name):
@@ -361,17 +361,17 @@ def reply_to_same_content_post_comment(source_comment, target_subreddit, post_wi
         same_content_post_url=post_with_same_content.permalink,
         target_subreddit=target_subreddit,
     )
-    return reply_as_bot(source_comment, text, reddit.SAME_POST_BOT_NAME)
+    return reply_as_bot(source_comment, text, reddit.SAME_POST_BOT_NAME, target_subreddit)
 
 
-def reply_as_bot(source_comment, text, bot_name):
+def reply_as_bot(source_comment, text, bot_name, target_subreddit):
     """Replies to `source_comment` as `bot_name`, or only logs the reply when DRY_RUN is enabled."""
     if config.is_dry_run():
         logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(source_comment.permalink)}:\n{text}')
         return None
     comment2 = get_comment_with_different_praw_instance(source_comment, bot_name)
     reply = comment2.reply(text)
-    reddit.log_posted_reply(bot_name, source_comment.permalink, reply)
+    reddit.log_posted_reply(bot_name, source_comment, target_subreddit, reply)
     return reply
 
 

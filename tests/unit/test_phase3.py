@@ -224,13 +224,13 @@ def test_image_scan_sentence_counts_only_posts_since_the_comment(make_mock_comme
     assert '20' in sentence
     assert '150' not in sentence
     assert phase3.describe_media_scan(make_media_scan(30, top_posts_checked=30), comment, 'pics') == ''
-def test_reply_to_crosspost_logs_full_url_of_the_reply(make_mock_comment, caplog):
-    comment = make_mock_comment(subreddit='test_source')
+def test_reply_to_crosspost_logs_the_suggestion_and_the_full_url_of_the_reply(make_mock_comment, caplog):
+    comment = make_mock_comment(subreddit='test_source', author='suggester')
     cross_post = MagicMock(permalink='/r/pics/comments/xyz/title/')
     cross_post.reply.return_value = MagicMock(permalink='/r/pics/comments/xyz/title/reply1/')
     with caplog.at_level('INFO'):
         phase3.reply_to_crosspost(comment, cross_post, 'pics')
     assert (
-        '/u/AutoCrosspostBot replied to https://reddit.com/r/pics/comments/xyz/title/: '
+        '/u/AutoCrosspostBot replied to suggester suggestion (r/test_source -> r/pics): '
         'https://reddit.com/r/pics/comments/xyz/title/reply1/'
     ) in caplog.text

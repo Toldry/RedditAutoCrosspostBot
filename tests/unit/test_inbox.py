@@ -217,14 +217,16 @@ def test_feedback_is_logged_with_a_real_praw_instance(no_dry_run):
 
 
 @pytest.mark.unit
-def test_reply_to_feedback_logs_full_url_of_the_reply(caplog):
+def test_reply_to_feedback_logs_the_feedback_and_the_full_url_of_the_reply(caplog):
     mock_comment = MagicMock(spec=praw.models.Comment)
     mock_comment.subreddit = MagicMock(display_name='pics')
+    mock_comment.author = MagicMock()
+    mock_comment.author.name = 'critic'
     mock_comment.permalink = '/r/pics/comments/abc/title/def/'
     mock_comment.reply.return_value = MagicMock(permalink='/r/pics/comments/abc/title/ghi/')
     with caplog.at_level('INFO'):
         inbox.reply_to_feedback(mock_comment, 'RESPOND_TO_NEGATIVE_SENTIMENT', 'same_subreddit_bot')
     assert (
-        '/u/same_subreddit_bot replied to https://reddit.com/r/pics/comments/abc/title/def/: '
+        '/u/same_subreddit_bot replied to critic feedback (r/pics): '
         'https://reddit.com/r/pics/comments/abc/title/ghi/'
     ) in caplog.text

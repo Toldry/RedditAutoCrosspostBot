@@ -149,7 +149,10 @@ def reply_to_feedback(comment, string_key, bot_name):
         logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(comment.permalink)}:\n{text}')
         return None
     reply = comment.reply(text)
-    reddit.log_posted_reply(bot_name, comment.permalink, reply)
+    logger.info(
+        f'/u/{bot_name} replied to {reddit.author_name(comment)} feedback '
+        f'(r/{comment.subreddit.display_name}): {reddit.full_url(getattr(reply, "permalink", "?"))}'
+    )
     return reply
 
 

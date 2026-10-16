@@ -140,7 +140,7 @@ def test_reply_as_bot_dry_run_does_not_reply(make_mock_comment):
     comment = make_mock_comment()
     with patch.dict('os.environ', {'DRY_RUN': 'true'}):
         with patch('racb.phases.phase1.get_comment_with_different_praw_instance') as mock_get_comment:
-            assert phase1.reply_as_bot(comment, 'text', 'same_post_bot') is None
+            assert phase1.reply_as_bot(comment, 'text', 'same_post_bot', 'pics') is None
             mock_get_comment.assert_not_called()
 
 
@@ -392,15 +392,14 @@ def test_short_titles_are_not_searched(make_mock_comment, make_mock_submission):
     assert result.posts_found is False
     queries = [call.kwargs['query'] for call in mock_reddit.subreddit.return_value.search.call_args_list]
     assert not any(query.startswith('title:') for query in queries)
-def test_reply_as_bot_logs_full_urls_of_the_reply_and_its_parent(make_mock_comment, caplog):
-    comment = make_mock_comment()
-    comment.permalink = '/r/pics/comments/abc/title/def/'
-    posted_reply = MagicMock(permalink='/r/pics/comments/abc/title/ghi/')
+def test_reply_as_bot_logs_the_suggestion_and_the_full_url_of_the_reply(make_mock_comment, caplog):
+    comment = make_mock_comment(subreddit='funny', author='suggester')
+    posted_reply = MagicMock(permalink='/r/funny/comments/abc/title/ghi/')
     with patch('racb.phases.phase1.get_comment_with_different_praw_instance') as mock_get_comment, \
             caplog.at_level('INFO'):
         mock_get_comment.return_value.reply.return_value = posted_reply
-        assert phase1.reply_as_bot(comment, 'text', 'same_post_bot') is posted_reply
+        assert phase1.reply_as_bot(comment, 'text', 'same_post_bot', 'pics') is posted_reply
     assert (
-        '/u/same_post_bot replied to https://reddit.com/r/pics/comments/abc/title/def/: '
-        'https://reddit.com/r/pics/comments/abc/title/ghi/'
+        '/u/same_post_bot replied to suggester suggestion (r/funny -> r/pics): '
+        'https://reddit.com/r/funny/comments/abc/title/ghi/'
     ) in caplog.text

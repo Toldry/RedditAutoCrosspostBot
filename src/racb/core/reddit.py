@@ -43,10 +43,18 @@ def full_url(permalink):
     return REDDIT_BASE_URL + permalink
 
 
-def log_posted_reply(bot_name, parent_permalink, reply):
-    """Logs a comment a bot has just posted, with full URLs of the new comment and of what it answers."""
+def author_name(comment):
+    """Returns the name of `comment`'s author, or `[deleted]` when the account is gone."""
+    author = getattr(comment, 'author', None)
+    return author.name if author else '[deleted]'
+
+
+def log_posted_reply(bot_name, suggestion_comment, target_subreddit, reply):
+    """Logs a comment a bot has just posted about a subreddit suggestion, with the new comment's full URL."""
+    source_subreddit = suggestion_comment.subreddit.display_name
     logger.info(
-        f'/u/{bot_name} replied to {full_url(parent_permalink)}: {full_url(getattr(reply, "permalink", "?"))}'
+        f'/u/{bot_name} replied to {author_name(suggestion_comment)} suggestion '
+        f'(r/{source_subreddit} -> r/{target_subreddit}): {full_url(getattr(reply, "permalink", "?"))}'
     )
 
 AUTO_CROSSPOST_BOT_NAME = 'AutoCrosspostBot'
