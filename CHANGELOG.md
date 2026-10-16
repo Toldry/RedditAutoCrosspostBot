@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-16
+
 ### Added
 - **"Other Discussions" Check:** the duplicate check now also asks Reddit for the source post's "other discussions" (`submission.duplicates()`, one call) and treats any of them in the target subreddit, such as an earlier crosspost of the same post, as a duplicate. This runs in all three phases.
 - **Title Search:** Phases 2 and 3 search the target for a post with the same title (`title:"..."`, compared ignoring case and punctuation), which catches reposts of videos and text posts that keep the title. Titles shorter than 4 words are not searched.
