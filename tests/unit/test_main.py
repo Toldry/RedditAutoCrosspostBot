@@ -191,15 +191,70 @@ def test_handle_comment_id_fetches_the_comment_with_this_threads_instance():
 @pytest.mark.unit
 def test_build_jobs_runs_phase2_and_phase3_under_one_lock():
     from racb.main import build_jobs
-    with patch.dict('os.environ', {'LISTEN_ONLY': 'false', 'DEBUG': 'false'}):
+    with patch.dict('os.environ', {'DEBUG': 'false'}):
         jobs = {job.name: job for job in build_jobs()}
     assert set(jobs) == {'cleanup', 'heartbeat', 'inbox', 'phase2', 'known-subreddits', 'phase3'}
     assert jobs['phase2'].lock is not None
     assert jobs['phase2'].lock is jobs['phase3'].lock
     assert jobs['inbox'].lock is None
 
-    with patch.dict('os.environ', {'LISTEN_ONLY': 'true'}):
-        assert 'phase3' not in {job.name for job in build_jobs()}
+
+ALL_BOTS_DISABLED = {
+    'AUTO_CROSSPOST_BOT_ENABLED': 'false',
+    'SUB_DOESNT_EXIST_BOT_ENABLED': 'false',
+    'SAME_SUBREDDIT_BOT_ENABLED': 'false',
+    'SAME_POST_BOT_ENABLED': 'false',
+}
+
+
+@pytest.mark.unit
+def test_build_jobs_skips_the_writing_jobs_of_disabled_bots():
+    from racb.main import build_jobs
+    with patch.dict('os.environ', {'AUTO_CROSSPOST_BOT_ENABLED': 'false'}):
+        assert {job.name for job in build_jobs()} == {'heartbeat', 'inbox', 'phase2', 'known-subreddits'}
+    with patch.dict('os.environ', ALL_BOTS_DISABLED):
+        assert {job.name for job in build_jobs()} == {'heartbeat', 'phase2', 'known-subreddits'}
+
+
+@pytest.mark.unit
+def test_listen_only_true_stops_startup():
+    from racb.main import main
+    with patch('racb.main.configure_logging'), \
+         patch('racb.core.reddit.authenticate_all_bots') as mock_auth, \
+         patch('racb.main.start_bot') as mock_start, \
+         patch('sys.argv', ['racb']), \
+         patch.dict('os.environ', {'LISTEN_ONLY': 'True'}), \
+         pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 1
+    mock_auth.assert_not_called()
+    mock_start.assert_not_called()
+
+
+@pytest.mark.unit
+def test_listen_only_false_is_ignored():
+    from racb.main import main
+    with patch('racb.main.configure_logging'), \
+         patch('racb.core.reddit.authenticate_all_bots'), \
+         patch('racb.main.start_bot') as mock_start, \
+         patch('sys.argv', ['racb']), \
+         patch.dict('os.environ', {'LISTEN_ONLY': 'False'}):
+        main()
+    mock_start.assert_called_once()
+
+
+@pytest.mark.unit
+def test_process_one_refuses_when_autocrosspostbot_is_disabled():
+    from racb.main import main
+    with patch('racb.main.configure_logging'), \
+         patch('racb.core.reddit.authenticate_all_bots'), \
+         patch('racb.main.phase3.process_oldest_entry') as mock_oldest, \
+         patch('sys.argv', ['racb', '--process-one']), \
+         patch.dict('os.environ', {'AUTO_CROSSPOST_BOT_ENABLED': 'false'}), \
+         pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 2
+    mock_oldest.assert_not_called()
 
 
 @pytest.mark.unit

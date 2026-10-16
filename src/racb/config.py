@@ -51,7 +51,24 @@ def is_dry_run():
     return env_bool('DRY_RUN', False)
 
 
-def is_listen_only():
+# Each bot account's on/off switch, keyed by its Reddit username (as in `reddit.bot_details`). A disabled bot
+# never comments, posts or deletes. Unlike DRY_RUN it does not even log what it would have written.
+BOT_ENABLED_KEYS = {
+    'AutoCrosspostBot': 'AUTO_CROSSPOST_BOT_ENABLED',
+    'sub_doesnt_exist_bot': 'SUB_DOESNT_EXIST_BOT_ENABLED',
+    'same_subreddit_bot': 'SAME_SUBREDDIT_BOT_ENABLED',
+    'same_post_bot': 'SAME_POST_BOT_ENABLED',
+}
+
+
+def is_bot_enabled(bot_name):
+    return env_bool(BOT_ENABLED_KEYS[bot_name], True)
+
+
+def removed_listen_only_value():
+    """Returns the value of the removed LISTEN_ONLY setting (True/False), or None if it is not set."""
+    if os.environ.get('LISTEN_ONLY') is None:
+        return None
     return env_bool('LISTEN_ONLY', False)
 
 

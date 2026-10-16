@@ -145,7 +145,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
   - If the batch `info()` call throws, it falls back to fetching each comment individually (`run_filters(ce, comment=None)`).
   - Prunes failing entries from DB to conserve PostgreSQL table storage.
 - **Phase 3 ([`src/racb/phases/phase3.py`](./src/racb/phases/phase3.py)):**
-  - Runs periodically (every 6 minutes) if `LISTEN_ONLY` is false.
+  - Runs periodically (every 6 minutes) if `AUTO_CROSSPOST_BOT_ENABLED` is true.
   - Queries records older than `PHASE3_WAITING_PERIOD` using `get_comments_older_than(interval)`. This
     function does **not** filter on `phase2_checked`, so Phase 3 depends on Phase 2 having pruned rows first.
   - Re-runs validation checks (`phase2.run_filters(..., full_media_scan=True)`, which fetches each comment
@@ -202,7 +202,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`src/racb/workers.py`](./src/racb/workers.py) | Background threads: `PeriodicJob` (one thread per scheduled job), `Phase1Workers` (the Phase 1 thread pool fed by the stream), and `run_job_safely`. |
 | [`src/racb/__main__.py`](./src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
 | [`src/racb/__init__.py`](./src/racb/__init__.py) | Package marker; re-exports `__version__`. |
-| [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_listen_only()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
+| [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_bot_enabled()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
 | [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Per-thread factory for PRAW instances (one per account per thread, created lazily) with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check), `TRANSIENT_NETWORK_ERRORS` and the bot-name constants. |
 | [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with one connection per thread, connection retry logic and stored procedure invocation. |
 | [`src/racb/core/shutdown.py`](./src/racb/core/shutdown.py) | The process-wide stop signal: `request_stop()`, `stop_requested()`, `stop_requested_within(seconds)` (an interruptible sleep that returns True on shutdown), and `fail()`, which records a thread's crash and stops the process. |
@@ -231,7 +231,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`docs/logs.md`](./docs/logs.md) | How to read the bot's logs over SSH or in Google Cloud Logging, and how to turn Cloud Logging on. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1713 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/unit/`](./tests/unit/) | 1722 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -272,7 +272,10 @@ Store these in `.env` for local development or production:
 | `POSTGRES_PORT` | String | `5432` | Used only when building the URL from parts. |
 | `DB_SSLMODE` | String | auto | libpq `sslmode`. If unset: `disable` when the URL contains `@db:`, `@localhost:` or `@127.0.0.1:`, otherwise `prefer`. Compose sets `disable`. |
 | `DEBUG` | Boolean (`True`/`False`) | `False` | Debug mode toggle. Sets logging to `DEBUG`, disables catch-all exception swallow. See side effects below. |
-| `LISTEN_ONLY` | Boolean (`True`/`False`) | `False` | When `True`, disables Phase 3 crossposting while retaining stream listening and Phase 2 filtering. |
+| `AUTO_CROSSPOST_BOT_ENABLED` | Boolean (`True`/`False`) | `True` | When `False`, `AutoCrosspostBot` never writes: Phase 3 (crossposting) and the negative-score cleanup are not scheduled, its inbox is not read, and `--process-one` refuses to run (exit code 2). Its account is still used to read Reddit. |
+| `SUB_DOESNT_EXIST_BOT_ENABLED` | Boolean (`True`/`False`) | `True` | When `False`, `sub_doesnt_exist_bot` never replies (its suggestions are not even looked up) and its inbox is not read. |
+| `SAME_SUBREDDIT_BOT_ENABLED` | Boolean (`True`/`False`) | `True` | When `False`, `same_subreddit_bot` never replies and its inbox is not read. |
+| `SAME_POST_BOT_ENABLED` | Boolean (`True`/`False`) | `True` | When `False`, `same_post_bot` never replies and its inbox is not read. |
 | `DRY_RUN` | Boolean (`True`/`False`) | `False` | When `True`, nothing is written to Reddit: auxiliary replies, crossposts and cleanup deletions are only logged with a `[DRY RUN]` prefix. The database is still written to, but Phase 3 keeps the rows it would have crossposted. |
 | `COMMENT_SCORE_THRESHOLD` | Integer | `1` (`.env.example`: `30`) | Minimum upvote score a comment must have to survive Phase 2 and be crossposted in Phase 3. |
 | `PHASE2_WAITING_PERIOD` | Time string | `2 hours` | Time duration before Phase 2 checks a comment (parsed via `pytimeparse`, e.g. `2 hours` or `1 day`). |
@@ -304,9 +307,15 @@ Store these in `.env` for local development or production:
   that stops every thread (`shutdown.fail`) and `start_bot()` re-raises it, which crashes the process.
 - `add_comment` and `exec_crosspost` re-raise instead of logging.
 
-### `LISTEN_ONLY=True` is **not** a dry run
-It only skips scheduling Phase 3. The 3 auxiliary bots **still post public replies** from Phase 1, and the
-cleanup job **still deletes** submissions. Use `DRY_RUN=True` for a fully read-only run.
+### Per-bot switches vs. `DRY_RUN`
+- `<BOT>_ENABLED=False` turns one account's writes off silently. Phase 1 still decides what it would have
+  done (a comment that would have got an auxiliary reply is still **not** stored), it just does not reply.
+  With all four off, only the stream, Phase 1's filtering, the database inserts, Phase 2 and the
+  known-subreddits job run. All 4 accounts still need valid credentials, since startup authenticates them all.
+- `DRY_RUN=True` keeps every bot running but logs each write instead of making it.
+- `LISTEN_ONLY` was replaced by these switches. `LISTEN_ONLY=True` makes startup fail with a message
+  pointing to `AUTO_CROSSPOST_BOT_ENABLED=False`, so an old `.env` cannot silently start crossposting;
+  `LISTEN_ONLY=False` only logs a warning.
 
 ---
 
@@ -546,11 +555,11 @@ flowchart LR
 
 | Job (thread name) | Interval | Function |
 | :--- | :--- | :--- |
-| Cleanup of negative-score submissions (`cleanup`) | 7 min | `cleanup.delete_unwanted_submissions` |
+| Cleanup of negative-score submissions (`cleanup`, only if `AUTO_CROSSPOST_BOT_ENABLED`) | 7 min | `cleanup.delete_unwanted_submissions` |
 | Heartbeat log (`heartbeat`) | 10 min | `metrics.log_heartbeat` |
 | Phase 2 (`phase2`) | 20 min | `phase2.filter_comments_from_db` |
-| Phase 3 (`phase3`, skipped if `LISTEN_ONLY`) | 6 min | `phase3.process_comment_entries` |
-| Inbox feedback, all 4 bots (`inbox`) | 10 min | `inbox.process_unread_inboxes` |
+| Phase 3 (`phase3`, only if `AUTO_CROSSPOST_BOT_ENABLED`) | 6 min | `phase3.process_comment_entries` |
+| Inbox feedback of the enabled bots (`inbox`, only if any is enabled) | 10 min | `inbox.process_unread_inboxes` |
 | Write buffered known subreddits (`known-subreddits`) | 5 min | `known_subreddits.flush` |
 
 Each job is a `workers.PeriodicJob` thread. It first runs one interval after startup, and each next run

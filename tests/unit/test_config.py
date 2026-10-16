@@ -48,3 +48,14 @@ def test_invalid_waiting_period_falls_back_to_default():
 def test_six_months_is_not_silently_ninety_days():
     with patch.dict('os.environ', {'PHASE3_WAITING_PERIOD': '6 months'}):
         assert config.phase3_waiting_period_seconds() == 180 * 86400
+
+
+@pytest.mark.unit
+def test_every_bot_has_an_enabled_switch_that_defaults_to_on():
+    from racb.core import reddit
+    assert set(config.BOT_ENABLED_KEYS) == set(reddit.bot_details)
+    with patch.dict('os.environ', {}, clear=True):
+        assert all(config.is_bot_enabled(name) for name in reddit.bot_details)
+    with patch.dict('os.environ', {'SAME_POST_BOT_ENABLED': 'False'}):
+        assert not config.is_bot_enabled(reddit.SAME_POST_BOT_NAME)
+        assert config.is_bot_enabled(reddit.AUTO_CROSSPOST_BOT_NAME)

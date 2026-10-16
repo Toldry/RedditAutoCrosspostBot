@@ -149,19 +149,30 @@ def build_jobs():
     scraped_comments_lock = threading.Lock()
     debug = env_bool('DEBUG', False)
     jobs = [
-        PeriodicJob('cleanup', 7 * MINUTE, cleanup.delete_unwanted_submissions),
         PeriodicJob('heartbeat', 10 * MINUTE, metrics.log_heartbeat),
-        PeriodicJob('inbox', 10 * MINUTE, inbox.process_unread_inboxes),
         # With DEBUG, Phase 2 also runs once at startup; it is the only job that never writes to Reddit.
         # Cleanup and Phase 3 keep their normal schedule.
         PeriodicJob('phase2', 20 * MINUTE, phase2.filter_comments_from_db,
                     lock=scraped_comments_lock, run_at_start=debug),
         PeriodicJob('known-subreddits', 5 * MINUTE, known_subreddits.flush),
     ]
-    listen_only = env_bool('LISTEN_ONLY', False)
-    if not listen_only:
+    # Jobs that write to Reddit run only for enabled bots
+    if config.is_bot_enabled(reddit.AUTO_CROSSPOST_BOT_NAME):
+        jobs.append(PeriodicJob('cleanup', 7 * MINUTE, cleanup.delete_unwanted_submissions))
         jobs.append(PeriodicJob('phase3', 6 * MINUTE, phase3.process_comment_entries, lock=scraped_comments_lock))
+    if any(config.is_bot_enabled(bot_name) for bot_name in inbox.BOT_NAMES):
+        jobs.append(PeriodicJob('inbox', 10 * MINUTE, inbox.process_unread_inboxes))
     return jobs
+
+
+def log_disabled_bots():
+    """Logs, at startup, which bots will not write to Reddit."""
+    disabled = [name for name in config.BOT_ENABLED_KEYS if not config.is_bot_enabled(name)]
+    if not disabled:
+        return
+    logger.info(f'Disabled bots (no comments, posts or deletions): {", ".join("/u/" + name for name in disabled)}')
+    if len(disabled) == len(config.BOT_ENABLED_KEYS):
+        logger.info('All bots are disabled: only reading r/all and storing matches in the database')
 
 
 def parse_args():
@@ -187,6 +198,18 @@ def main():
     if config.is_dry_run():
         logger.info('DRY_RUN is enabled: no replies, crossposts or deletions will be made')
 
+    # LISTEN_ONLY=True kept Phase 3 from crossposting. Ignoring it would start crossposting, so refuse to run.
+    listen_only = config.removed_listen_only_value()
+    if listen_only:
+        logger.critical(
+            'Startup failed: LISTEN_ONLY was removed. To keep AutoCrosspostBot from crossposting, '
+            'replace it with AUTO_CROSSPOST_BOT_ENABLED=False in .env (see .env.example).'
+        )
+        sys.exit(1)
+    if listen_only is False:
+        logger.warning('LISTEN_ONLY was removed and is ignored; delete it from .env')
+    log_disabled_bots()
+
     try:
         i18n.check_catalogs_compiled()
     except i18n.CatalogNotCompiledError as e:
@@ -204,6 +227,9 @@ def main():
         return
 
     if args.process_one:
+        if not config.is_bot_enabled(reddit.AUTO_CROSSPOST_BOT_NAME):
+            logger.critical('--process-one crossposts as /u/AutoCrosspostBot, which AUTO_CROSSPOST_BOT_ENABLED disables')
+            sys.exit(2)
         found = phase3.process_oldest_entry()
         sys.exit(0 if found else 1)
 
