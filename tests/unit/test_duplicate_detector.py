@@ -548,3 +548,51 @@ def test_scan_falls_back_to_the_full_image_when_the_preview_cannot_be_read():
     )
     assert 'https://i.redd.it/a.png' in downloaded_urls
     assert scan.posts_checked == 1
+
+
+def make_crosspost(post_id, original_fields, created_utc=500):
+    """A crosspost as Reddit lists it: its url is the original's permalink, its media fields are on the original."""
+    crosspost = make_post(post_id, '/r/source/comments/orig/title/', created_utc)
+    crosspost.is_video = False
+    crosspost.is_gallery = None
+    crosspost.crosspost_parent_list = [original_fields]
+    return crosspost
+
+
+@pytest.mark.unit
+def test_crosspost_of_an_image_is_compared_through_the_original_image():
+    crosspost = make_crosspost('x', {
+        'url': 'https://i.redd.it/orig.jpeg',
+        'is_video': False,
+        'preview': {'images': [{'resolutions': [
+            {'url': 'https://preview.redd.it/orig.jpeg?width=320&amp;s=2', 'width': 320},
+        ]}]},
+    })
+    assert duplicate_detector.media_kind(crosspost) == duplicate_detector.IMAGE
+    images = {
+        'https://i.redd.it/source.png': png_bytes(make_noise_image(20)),
+        'https://preview.redd.it/orig.jpeg?width=320&s=2': png_bytes(make_noise_image(20)),
+    }
+    scan, _ = scan_listing([crosspost], image_bytes_by_url=images)
+    assert scan.posts_checked == 1
+    assert [duplicate['post_id'] for duplicate in scan.duplicates] == ['x']
+
+
+@pytest.mark.unit
+def test_crosspost_of_a_video_is_a_video_post():
+    crosspost = make_crosspost('x', {'url': 'https://v.redd.it/abc', 'is_video': True})
+    assert duplicate_detector.media_kind(crosspost) == duplicate_detector.VIDEO
+
+
+@pytest.mark.unit
+def test_crosspost_of_a_text_post_is_not_compared():
+    crosspost = make_crosspost('x', {'url': 'https://www.reddit.com/r/source/comments/orig/title/'})
+    assert duplicate_detector.media_kind(crosspost) is None
+
+
+@pytest.mark.unit
+def test_crosspost_whose_original_was_deleted_uses_its_own_fields():
+    crosspost = make_crosspost('x', {})
+    crosspost.crosspost_parent_list = []
+    crosspost.url = 'https://i.redd.it/kept.png'
+    assert duplicate_detector.media_kind(crosspost) == duplicate_detector.IMAGE

@@ -214,13 +214,34 @@ def fingerprints_match(fingerprint_a, fingerprint_b, hash_threshold=DEFAULT_HASH
 
 # --- Posts -------------------------------------------------------------------------------------------------
 
+def media_field(submission, name):
+    """Returns a field describing a post's media, read from the original post when `submission` is a crosspost.
+
+    A crosspost's own `url` is often just the original post's permalink, and its `is_video`, `preview`,
+    `is_gallery`, `media_metadata` and `gallery_data` are often missing; the original post's fields are in
+    `crosspost_parent_list` (empty when the original was deleted, in which case the crosspost's own are used).
+    """
+    parents = getattr(submission, 'crosspost_parent_list', None)
+    if isinstance(parents, list) and parents and isinstance(parents[0], dict):
+        return parents[0].get(name)
+    return getattr(submission, name, None)
+
+
+def media_url(submission):
+    """The URL of a post's media: the post's own `url`, or the original post's for a crosspost."""
+    return media_field(submission, 'url')
+
+
 def media_kind(submission):
-    """Returns IMAGE for an image or gallery post, VIDEO for a video post, or None for anything else."""
-    if getattr(submission, 'is_video', False) is True:
+    """Returns IMAGE for an image or gallery post, VIDEO for a video post, or None for anything else.
+
+    A crosspost has the kind of the post it crossposts.
+    """
+    if media_field(submission, 'is_video') is True:
         return VIDEO
     if gallery_image_urls(submission):
         return IMAGE
-    url = getattr(submission, 'url', None)
+    url = media_url(submission)
     if is_image_url(url):
         return IMAGE
     if url and urlparse(url.lower()).netloc in VIDEO_DOMAINS:
@@ -234,9 +255,9 @@ def preview_image_url(submission):
     For an image post, falls back to the full image when Reddit has no preview (yet). A video post without a
     preview cannot be compared, so it returns None. Preview URLs come HTML-escaped.
     """
-    fallback = submission.url if media_kind(submission) == IMAGE else None
+    fallback = media_url(submission) if media_kind(submission) == IMAGE else None
     try:
-        resolutions = submission.preview['images'][0]['resolutions']
+        resolutions = media_field(submission, 'preview')['images'][0]['resolutions']
     except (AttributeError, KeyError, IndexError, TypeError):
         return fallback
     wide_enough = [resolution for resolution in resolutions if resolution.get('width', 0) >= PREVIEW_MIN_WIDTH]
@@ -247,22 +268,12 @@ def preview_image_url(submission):
 
 
 def gallery_metadata(submission):
-    """Returns (media_metadata, gallery_data) of a gallery post, or of the gallery a crosspost points to.
-
-    Both are None for a post that is not a gallery. A crosspost of a gallery carries them only in
-    `crosspost_parent_list`.
-    """
-    sources = [submission]
-    parents = getattr(submission, 'crosspost_parent_list', None)
-    if isinstance(parents, list) and parents and isinstance(parents[0], dict):
-        sources.append(parents[0])
-    for source in sources:
-        get = source.get if isinstance(source, dict) else (lambda name, s=source: getattr(s, name, None))
-        if get('is_gallery') is not True:
-            continue
-        media_metadata, gallery_data = get('media_metadata'), get('gallery_data')
-        if isinstance(media_metadata, dict) and isinstance(gallery_data, dict):
-            return media_metadata, gallery_data
+    """Returns (media_metadata, gallery_data) of a gallery post (or a crosspost of one), else (None, None)."""
+    if media_field(submission, 'is_gallery') is not True:
+        return None, None
+    media_metadata, gallery_data = media_field(submission, 'media_metadata'), media_field(submission, 'gallery_data')
+    if isinstance(media_metadata, dict) and isinstance(gallery_data, dict):
+        return media_metadata, gallery_data
     return None, None
 
 
@@ -303,8 +314,9 @@ def fingerprint_post(submission):
         return [fingerprint for fingerprint in fingerprints if fingerprint is not None]
     preview_url = preview_image_url(submission)
     fingerprint = compute_image_fingerprint(preview_url)
-    if fingerprint is None and media_kind(submission) == IMAGE and submission.url != preview_url:
-        fingerprint = compute_image_fingerprint(submission.url)
+    full_image_url = media_url(submission)
+    if fingerprint is None and media_kind(submission) == IMAGE and full_image_url != preview_url:
+        fingerprint = compute_image_fingerprint(full_image_url)
     return [fingerprint] if fingerprint is not None else []
 
 
@@ -408,20 +420,21 @@ def scan_subreddit_for_duplicates(submission, subreddit_name, posted_after=None,
 
     unreadable_count = 0
     for post, fingerprints in zip(candidates, fingerprint_all(candidates)):
-        if post.url == submission.url:
+        if media_url(post) == media_url(submission):
             is_match, distance = True, 0
         elif fingerprints:
             is_match, distance = best_match(source_fingerprints, fingerprints, hash_threshold)
         else:
             unreadable_count += 1
-            logger.debug(f'Could not read the picture of {post.url}; it does not count as checked')
+            logger.debug(f'Could not read the picture of {media_url(post)}; it does not count as checked')
             continue
         scan.posts_checked += 1
         if post.id in top_only_ids:
             scan.top_posts_checked += 1
         if is_match:
             logger.info(
-                f'Duplicate {media} found in r/{subreddit_name}: {submission.url} vs {post.url} (distance={distance})'
+                f'Duplicate {media} found in r/{subreddit_name}: {media_url(submission)} vs {media_url(post)} '
+                f'(distance={distance})'
             )
             scan.duplicates.append({
                 'post_id': post.id,
