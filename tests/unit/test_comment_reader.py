@@ -134,12 +134,47 @@ def test_fetch_head_takes_the_newest_of_several_comments():
 
 
 @pytest.mark.unit
-def test_fetch_head_raises_on_an_empty_listing():
+def test_fetch_head_returns_none_on_an_empty_listing():
     instance = MagicMock()
     instance.subreddit.return_value.comments.return_value = iter([])
     with patch('racb.comment_reader.reddit.get_reddit_instance', return_value=instance):
-        with pytest.raises(RuntimeError):
-            comment_reader.fetch_head()
+        assert comment_reader.fetch_head() is None
+
+
+@pytest.mark.unit
+def test_an_empty_head_listing_is_skipped_and_the_next_poll_catches_up():
+    reader, _ = make_reader(head=1000)
+    reader.poll_head()
+    head = {'value': None}
+    reader.fetch_head = lambda: head['value']
+    reader.poll_head()
+    reader.poll_head()
+    assert reader.empty_head_polls == 2
+    assert queued_blocks(reader) == []
+    head['value'] = 1000 + 3 * BLOCK_SIZE
+    reader.poll_head()
+    assert reader.empty_head_polls == 0
+    assert queued_blocks(reader) == [1001, 1101, 1201]
+
+
+@pytest.mark.unit
+def test_run_survives_an_empty_head_listing():
+    errors = []
+    polls = []
+
+    def empty_then_stop():
+        polls.append(1)
+        if len(polls) == 2:
+            shutdown.request_stop()
+        return None
+
+    reader, _ = make_reader()
+    reader.handle_exception = lambda error: errors.append(error) or True
+    reader.fetch_head = empty_then_stop
+    with patch('racb.comment_reader.HEAD_POLL_SECONDS', 0):
+        reader.run()
+    assert polls == [1, 1]
+    assert errors == []
 
 
 @pytest.mark.unit
