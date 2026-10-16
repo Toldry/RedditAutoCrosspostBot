@@ -134,6 +134,20 @@ def test_phase1_workers_drop_comments_when_the_queue_is_full():
 
 
 @pytest.mark.unit
+def test_phase1_workers_log_a_full_queue_once_until_it_has_room_again():
+    workers = Phase1Workers(lambda comment_id: None, worker_count=1, queue_size=1)
+    with patch('racb.workers.logger.warning') as mock_warning:
+        workers.submit('a')
+        for comment_id in ['b', 'c', 'd']:
+            workers.submit(comment_id)
+        assert mock_warning.call_count == 1  # Only when the queue filled
+        workers.queue.get_nowait()
+        assert workers.submit('e')
+    assert mock_warning.call_count == 2
+    assert 'dropped 3 match(es)' in mock_warning.call_args.args[0]
+
+
+@pytest.mark.unit
 def test_phase1_worker_backs_off_after_a_network_error_and_keeps_going():
     handled = []
 

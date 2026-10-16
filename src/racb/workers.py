@@ -23,8 +23,9 @@ NETWORK_RETRY_DELAY_SECONDS = 30
 # How often a thread waiting for work or for a lock checks for shutdown
 POLL_SECONDS = 1
 
-# Matching comments waiting for a Phase 1 worker. When all workers are busy for this long,
-# new matches are dropped (and counted in the heartbeat) instead of blocking the stream.
+# Matching comments waiting for a Phase 1 worker. When the queue is full, new matches are dropped (and
+# counted in the heartbeat) instead of blocking the stream. The bound is not about memory (1000 comment IDs
+# take well under 1 MB) but a backstop: a queue that stays full means Phase 1 cannot keep up at all.
 PHASE1_QUEUE_SIZE = 1000
 
 
@@ -110,6 +111,8 @@ class Phase1Workers:
         self.handle_comment_id = handle_comment_id
         self.metrics = metrics
         self.queue = queue.Queue(maxsize=queue_size)
+        # Matches dropped since the queue last had room. Only the stream thread calls submit(), so no lock.
+        self.dropped_since_full = 0
         self.threads = [
             threading.Thread(target=self.work, name=f'phase1-{number}', daemon=True)
             for number in range(1, worker_count + 1)
@@ -124,12 +127,18 @@ class Phase1Workers:
         """Queues a comment for Phase 1 without blocking. Returns False if the queue is full."""
         try:
             self.queue.put_nowait(comment_id)
-            return True
         except queue.Full:
-            logger.warning(f'Phase 1 queue is full ({self.queue.maxsize}); dropping comment {comment_id}')
+            # Logged once when the queue fills and once when it has room again; the heartbeat counts drops
+            if self.dropped_since_full == 0:
+                logger.warning(f'Phase 1 queue is full ({self.queue.maxsize}); dropping matches until it has room')
+            self.dropped_since_full += 1
             if self.metrics:
                 self.metrics.record_dropped()
             return False
+        if self.dropped_since_full:
+            logger.warning(f'Phase 1 queue has room again; dropped {self.dropped_since_full} match(es) meanwhile')
+            self.dropped_since_full = 0
+        return True
 
     def pending(self):
         return self.queue.qsize()
