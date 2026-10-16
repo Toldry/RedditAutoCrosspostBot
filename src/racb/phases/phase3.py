@@ -140,7 +140,9 @@ def reply_to_crosspost(source_comment, cross_post, target_subreddit, media_scan=
         source_comment_author_name=source_comment_author_name,
         image_check=describe_media_scan(media_scan, source_comment, target_subreddit),
     )
-    return cross_post.reply(text)
+    reply = cross_post.reply(text)
+    reddit.log_posted_reply(reddit.AUTO_CROSSPOST_BOT_NAME, cross_post.permalink, reply)
+    return reply
 
 
 def describe_media_scan(media_scan, source_comment, target_subreddit):

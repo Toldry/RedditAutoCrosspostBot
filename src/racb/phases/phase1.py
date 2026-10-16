@@ -370,7 +370,9 @@ def reply_as_bot(source_comment, text, bot_name):
         logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(source_comment.permalink)}:\n{text}')
         return None
     comment2 = get_comment_with_different_praw_instance(source_comment, bot_name)
-    return comment2.reply(text)
+    reply = comment2.reply(text)
+    reddit.log_posted_reply(bot_name, source_comment.permalink, reply)
+    return reply
 
 
 def get_comment_with_different_praw_instance(comment, username):

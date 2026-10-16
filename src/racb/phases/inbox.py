@@ -148,7 +148,9 @@ def reply_to_feedback(comment, string_key, bot_name):
     if config.is_dry_run():
         logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(comment.permalink)}:\n{text}')
         return None
-    return comment.reply(text)
+    reply = comment.reply(text)
+    reddit.log_posted_reply(bot_name, comment.permalink, reply)
+    return reply
 
 
 def respond_to_positive_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):

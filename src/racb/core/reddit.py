@@ -42,6 +42,13 @@ def full_url(permalink):
         return permalink
     return REDDIT_BASE_URL + permalink
 
+
+def log_posted_reply(bot_name, parent_permalink, reply):
+    """Logs a comment a bot has just posted, with full URLs of the new comment and of what it answers."""
+    logger.info(
+        f'/u/{bot_name} replied to {full_url(parent_permalink)}: {full_url(getattr(reply, "permalink", "?"))}'
+    )
+
 AUTO_CROSSPOST_BOT_NAME = 'AutoCrosspostBot'
 SUB_DOESNT_EXIST_BOT_NAME = 'sub_doesnt_exist_bot'
 SAME_SUBREDDIT_BOT_NAME = 'same_subreddit_bot'
