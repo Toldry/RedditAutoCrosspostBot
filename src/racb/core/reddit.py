@@ -42,6 +42,33 @@ def full_url(permalink):
         return permalink
     return REDDIT_BASE_URL + permalink
 
+
+def author_label(comment):
+    """Returns `/u/<name>` for `comment`'s author, or `[deleted]` when the account is gone."""
+    author = getattr(comment, 'author', None)
+    return f'/u/{author.name}' if author else '[deleted]'
+
+
+def comment_permalink(comment):
+    """Returns `comment`'s permalink, also for a comment from an inbox listing.
+
+    Inbox comments have no `permalink`, only a `context` link (the permalink plus `?context=3`).
+    """
+    # Read `context` from __dict__: getattr on a lazy PRAW object would fetch it
+    context = getattr(comment, '__dict__', {}).get('context')
+    if context:
+        return context.split('?', 1)[0]
+    return getattr(comment, 'permalink', '?')
+
+
+def log_posted_reply(bot_name, suggestion_comment, target_subreddit, reply):
+    """Logs a comment a bot has just posted about a subreddit suggestion, with the new comment's full URL."""
+    source_subreddit = suggestion_comment.subreddit.display_name
+    logger.info(
+        f'/u/{bot_name} replied to {author_label(suggestion_comment)} suggestion '
+        f'(r/{source_subreddit} -> r/{target_subreddit}): {full_url(getattr(reply, "permalink", "?"))}'
+    )
+
 AUTO_CROSSPOST_BOT_NAME = 'AutoCrosspostBot'
 SUB_DOESNT_EXIST_BOT_NAME = 'sub_doesnt_exist_bot'
 SAME_SUBREDDIT_BOT_NAME = 'same_subreddit_bot'

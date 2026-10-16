@@ -100,6 +100,8 @@ flowchart TD
 ```
 
 Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1. Phase 2 deletes it later.
+A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNED`) gets no
+`sub_doesnt_exist_bot` reply and is handled the same way.
 
 ### Phase Details
 - **Phase 1 ([`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py)):**
@@ -402,6 +404,9 @@ uv run pytest -m integration
 - The `prawcore`, `urllib3.connectionpool` and `schedule` loggers are **disabled entirely**, which also hides prawcore's rate-limit messages.
 - `[DRY RUN]` lines show writes that `DRY_RUN` suppressed. `Skipping comment ... after Reddit error` lines
   show per-comment failures (e.g. a bot banned from a subreddit) that no longer interrupt the stream.
+- Every comment a bot posts is logged after it is posted: `/u/<bot> replied to <user> suggestion (r/<source> -> r/<target>): <reply URL>`
+  (Phase 1 auxiliary replies and the crosspost reply) or `/u/<bot> replied to <user> feedback (r/<subreddit>): <reply URL>` (inbox).
+  A Phase 1 `Replying via ...` line without a matching `replied to` line means the reply failed.
 - A heartbeat line (`[Heartbeat] Last ~10m: scanned N comments ...`) is logged every 10 minutes by `StreamMetrics`. It is the quickest health and throughput signal.
 
 ### Release & Semantic Versioning Workflow

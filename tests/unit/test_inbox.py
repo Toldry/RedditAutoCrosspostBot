@@ -214,3 +214,46 @@ def test_feedback_is_logged_with_a_real_praw_instance(no_dry_run):
 
     comment.reply.assert_called_once()
     reddit_instance.inbox.mark_read.assert_called_once_with([comment])
+
+
+@pytest.mark.unit
+def test_reply_to_feedback_logs_the_feedback_and_the_full_url_of_the_reply(caplog):
+    mock_comment = MagicMock(spec=praw.models.Comment)
+    mock_comment.subreddit = MagicMock(display_name='pics')
+    mock_comment.author = MagicMock()
+    mock_comment.author.name = 'critic'
+    mock_comment.permalink = '/r/pics/comments/abc/title/def/'
+    mock_comment.reply.return_value = MagicMock(permalink='/r/pics/comments/abc/title/ghi/')
+    with caplog.at_level('INFO'):
+        inbox.reply_to_feedback(mock_comment, 'RESPOND_TO_NEGATIVE_SENTIMENT', 'same_subreddit_bot')
+    assert (
+        '/u/same_subreddit_bot replied to /u/critic feedback (r/pics): '
+        'https://reddit.com/r/pics/comments/abc/title/ghi/'
+    ) in caplog.text
+
+
+def make_inbox_comment(body):
+    """An inbox comment, which (like PRAW's) has a `context` link but no `permalink`."""
+    comment = MagicMock(spec=praw.models.Comment)
+    comment.body = body
+    comment.context = '/r/pics/comments/abc/title/def/?context=3'
+    comment.subreddit = MagicMock(display_name='pics')
+    return comment
+
+
+@pytest.mark.unit
+def test_feedback_from_the_inbox_is_logged_with_its_url(caplog):
+    comment = make_inbox_comment('bad bot')
+    with patch('racb.phases.inbox.get_reddit_instance'), \
+            patch('racb.phases.inbox.respond_to_negative_sentiment'), \
+            caplog.at_level('INFO'):
+        inbox.handle_comment_reply(comment)
+    assert 'Received negative feedback: https://reddit.com/r/pics/comments/abc/title/def/' in caplog.text
+
+
+@pytest.mark.unit
+def test_second_good_bot_from_the_inbox_is_skipped_without_error(caplog):
+    comment = make_inbox_comment('good bot')
+    with patch('racb.phases.inbox.is_first_positive_reply', return_value=False), caplog.at_level('INFO'):
+        assert inbox.respond_to_positive_sentiment(comment) is None
+    assert 'Not thanking https://reddit.com/r/pics/comments/abc/title/def/' in caplog.text

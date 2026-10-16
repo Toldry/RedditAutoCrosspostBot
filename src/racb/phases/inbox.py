@@ -63,7 +63,7 @@ def handle_comment_reply(comment, reddit_instance=None, bot_name=reddit.AUTO_CRO
         return
     sentiment = check_sentiment(comment.body)
     if sentiment is not None:
-        logger.info(f'Received {sentiment} feedback: {reddit.full_url(getattr(comment, "permalink", "?"))}')
+        logger.info(f'Received {sentiment} feedback: {reddit.full_url(reddit.comment_permalink(comment))}')
     try:
         if sentiment == 'positive':
             respond_to_positive_sentiment(comment, bot_name)
@@ -82,7 +82,7 @@ def handle_comment_reply(comment, reddit_instance=None, bot_name=reddit.AUTO_CRO
             raise
     except praw.exceptions.RedditAPIException as e:
         # E.g. a locked thread or an archived post. Retrying would fail the same way every 10 minutes.
-        logger.info(f'Could not reply to feedback {reddit.full_url(getattr(comment, "permalink", "?"))}: {e}')
+        logger.info(f'Could not reply to feedback {reddit.full_url(reddit.comment_permalink(comment))}: {e}')
         reddit_instance.inbox.mark_read([comment])
 
 
@@ -146,14 +146,19 @@ def reply_to_feedback(comment, string_key, bot_name):
     """Replies to `comment` in its subreddit's language, or only logs the reply when DRY_RUN is enabled."""
     text = i18n.get_translated_string(string_key, subreddit=comment.subreddit.display_name, bot_name=bot_name)
     if config.is_dry_run():
-        logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(comment.permalink)}:\n{text}')
+        logger.info(f'[DRY RUN] Would reply as /u/{bot_name} to {reddit.full_url(reddit.comment_permalink(comment))}:\n{text}')
         return None
-    return comment.reply(text)
+    reply = comment.reply(text)
+    logger.info(
+        f'/u/{bot_name} replied to {reddit.author_label(comment)} feedback '
+        f'(r/{comment.subreddit.display_name}): {reddit.full_url(getattr(reply, "permalink", "?"))}'
+    )
+    return reply
 
 
 def respond_to_positive_sentiment(comment, bot_name=reddit.AUTO_CROSSPOST_BOT_NAME):
     if not is_first_positive_reply(comment):
-        logger.info(f'Not thanking {reddit.full_url(comment.permalink)}: an earlier reply already said the same')
+        logger.info(f'Not thanking {reddit.full_url(reddit.comment_permalink(comment))}: an earlier reply already said the same')
         return None
     return reply_to_feedback(comment, 'RESPOND_TO_POSITIVE_SENTIMENT', bot_name)
 
