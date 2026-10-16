@@ -159,7 +159,7 @@ def test_reply_to_crosspost_without_image_scan_has_no_image_sentence(make_mock_c
     cross_post = MagicMock()
     phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=None)
     reply_text = cross_post.reply.call_args.args[0]
-    assert 'To prevent reposts, I looked through r/pics for posts with the same URL.\n' in reply_text
+    assert 'To prevent reposts, I searched all of r/pics for posts with the same URL and for crossposts of this post.\n' in reply_text
     assert 'duplicate_detector.py' not in reply_text
 
 
@@ -171,8 +171,9 @@ def test_reply_to_crosspost_reports_complete_image_scan(make_mock_comment):
     phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=make_media_scan(412))
     reply_text = cross_post.reply.call_args.args[0]
     assert (
-        'I also looked through all 412 image posts made in r/pics in the last 90 days and '
-        f'[checked for duplicates]({phase3.DUPLICATE_DETECTOR_SOURCE_URL}) of this image. None were found.'
+        f'I also [compared this image]({phase3.DUPLICATE_DETECTOR_SOURCE_URL}) with all 412 image posts made in '
+        'r/pics in the last 90 days, with the newest ones from before then, and with its top image posts of the '
+        'past year and of all time. None matched.'
     ) in reply_text
 
 
@@ -184,7 +185,7 @@ def test_reply_to_crosspost_reports_partial_image_scan(make_mock_comment):
     cross_post = MagicMock()
     phase3.reply_to_crosspost(comment, cross_post, 'pics', media_scan=scan)
     reply_text = cross_post.reply.call_args.args[0]
-    assert 'the 870 newest image posts in r/pics, going back 12 days' in reply_text
+    assert 'the 870 newest image posts in r/pics, going back 12 days, with the newest ones from when the comment was written' in reply_text
     assert "Reddit doesn't list older posts" not in reply_text
 
 

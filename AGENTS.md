@@ -162,9 +162,10 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     the reply.
   - Formats submission title (e.g. uppercase for `r/totallynotrobots`).
   - Executes `submission.crosspost()` and posts an explanatory reply using localized text templates loaded by [`src/racb/i18n.py`](./src/racb/i18n.py) from the gettext catalogs in [`src/racb/locales/`](./src/racb/locales/).
-    The reply (`REPLY_TO_CROSSPOST`) says the target was searched for the same URL and, for image and video
-    posts, adds one sentence from `phase3.describe_media_scan`: how many image (or video) posts were compared
-    and over what period (`REPLY_TO_CROSSPOST_IMAGE_CHECK` / `..._VIDEO_CHECK`), the same for a scan cut short
+    The reply (`REPLY_TO_CROSSPOST`) says the whole target was searched for the same URL and for crossposts and,
+    for image and video posts, adds one sentence from `phase3.describe_media_scan`: how many image (or video)
+    posts were compared and over what period (`REPLY_TO_CROSSPOST_IMAGE_CHECK` / `..._VIDEO_CHECK`), that the
+    newest ones from before the comment (the Phase 1 check) and the top posts were compared too, the same for a scan cut short
     by Reddit's listing limit (`..._IMAGE_CHECK_PARTIAL` / `..._VIDEO_CHECK_PARTIAL`). A scan that
     found no posts to compare adds no sentence. That sentence links to
     `duplicate_detector.py` on GitHub (`DUPLICATE_DETECTOR_SOURCE_URL`), so keep that file readable.
