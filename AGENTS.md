@@ -100,6 +100,8 @@ flowchart TD
 ```
 
 Note: a private target (`SUBREDDIT_IS_PRIVATE`) is **still inserted** in Phase 1. Phase 2 deletes it later.
+A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNED`) gets no
+`sub_doesnt_exist_bot` reply and is handled the same way.
 
 ### Phase Details
 - **Phase 1 ([`src/racb/phases/phase1.py`](./src/racb/phases/phase1.py)):**

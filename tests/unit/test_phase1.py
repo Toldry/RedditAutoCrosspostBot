@@ -403,3 +403,30 @@ def test_reply_as_bot_logs_the_suggestion_and_the_full_url_of_the_reply(make_moc
         '/u/same_post_bot replied to /u/suggester suggestion (r/funny -> r/pics): '
         'https://reddit.com/r/funny/comments/abc/title/ghi/'
     ) in caplog.text
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('reason, expected', [
+    ('banned', 'SUBREDDIT_IS_BANNED'),
+    (None, 'SUBREDDIT_DOES_NOT_EXIST'),
+])
+def test_search_404_tells_a_banned_subreddit_from_a_nonexistent_one(make_mock_comment, reason, expected):
+    comment = make_mock_comment()
+    mock_reddit = MagicMock()
+    error = make_prawcore_error(prawcore.exceptions.NotFound, 404, reason)
+    mock_reddit.subreddit.return_value.search.side_effect = error
+    with patch('racb.core.reddit.get_reddit_instance', return_value=mock_reddit):
+        result = phase1.get_posts_with_same_content(comment, 'jar')
+    assert result.unable_to_search is True
+    assert result.unable_to_search_reason == expected
+
+
+@pytest.mark.unit
+def test_banned_target_gets_no_sub_doesnt_exist_reply(make_mock_comment):
+    comment = make_mock_comment(body='r/jar')
+    result = MagicMock(posts_found=False, unable_to_search=True, unable_to_search_reason='SUBREDDIT_IS_BANNED')
+    with patch('racb.phases.phase1.get_posts_with_same_content', return_value=result), \
+            patch('racb.phases.phase1.reply_to_nonexistent_target_subreddit_comment') as mock_reply, \
+            patch('racb.phases.phase1.db.add_comment'):
+        phase1.handle_incoming_comment(comment)
+    mock_reply.assert_not_called()

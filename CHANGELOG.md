@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Reply Logging:** every comment a bot posts is now logged after it is posted, with the new comment's full URL: `/u/<bot> replied to <user> suggestion (r/<source> -> r/<target>): <reply URL>` for replies about a subreddit suggestion, and `/u/<bot> replied to <user> feedback (r/<subreddit>): <reply URL>` for answers to "good bot"/"bad bot". Before, the explanatory reply under each crosspost and the replies to "good bot"/"bad bot" feedback were not logged at all, and the Phase 1 auxiliary replies were only announced before posting, without the reply's own URL.
 
+### Fixed
+- **Banned Subreddits:** a suggestion of a banned subreddit (such as r/jar) got a `sub_doesnt_exist_bot` reply saying the subreddit does not exist and inviting the reader to create it, because Reddit answers 404 for banned subreddits too. A 404 whose reason is `banned` is now `SUBREDDIT_IS_BANNED` and gets no reply.
+- **Inbox Comment Links:** comments from an inbox listing have no `permalink`, only a `context` link, so feedback log lines showed `?` instead of a URL, and the "Not thanking" line (a second "good bot" under the same bot comment) and the `DRY_RUN` reply line raised `AttributeError`, which aborted that inbox pass and left the comment unread. They now use the `context` link.
+
 ## [2.13.0] - 2026-10-16
 
 ### Added
