@@ -12,7 +12,7 @@ It is locked down three ways:
   service refuses to start while the password is empty, because pgweb would otherwise serve without a login.
 - **Read-only.** It runs with `--readonly`: every query runs in a read-only transaction, and queries containing
   `INSERT`, `UPDATE`, `DELETE`, `DROP` and similar keywords are rejected. `--lock-session` stops it from being
-  used to connect to any other database. To change data, use `psql` (see [AGENTS.md](./AGENTS.md)).
+  used to connect to any other database. To change data, use `psql` (see [AGENTS.md](../AGENTS.md)).
 
 ```mermaid
 flowchart LR

@@ -1,5 +1,5 @@
 # Local virtualenvs and caches are platform-specific and must not end up in the image.
-# .env is deliberately NOT listed: baking it into the image is the owner's choice (docs/AGENTS.md section 8).
+# .env is deliberately NOT listed: baking it into the image is the owner's choice (AGENTS.md section 8).
 .venv/
 venv/
 **/__pycache__/

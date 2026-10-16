@@ -92,9 +92,6 @@ gcloud compute ssh reddit-crosspost-bot --zone us-central1-a --command "cd /opt/
 ```
 Drop `-e DRY_RUN=True` to crosspost for real.
 
-For running it without Docker, see [Local Development](#local-development-without-docker). Section 5 of
-[`docs/AGENTS.md`](./docs/AGENTS.md) has the details.
-
 ---
 
 ## Local Development (Without Docker)
@@ -185,7 +182,7 @@ You can run this bot 100% free on Google Cloud's Always Free `e2-micro` tier:
    gcloud compute instances create reddit-crosspost-bot --flags-file=deploy/instance-flags.yaml
    ```
 2. The VM will automatically execute [`deploy/cloud-init.yaml`](./deploy/cloud-init.yaml) on first boot, provisioning 2GB swap space, Docker, and Docker Compose.
-3. See [`docs/AGENTS.md`](./docs/AGENTS.md) for architecture details.
+3. See [`AGENTS.md`](./AGENTS.md) for architecture details.
 4. Optionally, have every push to `master` that passes the unit and integration tests redeploy the VM automatically: see
    [`docs/auto-deploy.md`](./docs/auto-deploy.md) for the one-time setup.
 
