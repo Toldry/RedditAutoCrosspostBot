@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.0.4] - 2026-10-16
+
+### Changed
+
+- **Changelog Fragments Instead of Editing CHANGELOG.md:** every pull request edited the `## [Unreleased]` section, so merging one made all other open PRs conflict. PRs now add a small file to `changelog.d/` (e.g. `+my-fix.fixed.md`), and the release job compiles those files into CHANGELOG.md with [towncrier](https://towncrier.readthedocs.io/) and deletes them. `uv run pytest` rejects a fragment towncrier cannot read. The `## [Unreleased]` heading is gone, and a new `CONTRIBUTING.md` explains the workflow.
+
+
 ## [3.0.3] - 2026-10-16
 
 ### Changed
