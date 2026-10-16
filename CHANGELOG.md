@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-16
+
 ### Fixed
 - **Rate Limit During the Image Duplicate Scan:** v2.14.3 read fields such as `crosspost_parent_list` that most listed posts lack, and PRAW answers a missing field by downloading the whole post again, so the scan made one Reddit request per post and quickly got HTTP 429 (`TooManyRequests`), crashing `--process-one`. The scan now reads only the fields Reddit already sent with the listing.
 - **Phase 3 Survives Reddit Outages:** a rate limit or network error while processing a Phase 3 entry no longer crashes the run (`--process-one`) or aborts the scheduled job with a traceback. It is logged as a warning, the entry is kept for the next run, and the rest of that batch waits too.
