@@ -167,9 +167,14 @@ def get_source_submission_problem(submission):
     discussed where it was posted.
     """
     try:
-        if isinstance(getattr(submission, 'removed_by_category', None), str):
+        # Logged so a post that looks live in a browser can be told apart from one Reddit reports as removed
+        removed_by_category = getattr(submission, 'removed_by_category', None)
+        if isinstance(removed_by_category, str):
+            logger.info(f'Source post {permalink_safe(submission)} has removed_by_category={removed_by_category!r}')
             return 'SOURCE_DELETED_OR_REMOVED'
-        if getattr(submission, 'selftext', None) in ('[deleted]', '[removed]'):
+        selftext = getattr(submission, 'selftext', None)
+        if selftext in ('[deleted]', '[removed]'):
+            logger.info(f'Source post {permalink_safe(submission)} has selftext={selftext!r}')
             return 'SOURCE_DELETED_OR_REMOVED'
         if getattr(submission, 'locked', False) is True:
             return 'SOURCE_LOCKED'
