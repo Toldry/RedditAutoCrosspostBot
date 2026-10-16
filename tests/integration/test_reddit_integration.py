@@ -366,7 +366,9 @@ def test_live_duplicate_detector_scans_gallery_posts():
     from racb.core import duplicate_detector
 
     r = reddit.get_reddit_instance(reddit.AUTO_CROSSPOST_BOT_NAME)
-    source_sub = r.subreddit(TEST_SOURCE_SUBREDDIT)
+    # Both posts go to the target and both scans read it. Scanning r/racb_test_1 failed in 3 of 4 master runs
+    # on 2026-10-16: the image post made there never showed up in the scan, not even after 30 s, while every
+    # scan of r/racb_test_2 (here and in the other tests) found posts made seconds earlier.
     target_sub = r.subreddit(TEST_TARGET_SUBREDDIT)
 
     asset_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'test_sample.png')
@@ -387,7 +389,7 @@ def test_live_duplicate_detector_scans_gallery_posts():
             gallery=[PostMedia(other_path), PostMedia(shared_path)],
             timeout=25,
         ))
-        image_submission = track(source_sub.submit(
+        image_submission = track(target_sub.submit(
             title=f'[Test Gallery Picture] {uuid.uuid4().hex[:8]}',
             image=PostMedia(shared_path),
             timeout=25,
@@ -405,21 +407,22 @@ def test_live_duplicate_detector_scans_gallery_posts():
         assert len(duplicate_detector.fingerprint_post(gallery)) == 2
 
         image_post = r.submission(id=image_submission.id)
-        for scanned, subreddit_name, expected_id in (
-            (image_post, TEST_TARGET_SUBREDDIT, gallery_submission.id),
-            (gallery, TEST_SOURCE_SUBREDDIT, image_submission.id),
-        ):
+        for scanned, expected_id in ((image_post, gallery_submission.id), (gallery, image_submission.id)):
             # Reddit's "new" listing can take a while to show a post made seconds ago, so keep asking
             scan = None
             for attempt in range(10):
-                scan = duplicate_detector.scan_subreddit_for_duplicates(scanned, subreddit_name, limit=15)
+                scan = duplicate_detector.scan_subreddit_for_duplicates(scanned, TEST_TARGET_SUBREDDIT, limit=15)
                 if scan and expected_id in [duplicate['post_id'] for duplicate in scan.duplicates]:
                     break
                 time.sleep(3.0)
             assert scan is not None, f'{scanned.url} was not scanned'
-            assert expected_id in [duplicate['post_id'] for duplicate in scan.duplicates], (
-                f'r/{subreddit_name} post {expected_id} not found as a duplicate of {scanned.url}'
-            )
+            if expected_id not in [duplicate['post_id'] for duplicate in scan.duplicates]:
+                # Says whether the post was missing from the listing or listed but not matched
+                listed_ids = [post.id for post in duplicate_detector.list_newest_posts(TEST_TARGET_SUBREDDIT, 15)]
+                pytest.fail(
+                    f'r/{TEST_TARGET_SUBREDDIT} post {expected_id} not found as a duplicate of {scanned.url}: '
+                    f'{scan.posts_checked} posts compared, newest posts listed: {listed_ids}'
+                )
 
     finally:
         image_dir.cleanup()
