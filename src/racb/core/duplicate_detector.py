@@ -219,12 +219,26 @@ def media_field(submission, name):
 
     A crosspost's own `url` is often just the original post's permalink, and its `is_video`, `preview`,
     `is_gallery`, `media_metadata` and `gallery_data` are often missing; the original post's fields are in
-    `crosspost_parent_list` (empty when the original was deleted, in which case the crosspost's own are used).
+    `crosspost_parent_list`, in the entry whose `name` is the crosspost's `crosspost_parent` (the first entry if
+    none is). When the list is empty (the original was deleted), the crosspost's own fields are used.
     """
-    parents = getattr(submission, 'crosspost_parent_list', None)
-    if isinstance(parents, list) and parents and isinstance(parents[0], dict):
-        return parents[0].get(name)
+    parent = crosspost_parent(submission)
+    if parent is not None:
+        return parent.get(name)
     return getattr(submission, name, None)
+
+
+def crosspost_parent(submission):
+    """Returns the original post's fields (a dict) when `submission` is a crosspost, else None."""
+    parents = getattr(submission, 'crosspost_parent_list', None)
+    if not isinstance(parents, list):
+        return None
+    parents = [parent for parent in parents if isinstance(parent, dict)]
+    if not parents:
+        return None
+    parent_name = getattr(submission, 'crosspost_parent', None)
+    named = [parent for parent in parents if parent_name is not None and parent.get('name') == parent_name]
+    return (named or parents)[0]
 
 
 def media_url(submission):

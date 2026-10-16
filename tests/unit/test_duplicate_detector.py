@@ -596,3 +596,18 @@ def test_crosspost_whose_original_was_deleted_uses_its_own_fields():
     crosspost.crosspost_parent_list = []
     crosspost.url = 'https://i.redd.it/kept.png'
     assert duplicate_detector.media_kind(crosspost) == duplicate_detector.IMAGE
+
+
+@pytest.mark.unit
+def test_crosspost_reads_the_parent_that_crosspost_parent_names():
+    crosspost = make_crosspost('x', {'name': 't3_middle', 'url': 'https://example.com/article'})
+    crosspost.crosspost_parent_list.append({'name': 't3_orig', 'url': 'https://i.redd.it/orig.png'})
+    crosspost.crosspost_parent = 't3_orig'
+    assert duplicate_detector.media_url(crosspost) == 'https://i.redd.it/orig.png'
+
+
+@pytest.mark.unit
+def test_crosspost_reads_the_first_parent_when_none_is_named():
+    crosspost = make_crosspost('x', {'name': 't3_orig', 'url': 'https://i.redd.it/orig.png'})
+    crosspost.crosspost_parent = None
+    assert duplicate_detector.media_url(crosspost) == 'https://i.redd.it/orig.png'
