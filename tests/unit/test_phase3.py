@@ -2,6 +2,7 @@
 
 import time
 from unittest.mock import patch, MagicMock
+import prawcore
 import pytest
 import praw.exceptions
 from racb import i18n
@@ -275,3 +276,34 @@ def test_reply_to_crosspost_logs_the_suggestion_and_the_full_url_of_the_reply(ma
         '/u/AutoCrosspostBot replied to /u/suggester suggestion (r/test_source -> r/pics): '
         'https://reddit.com/r/pics/comments/xyz/title/reply1/'
     ) in caplog.text
+
+
+def too_many_requests():
+    response = MagicMock(status_code=429, headers={}, text='')
+    return prawcore.exceptions.TooManyRequests(response)
+
+
+@pytest.mark.unit
+def test_rate_limit_keeps_the_row_and_stops_the_batch():
+    entries = [
+        {'id': 1, 'permalink': '/r/a/comments/1/t/c/', 'target_subreddit': 'b'},
+        {'id': 2, 'permalink': '/r/a/comments/2/t/c/', 'target_subreddit': 'b'},
+    ]
+    with patch.dict('os.environ', {'DRY_RUN': 'false', 'DEBUG': 'false'}), \
+         patch('racb.phases.phase3.db.get_comments_older_than', return_value=entries), \
+         patch('racb.phases.phase3.handle_comment', side_effect=too_many_requests()) as mock_handle, \
+         patch('racb.phases.phase3.db.delete_comment') as mock_delete:
+        phase3.process_comment_entries()
+    mock_handle.assert_called_once_with(entries[0])
+    mock_delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_process_oldest_entry_keeps_the_row_when_rate_limited():
+    entry = {'id': 7, 'permalink': '/r/a/comments/1/t/c/', 'scraped_time': None, 'target_subreddit': 'b'}
+    with patch.dict('os.environ', {'DRY_RUN': 'false', 'DEBUG': 'false'}), \
+         patch('racb.phases.phase3.db.get_oldest_comment', return_value=entry), \
+         patch('racb.phases.phase3.handle_comment', side_effect=too_many_requests()), \
+         patch('racb.phases.phase3.db.delete_comment') as mock_delete:
+        assert phase3.process_oldest_entry() is True
+    mock_delete.assert_not_called()

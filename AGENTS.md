@@ -169,6 +169,8 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     found no posts to compare adds no sentence. That sentence links to
     `duplicate_detector.py` on GitHub (`DUPLICATE_DETECTOR_SOURCE_URL`), so keep that file readable.
   - Handles Reddit API crosspost exceptions gracefully via modern `e.items` inspection (e.g., `NO_CROSSPOSTS`, `SUBREDDIT_NOTALLOWED`, `NO_IMAGES`, `SUBMIT_VALIDATION_*`).
+  - A rate limit or network error (`reddit.TRANSIENT_NETWORK_ERRORS`) while handling an entry keeps its row,
+    logs a warning and stops that batch (`handle_comment_or_defer`), so the entry is retried next run.
   - Deletes the record from PostgreSQL. This happens **after** the crosspost, and Phase 3 keeps no
     "already crossposted" state (see section 9).
   - With `DRY_RUN`, it logs what it would crosspost and keeps the row.
@@ -231,7 +233,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`docs/logs.md`](./docs/logs.md) | How to read the bot's logs over SSH or in Google Cloud Logging, and how to turn Cloud Logging on. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1721 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/unit/`](./tests/unit/) | 1725 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -488,6 +490,9 @@ Mechanics worth knowing:
   deliberately **paused** (`open-pull-requests-limit: 0` in `.github/dependabot.yml`); upgrades are manual.
 - **Do not reintroduce `requirements.txt`.** If a tool needs one, generate it with
   `uv export --no-dev --no-hashes -o requirements.txt` rather than maintaining it by hand.
+- **Lazy PRAW fields:** reading a field a listed post lacks (`crosspost_parent_list`, `preview`, ...) makes PRAW
+  fetch the whole post, one request each. Read media fields through `duplicate_detector.post_attribute`, which
+  only looks at what the listing returned.
 - **Image duplicate matching** (`duplicate_detector.fingerprints_match`) needs both a whole-image dhash
   distance ≤ `DEFAULT_HASH_THRESHOLD` (5) **and** every cell of a 4×4 grid within
   `DEFAULT_REGION_HASH_THRESHOLD` (10). The grid check stops different memes made from the same template
