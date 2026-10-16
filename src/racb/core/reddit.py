@@ -21,10 +21,10 @@ from racb.version import __version__
 
 logger = logging.getLogger(__name__)
 
-# Reddit answers PRAW's delete path, `POST /api/del/`, with a plain-text "404 page not found" (its router
-# has no route with the trailing slash), so every `Submission.delete()` / `Comment.delete()` failed. The same
-# endpoint without the slash works (confirmed live, October 2026). PRAW reads this shared dict on each
-# call, so patching it here fixes every delete made through any PRAW instance in this process.
+# On 2026-10-15 Reddit answered PRAW's delete path, `POST /api/del/`, with a plain-text "404 page not found"
+# for every item, while the same endpoint without the trailing slash worked. By 2026-10-16 both paths
+# worked again, so it was probably a temporary Reddit-side problem. The slash-less path is kept because it
+# works either way. PRAW reads this shared dict on each call, so this covers every PRAW instance in the process.
 praw.endpoints.API_PATH['del'] = 'api/del'
 
 praw_instances = None
