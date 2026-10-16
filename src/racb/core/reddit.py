@@ -9,6 +9,7 @@ IDs, not PRAW objects, from one thread to another.
 
 __all__ = [
     'get_reddit_instance',
+    'authenticate_bots',
     'authenticate_all_bots',
     'AUTO_CROSSPOST_BOT_NAME',
     'SUB_DOESNT_EXIST_BOT_NAME',
@@ -179,9 +180,17 @@ def authenticate_all_bots():
     Raises:
         RuntimeError: If any bot fails authentication or user identity verification.
     """
-    logger.info('Authenticating all Reddit bot accounts...')
+    authenticate_bots(BOT_NAMES)
+
+
+def authenticate_bots(bot_names):
+    """Verifies that the given bot accounts can authenticate; see `authenticate_all_bots`.
+
+    Every account is tried before raising, so one failure does not hide another.
+    """
+    logger.info(f'Authenticating {len(bot_names)} Reddit bot account(s)...')
     failed_bots = {}
-    for name in BOT_NAMES:
+    for name in bot_names:
         logger.info(f'Verifying authentication for /u/{name}...')
         try:
             reddit_instance = get_reddit_instance(name)
@@ -200,4 +209,4 @@ def authenticate_all_bots():
         failures_summary = '; '.join(f'/u/{name}: {err}' for name, err in failed_bots.items())
         raise RuntimeError(f'Authentication failed for {len(failed_bots)} bot(s): {failures_summary}')
 
-    logger.info('All bot accounts authenticated successfully.')
+    logger.info('Bot account(s) authenticated successfully.')

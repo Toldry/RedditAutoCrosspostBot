@@ -5,6 +5,7 @@ import pytest
 import praw.exceptions
 import prawcore
 import requests
+from racb.core import reddit
 from racb.main import StreamMetrics, handle_exception, env_bool
 
 
@@ -61,11 +62,11 @@ def test_main_startup_auth_success():
     from racb.main import main
 
     with patch('racb.main.configure_logging'), \
-         patch('racb.core.reddit.authenticate_all_bots') as mock_auth, \
+         patch('racb.core.reddit.authenticate_bots') as mock_auth, \
          patch('racb.main.start_bot') as mock_start, \
          patch('sys.argv', ['racb']):
         main()
-        mock_auth.assert_called_once()
+        mock_auth.assert_called_once_with(reddit.BOT_NAMES)
         mock_start.assert_called_once()
 
 
@@ -74,7 +75,7 @@ def test_main_startup_auth_failure_exits():
     from racb.main import main
 
     with patch('racb.main.configure_logging'), \
-         patch('racb.core.reddit.authenticate_all_bots', side_effect=RuntimeError('Bot authentication failed')), \
+         patch('racb.core.reddit.authenticate_bots', side_effect=RuntimeError('Bot authentication failed')), \
          patch('racb.main.start_bot') as mock_start, \
          patch('sys.argv', ['racb']), \
          pytest.raises(SystemExit) as excinfo:
@@ -140,7 +141,7 @@ def test_run_job_safely_swallows_errors_so_job_is_rescheduled():
 def test_help_does_not_require_reddit_authentication():
     from racb.main import main
     with patch('racb.main.configure_logging'), \
-         patch('racb.core.reddit.authenticate_all_bots') as mock_auth, \
+         patch('racb.core.reddit.authenticate_bots') as mock_auth, \
          patch('sys.argv', ['racb', '--help']), \
          pytest.raises(SystemExit) as excinfo:
         main()
@@ -154,15 +155,19 @@ def test_help_does_not_require_reddit_authentication():
 def test_process_one_runs_oldest_entry_and_exits(found, expected_exit_code):
     from racb.main import main
     with patch('racb.main.configure_logging'), \
-         patch('racb.core.reddit.authenticate_all_bots'), \
+         patch('racb.core.reddit.authenticate_bots') as mock_auth, \
          patch('racb.main.phase3.process_oldest_entry', return_value=found) as mock_oldest, \
          patch('racb.main.start_bot') as mock_start, \
+         patch('racb.main.phase2.filter_comments_from_db') as mock_phase2, \
          patch('sys.argv', ['racb', '--process-one']), \
          pytest.raises(SystemExit) as excinfo:
         main()
     assert excinfo.value.code == expected_exit_code
     mock_oldest.assert_called_once_with()
+    # Only the account Phase 3 uses is authenticated, and nothing else runs
+    mock_auth.assert_called_once_with([reddit.AUTO_CROSSPOST_BOT_NAME])
     mock_start.assert_not_called()
+    mock_phase2.assert_not_called()
 
 
 @pytest.mark.unit
@@ -220,7 +225,7 @@ def test_build_jobs_skips_the_writing_jobs_of_disabled_bots():
 def test_process_one_refuses_when_autocrosspostbot_is_disabled():
     from racb.main import main
     with patch('racb.main.configure_logging'), \
-         patch('racb.core.reddit.authenticate_all_bots'), \
+         patch('racb.core.reddit.authenticate_bots') as mock_auth, \
          patch('racb.main.phase3.process_oldest_entry') as mock_oldest, \
          patch('sys.argv', ['racb', '--process-one']), \
          patch.dict('os.environ', {'AUTO_CROSSPOST_BOT_ENABLED': 'false'}), \
@@ -228,6 +233,7 @@ def test_process_one_refuses_when_autocrosspostbot_is_disabled():
         main()
     assert excinfo.value.code == 2
     mock_oldest.assert_not_called()
+    mock_auth.assert_not_called()
 
 
 @pytest.mark.unit

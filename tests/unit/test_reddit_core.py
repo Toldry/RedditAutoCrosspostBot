@@ -180,3 +180,18 @@ def test_authenticate_all_bots_attempts_all_before_raising():
 ])
 def test_full_url(permalink, expected):
     assert reddit.full_url(permalink) == expected
+
+
+@pytest.mark.unit
+def test_authenticate_bots_checks_only_the_given_accounts():
+    calls = []
+
+    def mock_get_bot(name):
+        calls.append(name)
+        mock_r = MagicMock()
+        mock_r.user.me.return_value.name = name
+        return mock_r
+
+    with patch('racb.core.reddit.get_reddit_instance', side_effect=mock_get_bot):
+        reddit.authenticate_bots([reddit.AUTO_CROSSPOST_BOT_NAME])
+    assert calls == [reddit.AUTO_CROSSPOST_BOT_NAME]

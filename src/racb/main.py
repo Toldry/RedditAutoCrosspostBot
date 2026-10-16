@@ -198,32 +198,49 @@ def main():
     if config.is_dry_run():
         logger.info('DRY_RUN is enabled: no replies, crossposts or deletions will be made')
 
-    log_disabled_bots()
+    if args.process_one:
+        process_one()
 
+    log_disabled_bots()
+    check_catalogs_compiled()
+    authenticate(reddit.BOT_NAMES)
+
+    if args.only_phase2:
+        phase2.filter_comments_from_db(verbose=True)
+        return
+
+    start_bot()
+
+
+def check_catalogs_compiled():
     try:
         i18n.check_catalogs_compiled()
     except i18n.CatalogNotCompiledError as e:
         logger.critical(f'Startup failed: {e}')
         sys.exit(1)
 
+
+def authenticate(bot_names):
     try:
-        reddit.authenticate_all_bots()
+        reddit.authenticate_bots(bot_names)
     except Exception as e:
         logger.critical(f'Startup authentication failed: {e}')
         sys.exit(1)
 
-    if args.only_phase2:
-        phase2.filter_comments_from_db(verbose=True)
-        return
 
-    if args.process_one:
-        if not config.is_bot_enabled(reddit.AUTO_CROSSPOST_BOT_NAME):
-            logger.critical('--process-one crossposts as /u/AutoCrosspostBot, which AUTO_CROSSPOST_BOT_ENABLED disables')
-            sys.exit(2)
-        found = phase3.process_oldest_entry()
-        sys.exit(0 if found else 1)
+def process_one():
+    """`--process-one`: runs Phase 3 on the oldest DB row, then exits.
 
-    start_bot()
+    Nothing else starts: no stream, no jobs, no worker threads. Phase 3 reads Reddit and crossposts only as
+    /u/AutoCrosspostBot, so the other 3 accounts are not even authenticated.
+    """
+    if not config.is_bot_enabled(reddit.AUTO_CROSSPOST_BOT_NAME):
+        logger.critical('--process-one crossposts as /u/AutoCrosspostBot, which AUTO_CROSSPOST_BOT_ENABLED disables')
+        sys.exit(2)
+    check_catalogs_compiled()
+    authenticate([reddit.AUTO_CROSSPOST_BOT_NAME])
+    found = phase3.process_oldest_entry()
+    sys.exit(0 if found else 1)
 
 
 def install_signal_handlers():

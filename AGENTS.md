@@ -203,7 +203,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`src/racb/__main__.py`](./src/racb/__main__.py) | Module executable entrypoint for `python -m racb`. |
 | [`src/racb/__init__.py`](./src/racb/__init__.py) | Package marker; re-exports `__version__`. |
 | [`src/racb/config.py`](./src/racb/config.py) | **All** environment parsing: `load_environment()`, `env_bool()`, `is_debug()` / `is_dry_run()` / `is_bot_enabled()`, `parse_duration()` (adds months and years on top of `pytimeparse`), waiting periods, score threshold. Use it instead of reading `os.environ` directly. |
-| [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Per-thread factory for PRAW instances (one per account per thread, created lazily) with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` (startup check), `TRANSIENT_NETWORK_ERRORS` and the bot-name constants. |
+| [`src/racb/core/reddit.py`](./src/racb/core/reddit.py) | Per-thread factory for PRAW instances (one per account per thread, created lazily) with native `ratelimit_seconds=300` and updated user-agent formats. Also `authenticate_all_bots()` / `authenticate_bots(names)` (startup check), `TRANSIENT_NETWORK_ERRORS` and the bot-name constants. |
 | [`src/racb/core/db.py`](./src/racb/core/db.py) | PostgreSQL connector (`psycopg2-binary`) with one connection per thread, connection retry logic and stored procedure invocation. |
 | [`src/racb/core/shutdown.py`](./src/racb/core/shutdown.py) | The process-wide stop signal: `request_stop()`, `stop_requested()`, `stop_requested_within(seconds)` (an interruptible sleep that returns True on shutdown), and `fail()`, which records a thread's crash and stops the process. |
 | [`src/racb/core/sub_search.py`](./src/racb/core/sub_search.py) | Typo suggestions: merges candidates from `known_subreddits` and `reddit.subreddits.search()`, filtered and ranked by name similarity. |
@@ -231,7 +231,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`docs/logs.md`](./docs/logs.md) | How to read the bot's logs over SSH or in Google Cloud Logging, and how to turn Cloud Logging on. |
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
-| [`tests/unit/`](./tests/unit/) | 1720 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
+| [`tests/unit/`](./tests/unit/) | 1721 mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
 | [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
@@ -311,7 +311,7 @@ Store these in `.env` for local development or production:
 - `<BOT>_ENABLED=False` turns one account's writes off silently. Phase 1 still decides what it would have
   done (a comment that would have got an auxiliary reply is still **not** stored), it just does not reply.
   With all four off, only the stream, Phase 1's filtering, the database inserts, Phase 2 and the
-  known-subreddits job run. All 4 accounts still need valid credentials, since startup authenticates them all.
+  known-subreddits job run. All 4 accounts still need valid credentials, since startup authenticates them all (except `--process-one`).
 - `DRY_RUN=True` keeps every bot running but logs each write instead of making it.
 
 ---
@@ -378,8 +378,11 @@ Store these in `.env` for local development or production:
    so repeated runs walk through the table oldest first. Exit code 1 means the table is empty.
    Under Docker Compose, inside the running bot container: `docker compose exec bot python -m racb --process-one`
    (add `-e DRY_RUN=True` after `exec` for a dry run).
-   Every invocation except `--help`, including `--only-phase2` and `--process-one`, first runs `authenticate_all_bots()`. That
-   needs network access and valid credentials for **all 4** accounts, and exits with code 1 otherwise.
+   `--process-one` starts nothing else (no stream, jobs or worker threads) and authenticates only
+   `AutoCrosspostBot`, the one account Phase 3 uses, so the other 3 need no valid credentials for it. It exits
+   with code 2 when `AUTO_CROSSPOST_BOT_ENABLED` is false. Every other invocation except `--help`, including
+   `--only-phase2`, first runs `authenticate_all_bots()`. That needs network access and valid credentials for
+   **all 4** accounts, and exits with code 1 otherwise.
 
 ### Testing
 ```bash
