@@ -82,14 +82,20 @@ class PeriodicJob(threading.Thread):
             self.lock.release()
 
 
-def back_off_after_network_error(error, thread_name):
-    """Waits after a rate limit or network error. Returns True if a shutdown was requested meanwhile."""
+def back_off_after_network_error(error):
+    """Waits after a rate limit or network error. Returns True if a shutdown was requested meanwhile.
+
+    The log line names the thread (see the log format), so the message does not repeat it.
+    """
+    # A rate limit means the bot itself sends too many requests, which a setting can fix (fewer
+    # PHASE1_WORKERS, longer job intervals), so it is a WARNING. Network errors and Reddit outages
+    # happen routinely and fix themselves, so they are INFO, as in main.handle_exception.
     if isinstance(error, prawcore.exceptions.TooManyRequests):
         delay = TOO_MANY_REQUESTS_DELAY_SECONDS
-        logger.warning(f'{thread_name}: rate limited by Reddit ({error}). Waiting {delay}s.')
+        logger.warning(f'Rate limited by Reddit ({error}). Waiting {delay}s.')
     else:
         delay = NETWORK_RETRY_DELAY_SECONDS
-        logger.info(f'{thread_name}: network error {error!r}. Waiting {delay}s.')
+        logger.info(f'Network error {error!r}. Waiting {delay}s.')
     return shutdown.stop_requested_within(delay)
 
 
@@ -143,7 +149,7 @@ class Phase1Workers:
                         raise
                     # The comment is skipped, not retried: the back-off below may outlast its relevance
                     logger.info(f'Skipping comment {comment_id} after network error')
-                    if back_off_after_network_error(e, thread_name):
+                    if back_off_after_network_error(e):
                         return
         except BaseException as e:
             shutdown.fail(e, thread_name)
