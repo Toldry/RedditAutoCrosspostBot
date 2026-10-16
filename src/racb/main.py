@@ -346,9 +346,9 @@ def handle_comment_id(comment_id):
 def handle_comment_safely(comment):
     """Runs Phase 1 for one comment so that an error affecting only this comment skips just this comment.
 
-    Previously every such error (e.g. a 403 because an auxiliary bot is banned from the subreddit)
-    escaped to `handle_exception`, which slept and rebuilt the stream, dropping comments.
-    Network-level errors still propagate so the Phase 1 worker can back off.
+    Errors such as a 403 because an auxiliary bot is banned from the subreddit are logged and the comment
+    is skipped; the worker moves straight on to the next one. Network-level errors propagate, so the
+    Phase 1 worker can back off before making more requests.
     """
     try:
         phase1.handle_incoming_comment(comment, metrics=metrics)
