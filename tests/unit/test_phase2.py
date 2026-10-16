@@ -126,6 +126,26 @@ def test_run_filters_rejects_rows_for_blacklisted_subreddits(make_mock_comment, 
 
 
 @pytest.mark.unit
+def test_run_filters_rejects_a_target_subreddit_the_bot_is_banned_from(make_mock_comment):
+    comment = make_mock_comment(body='r/taiwan', score=100)
+    comment._reddit.subreddit.return_value.user_is_banned = True
+    result, mock_search = run_filters_on(comment, 'taiwan')
+    assert result.passes_filter is False
+    assert result.reason == 'BANNED_FROM_TARGET_SUBREDDIT'
+    comment._reddit.subreddit.assert_called_with('taiwan')
+    mock_search.assert_not_called()
+
+
+@pytest.mark.unit
+def test_is_banned_from_subreddit_is_false_when_the_subreddit_cannot_be_read():
+    reddit_instance = MagicMock()
+    type(reddit_instance.subreddit.return_value).user_is_banned = PropertyMock(
+        side_effect=prawcore.exceptions.Forbidden(MagicMock(status_code=403)),
+    )
+    assert phase2.is_banned_from_subreddit(reddit_instance, 'private_sub') is False
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize('source_state, reason', [
     ({'removed_by_category': 'moderator'}, 'SOURCE_DELETED_OR_REMOVED'),
     ({'removed_by_category': 'deleted'}, 'SOURCE_DELETED_OR_REMOVED'),

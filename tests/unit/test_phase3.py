@@ -25,6 +25,16 @@ def test_handle_crosspost_exception_familiar():
 
 
 @pytest.mark.unit
+def test_handle_crosspost_exception_treats_a_ban_as_familiar():
+    api_exc = praw.exceptions.RedditAPIException([[
+        'SUBREDDIT_NOTALLOWED_BANNED', "You've been banned from contributing to this community", 'sr',
+    ]])
+    res = phase3.handle_crosspost_exception(api_exc, None, 'some_sub')
+    assert res.handled_with_grace is True
+    assert res.error_type == 'SUBREDDIT_NOTALLOWED_BANNED'
+
+
+@pytest.mark.unit
 def test_handle_crosspost_exception_unfamiliar():
     api_exc = praw.exceptions.RedditAPIException([['COMPLETELY_UNEXPECTED_ERROR', 'Unexpected', 'field']])
     res = phase3.handle_crosspost_exception(api_exc, None, 'some_sub')

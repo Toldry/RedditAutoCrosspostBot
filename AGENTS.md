@@ -124,6 +124,9 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     - Regex pattern still holds (user didn't edit comment), and still names the stored target subreddit.
     - Neither the source nor the target is in `SUB_BLACKLIST` (`CROSSPOST_BLOCKED`), so subreddits blacklisted
       after a row was scraped are honored.
+    - `AutoCrosspostBot` is not banned from the target (`user_is_banned`, one request,
+      `BANNED_FROM_TARGET_SUBREDDIT`), checked before the duplicate scan. Phase 3 also treats a crosspost
+      rejected with `SUBREDDIT_NOTALLOWED_BANNED` as an expected outcome, for a ban that came after the check.
     - The source post is not deleted or removed (`removed_by_category`, `[deleted]` / `[removed]` self text),
       locked or archived (`get_source_submission_problem`).
     - Target subreddit availability and duplicate check. Besides the URL search and picture scan, a post in the

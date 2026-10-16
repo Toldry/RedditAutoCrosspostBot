@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Dead-Source Log Detail:** when a source post is skipped as `SOURCE_DELETED_OR_REMOVED`, the log now names the field Reddit reported (`removed_by_category` or `[deleted]`/`[removed]` self text) and its value, so a post that looks live in a browser can be checked.
 
+### Fixed
+- **Banned From the Target Subreddit:** when `AutoCrosspostBot` was banned from the target subreddit, Phase 3 still ran the full duplicate scan, and the crosspost then failed with `SUBREDDIT_NOTALLOWED_BANNED`, logged as an unexpected `ERROR` with a traceback. Phases 2 and 3 now check the subreddit's `user_is_banned` before the duplicate scan and drop the row (`BANNED_FROM_TARGET_SUBREDDIT`), and a crosspost rejected with `SUBREDDIT_NOTALLOWED_BANNED` is logged as a graceful rejection.
+
 ## [2.14.1] - 2026-10-16
 
 ### Changed
