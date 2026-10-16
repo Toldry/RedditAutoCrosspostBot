@@ -118,7 +118,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
   - Any error while handling one comment is caught in `main.handle_comment_safely()` and skips only that
     comment (section 7).
 - **Phase 2 ([`src/racb/phases/phase2.py`](./src/racb/phases/phase2.py)):**
-  - Runs every 20 minutes on its own thread (or manually via `python -m racb --only-phase2`).
+  - Runs every 20 minutes on its own thread.
   - Fetches unchecked rows older than `PHASE2_WAITING_PERIOD` using `get_unchecked_comments_older_than(interval)`.
   - Executes **batch fetching via `reddit.info(fullnames=chunk)`** in chunks of 100 to minimize API requests by 99%:
     - Comment availability (not deleted / removed).
@@ -362,11 +362,7 @@ Store these in `.env` for local development or production:
    ```bash
    uv run python -m racb
    ```
-4. **Run Only Phase 2 (Manual Filter Pass):**
-   ```bash
-   python -m racb --only-phase2
-   ```
-5. **Process a Single Entry (Production Testing):**
+4. **Process a Single Entry (Production Testing):**
    ```bash
    uv run python -m racb --process-one                    # the oldest row in scraped_comments
    DRY_RUN=True uv run python -m racb --process-one       # same checks, but only logs the crosspost
@@ -380,8 +376,8 @@ Store these in `.env` for local development or production:
    (add `-e DRY_RUN=True` after `exec` for a dry run).
    `--process-one` starts nothing else (no stream, jobs or worker threads) and authenticates only
    `AutoCrosspostBot`, the one account Phase 3 uses, so the other 3 need no valid credentials for it. It exits
-   with code 2 when `AUTO_CROSSPOST_BOT_ENABLED` is false. Every other invocation except `--help`, including
-   `--only-phase2`, first runs `authenticate_all_bots()`. That needs network access and valid credentials for
+   with code 2 when `AUTO_CROSSPOST_BOT_ENABLED` is false. Every other invocation except `--help` first runs
+   `authenticate_all_bots()`. That needs network access and valid credentials for
    **all 4** accounts, and exits with code 1 otherwise.
 
 ### Testing

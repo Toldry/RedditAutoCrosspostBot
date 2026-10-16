@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Graceful Shutdown:** `docker stop` (SIGTERM) and Ctrl-C now stop every thread cleanly: Phase 2 and Phase 3 stop between entries instead of being killed mid-entry, and back-off waits end at once. The bot service gets `stop_grace_period: 60s` in `docker-compose.yml`, so Docker waits for it.
 - **`schedule` Dependency Removed:** the job threads replace the `schedule` library.
 
+### Removed
+- **`--only-phase2` Flag:** it was added for a Heroku process type that no longer exists, and nothing uses it any more. Phase 2 still runs every 20 minutes.
+
 ## [2.14.3] - 2026-10-16
 
 ### Fixed

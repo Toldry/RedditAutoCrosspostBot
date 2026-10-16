@@ -177,7 +177,6 @@ def log_disabled_bots():
 
 def parse_args():
     parser = argparse.ArgumentParser(description="RedditAutoCrosspostBot runner")
-    parser.add_argument('--only-phase2', action='store_true', help="Run Phase 2 filtering only and exit")
     parser.add_argument(
         '--process-one',
         action='store_true',
@@ -204,10 +203,6 @@ def main():
     log_disabled_bots()
     check_catalogs_compiled()
     authenticate(reddit.BOT_NAMES)
-
-    if args.only_phase2:
-        phase2.filter_comments_from_db(verbose=True)
-        return
 
     start_bot()
 
