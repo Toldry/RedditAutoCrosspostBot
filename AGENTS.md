@@ -258,7 +258,7 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
 | [`scripts/negative_feedback_report.py`](./scripts/negative_feedback_report.py) | Writes an HTML report to `reports/negative_feedback/` (gitignored) of the "bad bot" exchanges with written feedback: a reply below a bot's `RESPOND_TO_NEGATIVE_SENTIMENT` question (or the "bad bot" comment itself) that says more than a bare sentiment phrase (bodies `[deleted]`, `[removed]` and `[unavailable]` never count). Each qualifying exchange shows only its new feedback, with the post and the Reddit-style comment tree collapsed behind a "Show full conversation" button. Scans all 4 bots by default (`--bot` picks some). Each report embeds the feedback ids it shows, so the next run only reports exchanges with new feedback, and links to the earlier reports. Reddit listings stop at about 1000 items, so very old comments may be unreachable. |
 | [`tests/conftest.py`](./tests/conftest.py) | `MockComment` / `MockSubmission` / `MockSubreddit` / `MockRedditor` plus the `make_mock_comment` and `make_mock_submission` factory fixtures. |
 | [`tests/unit/`](./tests/unit/) | 1700+ mocked unit tests (`@pytest.mark.unit`), one file per module. `test_crosspost_reply_phrasings.py` renders the crosspost reply for all 1330 combinations of locale, author, comment age and media-scan outcome (none, or each image and video scan) and checks each; its `render_crosspost_reply` is handy for reading them. |
-| [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 10 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
+| [`tests/integration/test_reddit_integration.py`](./tests/integration/test_reddit_integration.py) | 15 **live** Reddit tests (`@pytest.mark.integration`) that submit real posts and comments. |
 | [`tests/assets/test_sample.png`](./tests/assets/test_sample.png) | Base image for perceptual-hash variation tests. |
 | [`pytest.ini`](./pytest.ini) | Test discovery: `testpaths = tests`, `pythonpath = src .`, markers `unit` and `integration`, and `addopts = -m "not integration"`. |
 | [`.github/workflows/tests.yml`](./.github/workflows/tests.yml) | CI: `uv sync --locked` then `uv run pytest` on Python 3.11 (from `.python-version`), for pushes to `master`/`main` and for pull requests. Fails if `uv.lock` is out of date. On `master`, a `release` job then bumps the version and tags it (section 5), and, when the `AUTO_DEPLOY` variable is `true`, an `integration-tests` job runs the live tests with the bot credentials from repository secrets, then deletes what they created with `delete_test_artifacts.py --strict` (even after failed or cancelled tests), after which a `deploy` job redeploys the VM at the released commit ([`docs/auto-deploy.md`](./docs/auto-deploy.md)). |
@@ -467,8 +467,10 @@ uv run pytest -m integration
   - `reads`: ID blocks (or listing batches) fetched, and how many comments each returned (all of them, before
     the r/all filter). With `STREAM_SOURCE=listing`, about 100 comments/request means the listing returned
     full pages, so the bot was falling behind r/all.
-  - `head`: polls for the newest comment ID, and how many of them got an empty r/all listing. Empty polls
-    cost nothing but a few seconds of delay; only a long streak, which also logs a WARNING, stops new reads.
+  - `head`: polls for the newest comment ID, and how many of them got an empty r/all listing or were
+    `rejected` as implausible (see section 7). Empty polls cost nothing but a few seconds of delay; only a
+    long streak, which also logs a WARNING, stops new reads.
+  - If head polls succeeded but `reads: 0 requests`, a second line, a WARNING, says the reader is stalled.
   - `behind`: age of the newest comment read, and (`ids` only) how many IDs wait to be read. Growing values
     mean the readers do not keep up; `N ID block(s) failed` and `N IDs skipped` count comments given up on.
 
@@ -631,6 +633,14 @@ The reader saves its position every 30 s and at shutdown: the lowest ID not read
 the blocks already done above it, so a restart neither skips nor re-reads them. A restart more than
 `MAX_BACKLOG_IDS` (200,000, about half an hour at a guessed 100 comments a second) behind starts at the newest comment instead, and so does
 a running reader that falls that far behind (the skipped IDs are logged and counted).
+
+The head is checked before it is followed, because on 2026-10-17 a single bogus ID (about 6 × 10^18, real
+IDs were about 8 × 10^10) made the reader skip ahead to it and then read nothing for hours:
+- `fetch_head` ignores IDs in the listing more than `MAX_BACKLOG_IDS` from the median (`newest_consistent_id`).
+- A head more than `MAX_BACKLOG_IDS` plus `MAX_COMMENT_IDS_PER_SECOND` (2,000) per second since the last
+  accepted head (or the saved cursor, at startup) is rejected, logged once per streak and counted.
+- If `HEADS_BELOW_POSITION_BEFORE_RESET` (6) heads in a row are more than `MAX_BACKLOG_IDS` below the reader's
+  position, it restarts at the newest comment. A saved cursor ahead of the head is ignored the same way.
 
 **Reading comments (`STREAM_SOURCE=listing`).** `main_loop()` reads one batch from PRAW's comment stream. The
 stream uses `pause_after=-1`. In PRAW this makes the generator yield `None` after **every** request and

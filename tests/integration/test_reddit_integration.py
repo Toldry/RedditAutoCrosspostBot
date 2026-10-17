@@ -3,6 +3,7 @@
 import logging
 import os
 import tempfile
+import threading
 import time
 import uuid
 from urllib.parse import urlparse
@@ -131,6 +132,79 @@ def test_live_comment_reader_reads_recent_comments_by_id():
     # Comments in private subreddits are not returned, so not every ID comes back
     assert len(comments) >= block_count * comment_reader.BLOCK_SIZE // 2, f'only {len(comments)} comments'
     assert any(comment_reader.is_shown_on_r_all(comment) for comment in comments)
+
+
+@pytest.mark.integration
+def test_live_head_is_a_recent_real_comment():
+    """The head the reader follows must be a real, recent comment in the numbering it reads.
+
+    On 2026-10-17 the head became a bogus ID (about 6 * 10^18) and the reader read nothing for hours. The block
+    ending at the head must hold comments written in the last hour, with IDs no higher than the head.
+    """
+    head = fetch_head_with_retries()
+    first = head - comment_reader.BLOCK_SIZE + 1
+    comments = comment_reader.fetch_block(reddit.AUTO_CROSSPOST_BOT_NAME, first)
+    assert comments, f'no comment in the block ending at the head {comment_reader.number_to_comment_id(head)}'
+    numbers = [comment_reader.comment_id_to_number(comment.id) for comment in comments]
+    assert all(first <= number <= head for number in numbers)
+    newest_age = time.time() - max(comment.created_utc for comment in comments)
+    assert newest_age < 3600, f'the newest comment at the head is {newest_age:.0f} s old'
+
+
+class InMemoryCursorStore:
+    """Keeps the live reader test's cursor out of the database: no saved cursor, saves are only counted."""
+
+    def __init__(self):
+        self.saves = 0
+
+    def get_stream_cursor(self, name):
+        return None
+
+    def save_stream_cursor(self, name, next_comment_id, done_blocks):
+        self.saves += 1
+
+
+@pytest.mark.integration
+def test_live_comment_reader_scans_comments_after_start():
+    """Runs the real CommentReader against Reddit for about 45 s: it must read and hand on comments.
+
+    This is the check the 2026-10-17 outage would have failed: the head polls succeeded, but the reader
+    made no read requests and scanned nothing.
+    """
+    from racb.core import shutdown
+    from racb.main import StreamMetrics
+
+    handled = []
+    errors = []
+    metrics = StreamMetrics()
+    reader = comment_reader.CommentReader(
+        handled.append,
+        reader_count=2,
+        metrics=metrics,
+        handle_exception=lambda error: errors.append(error) or False,
+        cursor_store=InMemoryCursorStore(),
+    )
+    run_thread = threading.Thread(target=reader.run, name='live-reader-test', daemon=True)
+    reader.start()
+    run_thread.start()
+    try:
+        # Read for 45 s, and up to 90 s while fewer than 200 comments came in
+        started = time.monotonic()
+        while time.monotonic() - started < 45 or (len(handled) < 200 and time.monotonic() - started < 90):
+            time.sleep(1)
+    finally:
+        shutdown.request_stop()
+        run_thread.join(30)
+        for thread in reader.threads:
+            thread.join(30)
+        shutdown.reset()
+    assert metrics.interval_requests > 0, f'no read request; head poll errors: {errors}'
+    assert len(handled) >= 200, f'only {len(handled)} comments read; head poll errors: {errors}'
+    assert metrics.lag_ids is not None
+    # Slightly negative when the last head was a little older than the one before; the outage's was -6 * 10^18
+    assert abs(metrics.lag_ids) < comment_reader.MAX_BACKLOG_IDS
+    newest_age = time.time() - metrics.newest_created_utc
+    assert newest_age < 600, f'the newest comment read is {newest_age:.0f} s old'
 
 
 @pytest.mark.integration

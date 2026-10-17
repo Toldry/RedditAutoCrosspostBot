@@ -292,6 +292,7 @@ def test_heartbeat_counts_empty_head_polls(caplog):
     metrics = StreamMetrics()
     metrics.record_head_poll(1.0)
     metrics.record_head_poll(3.0, empty=True)
+    metrics.record_request(1.0, 100)
     with caplog.at_level(logging.INFO, logger='racb.main'):
         metrics.log_heartbeat()
     assert 'head: 2 polls (1 empty), 2.00 s/poll' in caplog.records[-1].getMessage()
@@ -318,6 +319,50 @@ def test_heartbeat_reports_reads_and_lag(caplog):
     assert message.endswith('1 ID block(s) failed')
     assert metrics.interval_requests == 0
     assert metrics.interval_failed_blocks == 0
+
+
+@pytest.mark.unit
+def test_heartbeat_counts_rejected_heads(caplog):
+    import logging
+    metrics = StreamMetrics()
+    metrics.record_head_poll(1.0)
+    metrics.record_head_poll(1.0, empty=True)
+    metrics.record_rejected_head()
+    metrics.record_request(1.0, 100)
+    with caplog.at_level(logging.INFO, logger='racb.main'):
+        metrics.log_heartbeat()
+    assert 'head: 2 polls (1 empty, 1 rejected), 1.00 s/poll' in caplog.records[-1].getMessage()
+    assert metrics.interval_rejected_heads == 0
+
+
+@pytest.mark.unit
+def test_heartbeat_warns_when_heads_were_found_but_nothing_was_read(caplog):
+    # The 2026-10-17 outage: head polls kept succeeding, the readers made no request for hours
+    import logging
+    metrics = StreamMetrics()
+    metrics.record_head_poll(1.0)
+    with caplog.at_level(logging.INFO, logger='racb.main'):
+        metrics.log_heartbeat()
+    assert [record.levelname for record in caplog.records] == ['INFO', 'WARNING']
+    assert 'stalled' in caplog.records[-1].getMessage()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('head_polls, empty_head_polls, requests', [
+    (0, 0, 0),  # STREAM_SOURCE=listing: no head polls
+    (3, 3, 0),  # Only empty listings: no head to read up to
+    (3, 0, 5),  # Reading normally
+])
+def test_heartbeat_does_not_warn_without_a_stall(caplog, head_polls, empty_head_polls, requests):
+    import logging
+    metrics = StreamMetrics()
+    for poll in range(head_polls):
+        metrics.record_head_poll(1.0, empty=poll < empty_head_polls)
+    for _ in range(requests):
+        metrics.record_request(1.0, 100)
+    with caplog.at_level(logging.INFO, logger='racb.main'):
+        metrics.log_heartbeat()
+    assert [record.levelname for record in caplog.records] == ['INFO']
 
 
 @pytest.mark.unit
