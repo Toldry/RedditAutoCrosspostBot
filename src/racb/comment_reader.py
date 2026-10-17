@@ -24,6 +24,7 @@ anyway, and only for regex matches. Subreddits that only opted out of r/all cann
 comment, so their comments are now read too.
 """
 
+import datetime
 import logging
 import queue
 import threading
@@ -56,6 +57,17 @@ HEAD_POLL_SECONDS = 10
 # works on comments too old to be worth a reply. The same limit decides whether a restart resumes.
 MAX_BACKLOG_IDS = 200_000
 
+# How fast the head may plausibly move. Reddit hands out roughly 100 comment IDs a second
+# (scripts/verify_comment_ids.py); this allows 20 times that. On 2026-10-17 the r/all listing started returning
+# a comment whose ID was about 6 * 10^18, while real IDs were about 8 * 10^10: the reader jumped to it, never
+# saw a real head above its position again, and read nothing for hours. A head further ahead of the last
+# accepted one than MAX_BACKLOG_IDS plus this rate allows is now rejected instead of followed
+MAX_COMMENT_IDS_PER_SECOND = 2_000
+
+# Head polls in a row whose head is far below the reader's position before the reader trusts the head again.
+# A position that far ahead of every head can only come from a bogus ID, and it would stall reading for good
+HEADS_BELOW_POSITION_BEFORE_RESET = 6
+
 # Tries per block before its comments are given up on
 MAX_BLOCK_ATTEMPTS = 3
 
@@ -86,6 +98,13 @@ def number_to_comment_id(number):
     return ''.join(reversed(digits))
 
 
+def saved_timestamp(updated_at):
+    """The Unix time of a cursor's `updated_at`, a naive timestamp in the database's time zone (UTC)."""
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=datetime.timezone.utc)
+    return updated_at.timestamp()
+
+
 def block_fullnames(block_start):
     """The 100 comment fullnames of the block that starts at ID `block_start`."""
     return [f't1_{number_to_comment_id(number)}' for number in range(block_start, block_start + BLOCK_SIZE)]
@@ -112,9 +131,32 @@ def fetch_head():
     Returns None if the listing came back empty, which Reddit sometimes does even with HEAD_LISTING_LIMIT.
     """
     newest = list(reddit.get_reddit_instance().subreddit('all').comments(limit=HEAD_LISTING_LIMIT))
-    if not newest:
+    return newest_consistent_id([comment.id for comment in newest])
+
+
+def newest_consistent_id(comment_ids):
+    """Returns the highest of `comment_ids` (as a number) that lies near most of the others, or None.
+
+    The listing's comments were all written in the last few seconds, so their IDs lie within a few thousand
+    of each other. An ID far from the median (another numbering, or a malformed ID) is not a head to follow.
+    """
+    numbers = []
+    for comment_id in comment_ids:
+        try:
+            numbers.append(comment_id_to_number(comment_id))
+        except (AttributeError, TypeError, ValueError):
+            logger.debug(f'Ignoring comment ID {comment_id!r} in the r/all listing: not base 36')
+    if not numbers:
         return None
-    return max(comment_id_to_number(comment.id) for comment in newest)
+    median = sorted(numbers)[len(numbers) // 2]
+    consistent = [number for number in numbers if abs(number - median) <= MAX_BACKLOG_IDS]
+    if len(consistent) < len(numbers):
+        outliers = sorted(set(numbers) - set(consistent))
+        logger.warning(
+            f'Ignoring {len(numbers) - len(consistent)} of {len(numbers)} comment IDs in the r/all listing far '
+            f'from the others (median {number_to_comment_id(median)}, e.g. {number_to_comment_id(outliers[-1])})'
+        )
+    return max(consistent)
 
 
 def fetch_block(bot_name, block_start):
@@ -148,6 +190,12 @@ class CommentReader:
         self.last_saved = time.monotonic()
         # Head polls in a row that got an empty listing, so a long streak is logged once, not every poll
         self.empty_head_polls = 0
+        # The last head accepted (or the saved cursor) and when (time.time()), to reject implausible jumps
+        self.reference_id = None
+        self.reference_time = None
+        # Head polls in a row rejected as too far ahead, and in a row far below the reader's position
+        self.rejected_heads = 0
+        self.heads_below_position = 0
         # Readers take turns between the accounts, so each account's rate limit carries a share
         self.threads = [
             threading.Thread(
@@ -201,15 +249,84 @@ class CommentReader:
         with self._lock:
             if self.next_id is None:
                 self._choose_start(head)
+            if not self._accept_head(head):
+                return
+            self._reset_if_far_ahead_of(head)
             self._skip_ahead_if_too_far_behind(head)
             self._queue_blocks_up_to(head)
             lag_ids = head + 1 - self._watermark()
         if self.metrics:
             self.metrics.set_lag_ids(lag_ids)
 
+    def _max_plausible_head(self, now):
+        """The highest head that could be real, given the last accepted one; None if there is none yet."""
+        if self.reference_id is None:
+            return None
+        elapsed = max(0.0, now - self.reference_time)
+        return self.reference_id + MAX_BACKLOG_IDS + int(MAX_COMMENT_IDS_PER_SECOND * elapsed)
+
+    def _accept_head(self, head):
+        """False, with a WARNING once per streak, if `head` is too far ahead to be real. Call with the lock held."""
+        now = time.time()
+        max_head = self._max_plausible_head(now)
+        if max_head is not None and head > max_head:
+            self.rejected_heads += 1
+            if self.metrics:
+                self.metrics.record_rejected_head()
+            if self.rejected_heads == 1:
+                logger.warning(
+                    f'Ignoring head comment ID {number_to_comment_id(head)} ({head:,}): more than '
+                    f'{max_head - self.reference_id:,} IDs past the last one accepted, '
+                    f'{number_to_comment_id(self.reference_id)}'
+                )
+            return False
+        if self.rejected_heads:
+            logger.info(f'Accepted a head comment ID again after {self.rejected_heads} rejected one(s)')
+            self.rejected_heads = 0
+        if self.reference_id is None or head >= self.reference_id:
+            self.reference_id = head
+            self.reference_time = now
+        return True
+
+    def _reset_if_far_ahead_of(self, head):
+        """Moves the position back to `head` if every recent head was far below it. Call with the lock held."""
+        if self.next_id - (head + 1) <= MAX_BACKLOG_IDS:
+            self.heads_below_position = 0
+            return
+        self.heads_below_position += 1
+        if self.heads_below_position < HEADS_BELOW_POSITION_BEFORE_RESET:
+            return
+        logger.warning(
+            f'Comment reader position {number_to_comment_id(self.next_id)} is {self.next_id - head - 1:,} IDs '
+            f'ahead of the newest comment for {self.heads_below_position} polls; restarting at the newest comment'
+        )
+        self.next_id = head + 1
+        self.done_above.clear()
+        # The next head becomes the reference, in case this one was a bogus low ID
+        self.reference_id = None
+        self.reference_time = None
+        self.heads_below_position = 0
+
     def _choose_start(self, head):
-        """Resumes from the saved cursor if it is recent enough, otherwise starts at the head."""
+        """Resumes from the saved cursor if it is recent enough, otherwise starts at the head.
+
+        A saved cursor also bounds how far ahead the first head may plausibly be (see `_accept_head`), unless
+        it is ahead of the head itself, which only a bogus ID can have caused.
+        """
         saved = self._load_cursor()
+        if saved is not None and saved['next_comment_id'] <= head + 1 and saved.get('updated_at'):
+            self.reference_id = saved['next_comment_id']
+            self.reference_time = saved_timestamp(saved['updated_at'])
+            max_head = self._max_plausible_head(time.time())
+            if head > max_head:
+                # The first head is bogus: resume from the cursor and wait for a real head
+                logger.warning(
+                    f'Head comment ID {number_to_comment_id(head)} is implausibly far past the saved cursor '
+                    f'{number_to_comment_id(self.reference_id)}; resuming from the cursor'
+                )
+                self.next_id = saved['next_comment_id']
+                self.done_above = {start for start in saved['done_blocks'] or [] if start >= self.next_id}
+                return
         if saved is not None and 0 <= head + 1 - saved['next_comment_id'] <= MAX_BACKLOG_IDS:
             self.next_id = saved['next_comment_id']
             self.done_above = {start for start in saved['done_blocks'] or [] if start >= self.next_id}

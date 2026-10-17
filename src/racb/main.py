@@ -62,6 +62,7 @@ class StreamMetrics:
         self.interval_head_polls = 0
         self.interval_head_seconds = 0.0
         self.interval_empty_head_polls = 0
+        self.interval_rejected_heads = 0
         self.interval_failed_blocks = 0
         self.interval_skipped_ids = 0
         # Creation time of the newest comment read so far, and how many IDs wait to be read
@@ -104,6 +105,11 @@ class StreamMetrics:
             if empty:
                 self.interval_empty_head_polls += 1
 
+    def record_rejected_head(self):
+        """Counts a head comment ID ignored because it was implausibly far ahead (see comment_reader)."""
+        with self._lock:
+            self.interval_rejected_heads += 1
+
     def record_failed_block(self):
         """Counts a block of comment IDs given up on after repeated errors."""
         with self._lock:
@@ -135,6 +141,10 @@ class StreamMetrics:
             if self.interval_dropped:
                 message += f' | {self.interval_dropped} match(es) dropped, Phase 1 queue full'
             message += self._reading_summary(now)
+            # Heads came back but nothing was read: the reader is stuck, as on 2026-10-17
+            stalled = (
+                self.interval_head_polls > self.interval_empty_head_polls and self.interval_requests == 0
+            )
             self.interval_scanned = 0
             self.interval_matches = 0
             self.interval_aux = 0
@@ -145,10 +155,15 @@ class StreamMetrics:
             self.interval_head_polls = 0
             self.interval_head_seconds = 0.0
             self.interval_empty_head_polls = 0
+            self.interval_rejected_heads = 0
             self.interval_failed_blocks = 0
             self.interval_skipped_ids = 0
             self.last_log_time = now
         logger.info(message)
+        if stalled:
+            logger.warning(
+                '[Heartbeat] The newest comment ID was found but no comments were read: the comment reader is stalled'
+            )
 
     def _reading_summary(self, now):
         """The heartbeat's second half: how comments were read, and how far behind."""
@@ -162,7 +177,12 @@ class StreamMetrics:
         else:
             parts.append('reads: 0 requests')
         if self.interval_head_polls:
-            empty = f' ({self.interval_empty_head_polls:,} empty)' if self.interval_empty_head_polls else ''
+            details = []
+            if self.interval_empty_head_polls:
+                details.append(f'{self.interval_empty_head_polls:,} empty')
+            if self.interval_rejected_heads:
+                details.append(f'{self.interval_rejected_heads:,} rejected')
+            empty = f' ({", ".join(details)})' if details else ''
             parts.append(
                 f'head: {self.interval_head_polls:,} polls{empty}, '
                 f'{self.interval_head_seconds / self.interval_head_polls:.2f} s/poll'
