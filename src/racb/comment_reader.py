@@ -39,8 +39,13 @@ logger = logging.getLogger(__name__)
 BLOCK_SIZE = 100
 
 # Comments the head poll asks for. Reddit filters the r/all listing after applying the limit, so asking for
-# one comment sometimes returns none (seen live on 2026-10-16); the newest of a few is the head
-HEAD_LISTING_LIMIT = 25
+# one comment sometimes returns none (seen live on 2026-10-16); the newest of a few is the head. Even 25 came
+# back empty on about every other poll on 2026-10-16, so ask for the most one request can return
+HEAD_LISTING_LIMIT = 100
+
+# Empty head polls in a row before a WARNING is logged. A few are normal and cost nothing (the next poll
+# catches up), so they are only counted in the heartbeat; a long streak means no new comments are being queued
+EMPTY_HEAD_POLLS_BEFORE_WARNING = 6
 
 # Seconds to wait between two head polls (each poll itself takes a few seconds). It only sets how soon a new
 # comment is read, not how many: every block up to the head is queued at once. Fewer polls, fewer requests.
@@ -180,16 +185,19 @@ class CommentReader:
         started = time.monotonic()
         head = self.fetch_head()
         if self.metrics:
-            self.metrics.record_head_poll(time.monotonic() - started)
+            self.metrics.record_head_poll(time.monotonic() - started, empty=head is None)
         if head is None:
             # Nothing is lost: the next poll queues every block up to the head it finds
             self.empty_head_polls += 1
-            if self.empty_head_polls == 1:
-                logger.warning('The r/all comment listing returned no comments; trying again at the next poll')
+            if self.empty_head_polls == EMPTY_HEAD_POLLS_BEFORE_WARNING:
+                logger.warning(
+                    f'The r/all comment listing returned no comments {self.empty_head_polls} polls in a row; '
+                    'no new comments are queued until it does'
+                )
             return
-        if self.empty_head_polls:
+        if self.empty_head_polls >= EMPTY_HEAD_POLLS_BEFORE_WARNING:
             logger.info(f'The r/all comment listing has comments again after {self.empty_head_polls} empty poll(s)')
-            self.empty_head_polls = 0
+        self.empty_head_polls = 0
         with self._lock:
             if self.next_id is None:
                 self._choose_start(head)

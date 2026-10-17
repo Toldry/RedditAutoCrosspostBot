@@ -121,8 +121,9 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     `STREAM_READERS` threads, keeping only what r/all could show (`is_shown_on_r_all`: not private or on a user
     profile). `/api/info` comments have no `over_18` or `quarantine` field, so Phase 1 drops NSFW and
     quarantined ones by their submission (`phase1.is_hidden_from_r_all`, no extra request). The head poll
-    asks the listing for 25 comments and takes the newest, because `limit=1` sometimes returns none. An empty
-    listing anyway only skips that poll (one WARNING per streak); the next poll catches up. Subreddits that opted out of r/all cannot be told apart, so their comments
+    asks the listing for 100 comments and takes the newest, because smaller limits often return none. An empty
+    listing anyway only skips that poll and is counted in the heartbeat (`head: N polls (M empty)`); the next
+    poll catches up. Only `EMPTY_HEAD_POLLS_BEFORE_WARNING` (6) empty polls in a row log a WARNING. Subreddits that opted out of r/all cannot be told apart, so their comments
     are read too. `STREAM_SOURCE=listing` instead reads
     `reddit.subreddit('all').stream.comments(skip_existing=True, pause_after=-1)` one request at a time, which
     sees only a fraction of r/all (section 9).
@@ -466,6 +467,8 @@ uv run pytest -m integration
   - `reads`: ID blocks (or listing batches) fetched, and how many comments each returned (all of them, before
     the r/all filter). With `STREAM_SOURCE=listing`, about 100 comments/request means the listing returned
     full pages, so the bot was falling behind r/all.
+  - `head`: polls for the newest comment ID, and how many of them got an empty r/all listing. Empty polls
+    cost nothing but a few seconds of delay; only a long streak, which also logs a WARNING, stops new reads.
   - `behind`: age of the newest comment read, and (`ids` only) how many IDs wait to be read. Growing values
     mean the readers do not keep up; `N ID block(s) failed` and `N IDs skipped` count comments given up on.
 

@@ -158,6 +158,39 @@ def test_an_empty_head_listing_is_skipped_and_the_next_poll_catches_up():
 
 
 @pytest.mark.unit
+def test_only_a_long_streak_of_empty_head_polls_is_logged(caplog):
+    import logging
+    reader, _ = make_reader(head=1000)
+    reader.poll_head()
+    reader.fetch_head = lambda: None
+    with caplog.at_level(logging.INFO, logger='racb.comment_reader'):
+        for _ in range(comment_reader.EMPTY_HEAD_POLLS_BEFORE_WARNING - 1):
+            reader.poll_head()
+        assert not caplog.records
+        reader.poll_head()
+        reader.poll_head()
+        assert [record.levelname for record in caplog.records] == ['WARNING']
+        reader.fetch_head = lambda: 1000
+        reader.poll_head()
+    assert [record.levelname for record in caplog.records] == ['WARNING', 'INFO']
+    assert reader.empty_head_polls == 0
+
+
+@pytest.mark.unit
+def test_a_short_streak_of_empty_head_polls_logs_nothing(caplog):
+    import logging
+    reader, _ = make_reader(head=1000)
+    reader.poll_head()
+    head = {'value': None}
+    reader.fetch_head = lambda: head['value']
+    with caplog.at_level(logging.INFO, logger='racb.comment_reader'):
+        reader.poll_head()
+        head['value'] = 1000
+        reader.poll_head()
+    assert not caplog.records
+
+
+@pytest.mark.unit
 def test_run_survives_an_empty_head_listing():
     errors = []
     polls = []
