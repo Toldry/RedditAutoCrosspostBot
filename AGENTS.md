@@ -51,8 +51,11 @@ auxiliary bot's PRAW instance (`get_comment_with_different_praw_instance`). All 
 > recommendations and get a reply from `same_subreddit_bot` or `same_post_bot`. `sub_doesnt_exist_bot` is the
 > one bot that also answers replies to other comments. For those, Phase 1 only checks whether the target exists
 > (`get_posts_with_same_content(..., existence_only=True)`: the URL search, no duplicate scan).
-> Every bot requires the **whole** body to be the subreddit reference (the matching rule above). A comment
-> edited after the bot answered (e.g. `r/name` later extended with `\n\nWait...`) keeps that answer.
+> Every bot requires the **whole** body to be the subreddit reference (the matching rule above). Reddit lets an
+> author edit a comment for about 3 minutes without marking it as edited, and people often extend a bare
+> `r/name` that way (`r/name makes me so mad...`). So Phase 1 handles a match only `EDIT_GRACE_SECONDS`
+> (4 minutes) after the comment was written, and checks the text as it is then. A later edit (marked as
+> edited on Reddit) still keeps the bot's answer.
 
 ---
 
@@ -133,7 +136,8 @@ A banned target (a 404 whose body says `"reason": "banned"`, `SUBREDDIT_IS_BANNE
     (`TARGET_SUBREDDIT_CHANGED`) if it no longer equals the stored target, case-insensitively. This blocks
     bait-and-switch edits. Rows scraped before v2.3 have `target_subreddit = NULL` and skip this check.
   - The reader threads (or the stream thread) only run the regex (`check_pattern`, no I/O) and queue the comment ID of a match. A
-    Phase 1 worker thread fetches the comment again through its own PRAW instance (one request) and does all
+    Phase 1 worker thread waits until 4 minutes after the comment was written (`workers.EDIT_GRACE_SECONDS`,
+    see the note in section 1), fetches the comment again through its own PRAW instance (one request) and does all
     of this work, including the duplicate search and image downloads (section 7).
   - Auxiliary replies go through `phase1.reply_as_bot()`, which only logs when `DRY_RUN` is enabled.
   - Any error while handling one comment is caught in `main.handle_comment_safely()` and skips only that
@@ -649,7 +653,8 @@ error, the new stream continues after the newest comment seen (`continue_after_i
 starts with `skip_existing=True`.
 
 Either way, for each comment the reading thread only counts it, buffers its subreddit name and runs the
-regex. A match goes into the Phase 1 queue as a comment ID; when the queue is full, the match is dropped and
+regex. A match goes into the Phase 1 queue as a comment ID with the time it is due (`created_utc` plus
+`EDIT_GRACE_SECONDS`), and a worker that takes it waits until then; when the queue is full, the match is dropped and
 counted in the heartbeat, so reading never waits for the workers.
 
 Rules for thread safety:

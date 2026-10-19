@@ -176,9 +176,11 @@ def test_dispatch_comment_queues_only_matching_comments(make_mock_comment):
     phase1_workers = MagicMock()
     scanned_before = metrics.total_scanned
     with patch('racb.main.known_subreddits.record') as mock_record:
-        dispatch_comment(make_mock_comment(comment_id='match', body='r/pics'), phase1_workers)
+        match = make_mock_comment(comment_id='match', body='r/pics', created_utc=1_700_000_000.0)
+        dispatch_comment(match, phase1_workers)
         dispatch_comment(make_mock_comment(comment_id='other', body='nice picture'), phase1_workers)
-    phase1_workers.submit.assert_called_once_with('match')
+    # Not before the author's unnoticed-edit window has passed
+    phase1_workers.submit.assert_called_once_with('match', not_before=1_700_000_000.0 + 240)
     assert mock_record.call_count == 2
     assert metrics.total_scanned == scanned_before + 2
 
@@ -274,7 +276,7 @@ def test_main_loop_stops_reading_the_stream_on_shutdown(make_mock_comment):
     from racb.main import main_loop
     from racb.core import shutdown
     phase1_workers = MagicMock()
-    comments = [make_mock_comment(comment_id='first'), make_mock_comment(comment_id='second')]
+    comments = [make_mock_comment(comment_id=comment_id, created_utc=0) for comment_id in ('first', 'second')]
 
     def stream():
         yield comments[0]
@@ -283,7 +285,8 @@ def test_main_loop_stops_reading_the_stream_on_shutdown(make_mock_comment):
 
     with patch('racb.main.known_subreddits.record'):
         main_loop(stream(), phase1_workers)
-    phase1_workers.submit.assert_called_once_with('first')
+    phase1_workers.submit.assert_called_once()
+    assert phase1_workers.submit.call_args.args == ('first',)
 
 
 @pytest.mark.unit
@@ -370,7 +373,7 @@ def test_main_loop_records_each_batch_as_one_request(make_mock_comment):
     from racb.main import main_loop, metrics
     newest_seen = {'fullname': None}
     requests_before = metrics.interval_requests
-    comments = [make_mock_comment(comment_id='first'), make_mock_comment(comment_id='second')]
+    comments = [make_mock_comment(comment_id=comment_id, created_utc=0) for comment_id in ('first', 'second')]
     with patch('racb.main.known_subreddits.record'):
         main_loop(iter(comments + [None]), MagicMock(), newest_seen)
     assert metrics.interval_requests == requests_before + 1

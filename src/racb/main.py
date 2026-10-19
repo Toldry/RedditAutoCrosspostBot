@@ -18,7 +18,7 @@ from racb.config import env_bool
 from racb.comment_reader import CommentReader
 from racb.core import db, known_subreddits, reddit, shutdown
 from racb.phases import phase1, phase2, phase3, inbox, cleanup
-from racb.workers import PeriodicJob, Phase1Workers
+from racb.workers import EDIT_GRACE_SECONDS, PeriodicJob, Phase1Workers
 
 logger = logging.getLogger(__name__)
 
@@ -500,7 +500,8 @@ def dispatch_comment(comment, phase1_workers):
         # Seeing a comment in a subreddit proves it exists; this only buffers the name (no I/O)
         known_subreddits.record(comment.subreddit.display_name)
         if phase1.check_pattern(comment) is not None:
-            phase1_workers.submit(comment.id)
+            # Handled once the author can no longer edit it unnoticed (`workers.EDIT_GRACE_SECONDS`)
+            phase1_workers.submit(comment.id, not_before=comment.created_utc + EDIT_GRACE_SECONDS)
     except Exception as e:
         if env_bool('DEBUG', False):
             raise

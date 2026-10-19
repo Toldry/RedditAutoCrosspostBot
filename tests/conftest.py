@@ -108,8 +108,10 @@ class MockComment:
         link_id='t3_sub_123',
         distinguished=None,
         submission=None,
+        created_utc=None,
     ):
         self.id = comment_id
+        self.created_utc = created_utc
         self.body = body
         self.permalink = permalink
         self.subreddit = MockSubreddit(subreddit) if isinstance(subreddit, str) else subreddit

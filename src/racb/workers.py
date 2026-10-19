@@ -9,6 +9,7 @@ Each thread gets its own PRAW instances (`reddit.get_reddit_instance`) and datab
 import logging
 import queue
 import threading
+import time
 
 import prawcore
 
@@ -27,6 +28,12 @@ POLL_SECONDS = 1
 # counted in the heartbeat) instead of blocking the stream. The bound is not about memory (1000 comment IDs
 # take well under 1 MB) but a backstop: a queue that stays full means Phase 1 cannot keep up at all.
 PHASE1_QUEUE_SIZE = 1000
+
+# How long after a comment was written Phase 1 waits before handling it. Reddit lets an author edit a
+# comment for about 3 minutes without marking it as edited, so a bare "r/name" answered at once can later
+# read "r/name makes me so mad" above a reply that no longer fits. After this wait, the worker fetches the
+# comment again and Phase 1 checks its final text.
+EDIT_GRACE_SECONDS = 4 * 60
 
 
 def run_job_safely(job_func):
@@ -124,10 +131,14 @@ class Phase1Workers:
             thread.start()
         return self
 
-    def submit(self, comment_id):
-        """Queues a comment for Phase 1 without blocking. Returns False if the queue is full."""
+    def submit(self, comment_id, not_before=0):
+        """Queues a comment for Phase 1 without blocking. Returns False if the queue is full.
+
+        A worker handles it no earlier than `not_before` (a Unix timestamp). Comments arrive roughly in the
+        order they were written, so waiting for the oldest one never holds back one that is due.
+        """
         try:
-            self.queue.put_nowait(comment_id)
+            self.queue.put_nowait((comment_id, not_before))
         except queue.Full:
             # Logged once when the queue fills and once when it has room again; the heartbeat counts drops
             with self._dropped_lock:
@@ -155,9 +166,12 @@ class Phase1Workers:
         try:
             while not shutdown.stop_requested():
                 try:
-                    comment_id = self.queue.get(timeout=POLL_SECONDS)
+                    comment_id, not_before = self.queue.get(timeout=POLL_SECONDS)
                 except queue.Empty:
                     continue
+                wait_seconds = not_before - time.time()
+                if wait_seconds > 0 and shutdown.stop_requested_within(wait_seconds):
+                    return
                 try:
                     self.handle_comment_id(comment_id)
                 except reddit.TRANSIENT_NETWORK_ERRORS as e:

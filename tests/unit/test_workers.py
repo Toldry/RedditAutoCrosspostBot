@@ -180,3 +180,29 @@ def test_phase1_worker_crash_stops_the_process():
     workers.threads[0].join(WAIT_SECONDS)
     assert shutdown.stop_requested()
     assert shutdown.fatal_error() is error
+
+
+
+@pytest.mark.unit
+def test_phase1_workers_wait_until_a_comment_is_due():
+    handled = []
+    workers = Phase1Workers(handled.append, worker_count=1).start()
+    due = time.time() + 0.5
+    assert workers.submit('late', not_before=due)
+    time.sleep(0.2)
+    assert handled == []
+    assert wait_until(lambda: handled == ['late'])
+    assert time.time() >= due
+    shutdown.request_stop()
+
+
+@pytest.mark.unit
+def test_phase1_worker_stops_while_waiting_for_a_comment():
+    handled = []
+    workers = Phase1Workers(handled.append, worker_count=1).start()
+    workers.submit('far_future', not_before=time.time() + 3600)
+    time.sleep(0.1)
+    shutdown.request_stop()
+    workers.threads[0].join(WAIT_SECONDS)
+    assert not workers.threads[0].is_alive()
+    assert handled == []
