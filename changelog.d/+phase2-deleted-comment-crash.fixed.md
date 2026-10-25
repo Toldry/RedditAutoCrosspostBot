@@ -1,1 +1,0 @@
-**Phase 2 Stuck on a Deleted Comment:** when Reddit returned no data for a stored comment, writing the "comment unavailable" log line fetched the comment again and raised, so the whole Phase 2 pass crashed on that comment every 20 minutes and none of the waiting comments were checked. The log line now falls back to the comment ID, and the comment is dropped as unavailable.

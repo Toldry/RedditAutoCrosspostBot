@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [3.1.4] - 2026-10-25
+
+### Fixed
+
+- **Comment Reader Works Again After Reddit's New Comment IDs:** since about 2026-10-21 Reddit gives every new comment a 64-bit, 13-character ID that is no longer sequential, so the reader that fetched blocks of 100 consecutive IDs read nothing for days. The bot now polls the r/all comment listing on `STREAM_READERS` threads (12 by default, 3 per account), handing each comment on once, and the heartbeat counts `gaps`: requests that may have missed comments. `STREAM_SOURCE=ids` is gone (it falls back to `listing` with a warning), the old one-request-at-a-time stream is now `STREAM_SOURCE=stream`, and the heartbeat warns whenever no comment was read in its interval.
+- **Phase 2 Stuck on a Deleted Comment:** when Reddit returned no data for a stored comment, writing the "comment unavailable" log line fetched the comment again and raised, so the whole Phase 2 pass crashed on that comment every 20 minutes and none of the waiting comments were checked. The log line now falls back to the comment ID, and the comment is dropped as unavailable.
+
+
 ## [3.1.3] - 2026-10-17
 
 ### Fixed
