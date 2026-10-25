@@ -287,79 +287,62 @@ def test_main_loop_stops_reading_the_stream_on_shutdown(make_mock_comment):
 
 
 @pytest.mark.unit
-def test_heartbeat_counts_empty_head_polls(caplog):
-    import logging
-    metrics = StreamMetrics()
-    metrics.record_head_poll(1.0)
-    metrics.record_head_poll(3.0, empty=True)
-    metrics.record_request(1.0, 100)
-    with caplog.at_level(logging.INFO, logger='racb.main'):
-        metrics.log_heartbeat()
-    assert 'head: 2 polls (1 empty), 2.00 s/poll' in caplog.records[-1].getMessage()
-    assert metrics.interval_empty_head_polls == 0
-
-
-@pytest.mark.unit
 def test_heartbeat_reports_reads_and_lag(caplog):
     import logging
     import time
     metrics = StreamMetrics()
     metrics.record_request(2.0, 100)
     metrics.record_request(1.0, 80)
-    metrics.record_head_poll(4.0)
+    metrics.record_comment()
     metrics.record_newest_created(time.time() - 12)
-    metrics.set_lag_ids(1234)
-    metrics.record_failed_block()
     with caplog.at_level(logging.INFO, logger='racb.main'):
         metrics.log_heartbeat()
     message = caplog.records[-1].getMessage()
-    assert 'reads: 2 requests, 90.0 comments/request, 1.50 s/request' in message
-    assert 'head: 1 polls, 4.00 s/poll' in message
-    assert 'behind: 12 s, 1,234 IDs' in message
-    assert message.endswith('1 ID block(s) failed')
+    assert 'reads: 2 requests, 90.0 comments/request, 1.50 s/request | behind: 12 s' in message
+    assert 'gaps' not in message
     assert metrics.interval_requests == 0
-    assert metrics.interval_failed_blocks == 0
 
 
 @pytest.mark.unit
-def test_heartbeat_counts_rejected_heads(caplog):
+def test_heartbeat_reports_new_comments_and_gaps_of_listing_polls(caplog):
     import logging
     metrics = StreamMetrics()
-    metrics.record_head_poll(1.0)
-    metrics.record_head_poll(1.0, empty=True)
-    metrics.record_rejected_head()
-    metrics.record_request(1.0, 100)
+    metrics.record_listing_poll(2.0, 100, 30, gap=False)
+    metrics.record_listing_poll(4.0, 100, 100, gap=True)
+    metrics.record_listing_poll(3.0, 90, 20, gap=False)
+    metrics.record_listing_poll(3.0, 90, 10, gap=False)
+    metrics.record_comment()
     with caplog.at_level(logging.INFO, logger='racb.main'):
         metrics.log_heartbeat()
-    assert 'head: 2 polls (1 empty, 1 rejected), 1.00 s/poll' in caplog.records[-1].getMessage()
-    assert metrics.interval_rejected_heads == 0
+    message = caplog.records[-1].getMessage()
+    assert 'reads: 4 requests, 95.0 comments/request, 3.00 s/request | 40.0 new/request, gaps: 1 (25%)' in message
+    assert metrics.interval_new_comments == 0
+    assert metrics.interval_gaps == 0
 
 
 @pytest.mark.unit
-def test_heartbeat_warns_when_heads_were_found_but_nothing_was_read(caplog):
-    # The 2026-10-17 outage: head polls kept succeeding, the readers made no request for hours
+@pytest.mark.parametrize('requests, reason', [
+    (0, 'no request was made'),
+    (3, 'every request returned no new comment'),
+])
+def test_heartbeat_warns_when_nothing_was_read(caplog, requests, reason):
+    # From 2026-10-21 the ID reader read nothing for days (Reddit's comment IDs stopped being sequential)
     import logging
     metrics = StreamMetrics()
-    metrics.record_head_poll(1.0)
+    for _ in range(requests):
+        metrics.record_listing_poll(1.0, 100, 0, gap=False)
     with caplog.at_level(logging.INFO, logger='racb.main'):
         metrics.log_heartbeat()
     assert [record.levelname for record in caplog.records] == ['INFO', 'WARNING']
-    assert 'stalled' in caplog.records[-1].getMessage()
+    assert f'No comments were read ({reason})' in caplog.records[-1].getMessage()
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize('head_polls, empty_head_polls, requests', [
-    (0, 0, 0),  # STREAM_SOURCE=listing: no head polls
-    (3, 3, 0),  # Only empty listings: no head to read up to
-    (3, 0, 5),  # Reading normally
-])
-def test_heartbeat_does_not_warn_without_a_stall(caplog, head_polls, empty_head_polls, requests):
+def test_heartbeat_does_not_warn_while_comments_are_read(caplog):
     import logging
     metrics = StreamMetrics()
-    for poll in range(head_polls):
-        metrics.record_head_poll(1.0, empty=poll < empty_head_polls)
-    for _ in range(requests):
-        metrics.record_request(1.0, 100)
+    metrics.record_listing_poll(1.0, 100, 40, gap=False)
+    metrics.record_comment()
     with caplog.at_level(logging.INFO, logger='racb.main'):
         metrics.log_heartbeat()
     assert [record.levelname for record in caplog.records] == ['INFO']
@@ -409,19 +392,19 @@ def test_init_comment_stream_continues_after_a_given_comment():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize('source', ['ids', 'listing'])
+@pytest.mark.parametrize('source', ['listing', 'stream'])
 def test_run_stream_reads_from_stream_source(source):
     from racb.main import run_stream
     with patch.dict('os.environ', {'STREAM_SOURCE': source, 'STREAM_READERS': '3'}), \
-         patch('racb.main.run_listing_stream') as mock_listing, \
+         patch('racb.main.run_listing_stream') as mock_stream, \
          patch('racb.main.CommentReader') as mock_reader:
         threads = run_stream(MagicMock())
-    if source == 'listing':
-        mock_listing.assert_called_once()
+    if source == 'stream':
+        mock_stream.assert_called_once()
         mock_reader.assert_not_called()
         assert threads == []
     else:
-        mock_listing.assert_not_called()
+        mock_stream.assert_not_called()
         assert mock_reader.call_args.args[1] == 3
         mock_reader.return_value.start.assert_called_once_with()
         mock_reader.return_value.run.assert_called_once_with()

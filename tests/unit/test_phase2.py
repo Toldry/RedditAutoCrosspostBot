@@ -178,3 +178,33 @@ def test_run_filters_passes_a_live_source_post_and_searches_titles(make_mock_com
     result, mock_search = run_filters_on(comment)
     assert result.passes_filter is True
     assert mock_search.call_args.kwargs['search_titles'] is True
+
+
+@pytest.mark.unit
+def test_run_filters_handles_a_comment_reddit_no_longer_returns():
+    """A deleted comment made the 'unavailable' log line itself raise, crashing every Phase 2 pass."""
+    import praw
+
+    class GoneComment:
+        id = 'phkdvpc'
+
+        def __getattr__(self, name):
+            raise praw.exceptions.ClientException('No data returned for comment t1_phkdvpc')
+
+    comment_entry = {'permalink': '/r/test/comments/1/title/phkdvpc/'}
+    with patch('racb.phases.phase2.get_full_comment_from_reddit', return_value=GoneComment()):
+        res = phase2.run_filters(comment_entry)
+    assert res.passes_filter is False
+    assert res.reason == 'COMMENT_UNAVAILABLE'
+
+
+@pytest.mark.unit
+def test_permalink_safe_falls_back_to_the_id():
+    class Unfetchable:
+        id = 'abc123'
+
+        @property
+        def permalink(self):
+            raise RuntimeError('fetch failed')
+
+    assert phase2.permalink_safe(Unfetchable()) == 'ID abc123'
