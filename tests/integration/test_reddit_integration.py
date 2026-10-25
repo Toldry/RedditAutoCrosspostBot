@@ -449,14 +449,20 @@ def test_live_duplicate_detector_scans_gallery_posts():
             timeout=25,
         ))
 
-        # Reddit fills in a gallery's media_metadata once it has processed the pictures
+        # Reddit fills in a gallery's media_metadata once it has processed the pictures. 30 s was not always
+        # enough (master run of 2026-10-25 22:56: still unprocessed), so wait up to 90 s
         gallery = None
-        for attempt in range(10):
+        started = time.monotonic()
+        while time.monotonic() - started < 90:
             gallery = r.submission(id=gallery_submission.id)
             if len(duplicate_detector.gallery_image_urls(gallery)) == 2:
                 break
             time.sleep(3.0)
-        assert duplicate_detector.media_kind(gallery) == duplicate_detector.IMAGE
+        media_metadata, _ = duplicate_detector.gallery_metadata(gallery)
+        assert duplicate_detector.media_kind(gallery) == duplicate_detector.IMAGE, (
+            f'gallery {gallery.id} still not processed after {time.monotonic() - started:.0f} s: '
+            f'media_metadata statuses {[item.get("status") for item in (media_metadata or {}).values()]}'
+        )
         assert len(duplicate_detector.gallery_image_urls(gallery)) == 2
         assert len(duplicate_detector.fingerprint_post(gallery)) == 2
 
