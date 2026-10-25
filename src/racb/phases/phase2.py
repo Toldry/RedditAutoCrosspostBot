@@ -217,5 +217,14 @@ def check_comment_availability(comment):
         return False
 
 
-def permalink_safe(comment):
-    return reddit.full_url(getattr(comment, 'permalink', 'unknown'))
+def permalink_safe(thing):
+    """The URL of a comment or submission for a log line, even one Reddit no longer returns.
+
+    Reading `permalink` makes PRAW fetch a lazy object, and for a deleted one that raises ClientException, not
+    AttributeError, so `getattr` with a default is not enough. On 2026-10-25 this turned every Phase 2 pass
+    into a crash on the same deleted comment, so no comment was checked at all.
+    """
+    try:
+        return reddit.full_url(thing.permalink)
+    except Exception:
+        return f'ID {getattr(thing, "id", "unknown")}'
