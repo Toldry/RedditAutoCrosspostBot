@@ -121,14 +121,16 @@ def phase1_worker_count():
 
 
 # Where the bot reads new comments from (see racb.comment_reader):
-# - 'ids': every new comment on Reddit, by ID range, on STREAM_READERS threads (the default)
-# - 'listing': PRAW's stream of the r/all comment listing, one request at a time (the pre-3.1 way)
-STREAM_SOURCES = ('ids', 'listing')
-STREAM_SOURCE_DEFAULT = 'ids'
+# - 'listing': the r/all comment listing, polled on STREAM_READERS threads at once (the default)
+# - 'stream': PRAW's stream of the r/all comment listing, one request at a time (the pre-3.0 way)
+# The 3.0 to 3.1 value 'ids' (by comment ID range) stopped working when Reddit's comment IDs stopped being
+# sequential (2026-10-21), so it now falls back to the default like any unknown value
+STREAM_SOURCES = ('listing', 'stream')
+STREAM_SOURCE_DEFAULT = 'listing'
 
 
 def stream_source():
-    """Returns 'ids' or 'listing', from STREAM_SOURCE."""
+    """Returns 'listing' or 'stream', from STREAM_SOURCE."""
     value = os.environ.get('STREAM_SOURCE', STREAM_SOURCE_DEFAULT).strip().lower()
     if value not in STREAM_SOURCES:
         logger.warning(f'Unknown STREAM_SOURCE={value!r}; using {STREAM_SOURCE_DEFAULT!r}')
@@ -136,11 +138,12 @@ def stream_source():
     return value
 
 
-STREAM_READERS_DEFAULT = 4
+# 3 per bot account. Each thread polls at most every comment_reader.MIN_SECONDS_BETWEEN_POLLS
+STREAM_READERS_DEFAULT = 12
 
 
 def stream_reader_count():
-    """Number of threads that fetch comment ID blocks when STREAM_SOURCE is 'ids' (at least 1)."""
+    """Number of threads that poll the r/all listing when STREAM_SOURCE is 'listing' (at least 1)."""
     raw_value = os.environ.get('STREAM_READERS', str(STREAM_READERS_DEFAULT))
     try:
         count = int(raw_value)

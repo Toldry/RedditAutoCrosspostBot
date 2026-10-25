@@ -64,7 +64,7 @@ def test_every_bot_has_an_enabled_switch_that_defaults_to_on():
 
 @pytest.mark.unit
 @pytest.mark.parametrize('value, expected', [
-    (None, 'ids'), ('ids', 'ids'), ('Listing', 'listing'), (' listing ', 'listing'), ('firehose', 'ids'),
+    (None, 'listing'), ('Stream', 'stream'), (' stream ', 'stream'), ('ids', 'listing'), ('firehose', 'listing'),
 ])
 def test_stream_source(value, expected):
     from racb import config
@@ -76,7 +76,7 @@ def test_stream_source(value, expected):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize('value, expected', [('8', 8), ('0', 1), ('many', 4)])
+@pytest.mark.parametrize('value, expected', [('8', 8), ('0', 1), ('many', 12)])
 def test_stream_reader_count(value, expected):
     from racb import config
     with patch.dict('os.environ', {'STREAM_READERS': value}):

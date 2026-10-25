@@ -100,90 +100,36 @@ def test_live_main_startup_flow(monkeypatch):
         mock_start_bot.assert_called_once()
 
 
-def fetch_head_with_retries(attempts=6, pause_seconds=5):
-    """Like comment_reader.fetch_head, but tries again while Reddit returns an empty r/all listing.
-
-    The bot itself just skips such a poll (CommentReader.poll_head); the test needs a head to start from.
-    """
-    for _ in range(attempts):
-        head = comment_reader.fetch_head()
-        if head is not None:
-            return head
-        time.sleep(pause_seconds)
-    pytest.fail(f'The r/all comment listing was empty {attempts} times in a row')
-
-
 @pytest.mark.integration
-def test_live_comment_reader_reads_recent_comments_by_id():
-    """Reads 4 blocks of comment IDs just below r/all's newest comment, one per bot account.
+def test_live_listing_returns_recent_comments():
+    """The r/all comment listing, which the comment reader polls, must return comments of the last minutes.
 
-    The comment reader relies on Reddit numbering comments in order across the whole site. If that ever
-    stops being true, most of these IDs come back empty, this test fails, and CI does not deploy a bot
-    that would read nothing.
+    Reddit filters the listing after applying the limit, so it sometimes comes back empty (2026-10-16);
+    a few tries are allowed.
     """
-    block_count = len(reddit.BOT_NAMES)
-    first_block = fetch_head_with_retries() - 10 * comment_reader.BLOCK_SIZE
-    comments = []
-    for index, bot_name in enumerate(reddit.BOT_NAMES):
-        comments += comment_reader.fetch_block(bot_name, first_block + index * comment_reader.BLOCK_SIZE)
-    numbers = [comment_reader.comment_id_to_number(comment.id) for comment in comments]
-    last_id = first_block + block_count * comment_reader.BLOCK_SIZE
-    assert all(first_block <= number < last_id for number in numbers)
-    # Comments in private subreddits are not returned, so not every ID comes back
-    assert len(comments) >= block_count * comment_reader.BLOCK_SIZE // 2, f'only {len(comments)} comments'
-    assert any(comment_reader.is_shown_on_r_all(comment) for comment in comments)
-
-
-@pytest.mark.integration
-def test_live_head_is_a_recent_real_comment():
-    """The head the reader follows must be a real, recent comment in the numbering it reads.
-
-    On 2026-10-17 the head became a bogus ID (about 6 * 10^18) and the reader read nothing for hours. The block
-    ending at the head must hold comments written in the last hour, with IDs no higher than the head.
-    """
-    head = fetch_head_with_retries()
-    first = head - comment_reader.BLOCK_SIZE + 1
-    comments = comment_reader.fetch_block(reddit.AUTO_CROSSPOST_BOT_NAME, first)
-    assert comments, f'no comment in the block ending at the head {comment_reader.number_to_comment_id(head)}'
-    numbers = [comment_reader.comment_id_to_number(comment.id) for comment in comments]
-    assert all(first <= number <= head for number in numbers)
+    for _ in range(6):
+        comments = comment_reader.fetch_listing(reddit.AUTO_CROSSPOST_BOT_NAME)
+        if comments:
+            break
+        time.sleep(5)
+    assert comments, 'the r/all comment listing was empty 6 times in a row'
     newest_age = time.time() - max(comment.created_utc for comment in comments)
-    assert newest_age < 3600, f'the newest comment at the head is {newest_age:.0f} s old'
-
-
-class InMemoryCursorStore:
-    """Keeps the live reader test's cursor out of the database: no saved cursor, saves are only counted."""
-
-    def __init__(self):
-        self.saves = 0
-
-    def get_stream_cursor(self, name):
-        return None
-
-    def save_stream_cursor(self, name, next_comment_id, done_blocks):
-        self.saves += 1
+    assert newest_age < 600, f'the newest comment on r/all is {newest_age:.0f} s old'
 
 
 @pytest.mark.integration
 def test_live_comment_reader_scans_comments_after_start():
     """Runs the real CommentReader against Reddit for about 45 s: it must read and hand on comments.
 
-    This is the check the 2026-10-17 outage would have failed: the head polls succeeded, but the reader
-    made no read requests and scanned nothing.
+    The check the 2026-10-21 outage would have failed: Reddit's comment IDs stopped being sequential, and
+    the reader of that time (by ID range) read nothing for days.
     """
     from racb.core import shutdown
     from racb.main import StreamMetrics
 
     handled = []
-    errors = []
     metrics = StreamMetrics()
-    reader = comment_reader.CommentReader(
-        handled.append,
-        reader_count=2,
-        metrics=metrics,
-        handle_exception=lambda error: errors.append(error) or False,
-        cursor_store=InMemoryCursorStore(),
-    )
+    reader = comment_reader.CommentReader(handled.append, reader_count=4, metrics=metrics)
     run_thread = threading.Thread(target=reader.run, name='live-reader-test', daemon=True)
     reader.start()
     run_thread.start()
@@ -198,11 +144,10 @@ def test_live_comment_reader_scans_comments_after_start():
         for thread in reader.threads:
             thread.join(30)
         shutdown.reset()
-    assert metrics.interval_requests > 0, f'no read request; head poll errors: {errors}'
-    assert len(handled) >= 200, f'only {len(handled)} comments read; head poll errors: {errors}'
-    assert metrics.lag_ids is not None
-    # Slightly negative when the last head was a little older than the one before; the outage's was -6 * 10^18
-    assert abs(metrics.lag_ids) < comment_reader.MAX_BACKLOG_IDS
+    assert metrics.interval_requests > 0, 'no listing request'
+    assert len(handled) >= 200, f'only {len(handled)} comments read'
+    fullnames = [f't1_{comment.id}' for comment in handled]
+    assert len(set(fullnames)) == len(fullnames), 'a comment was handed on twice'
     newest_age = time.time() - metrics.newest_created_utc
     assert newest_age < 600, f'the newest comment read is {newest_age:.0f} s old'
 

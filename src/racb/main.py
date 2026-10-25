@@ -59,15 +59,12 @@ class StreamMetrics:
         self.interval_requests = 0
         self.interval_request_comments = 0
         self.interval_request_seconds = 0.0
-        self.interval_head_polls = 0
-        self.interval_head_seconds = 0.0
-        self.interval_empty_head_polls = 0
-        self.interval_rejected_heads = 0
-        self.interval_failed_blocks = 0
-        self.interval_skipped_ids = 0
-        # Creation time of the newest comment read so far, and how many IDs wait to be read
+        # Comments the listing polls returned that no poll had returned before, and polls that may have
+        # missed comments (see comment_reader)
+        self.interval_new_comments = 0
+        self.interval_gaps = 0
+        # Creation time of the newest comment read so far
         self.newest_created_utc = None
-        self.lag_ids = None
         self.last_log_time = time.time()
 
     def record_comment(self):
@@ -91,43 +88,26 @@ class StreamMetrics:
             self.interval_dropped += 1
 
     def record_request(self, seconds, comments_returned):
-        """Counts one request that read comments (a listing batch or an ID block)."""
+        """Counts one request that read comments (a batch of the PRAW stream, STREAM_SOURCE=stream)."""
         with self._lock:
             self.interval_requests += 1
             self.interval_request_seconds += seconds
             self.interval_request_comments += comments_returned
 
-    def record_head_poll(self, seconds, empty=False):
-        """Counts one head poll; `empty` if the r/all listing returned no comments."""
+    def record_listing_poll(self, seconds, comments_returned, new_comments, gap):
+        """Counts one poll of the r/all listing (comment_reader); `gap` if it may have missed comments."""
         with self._lock:
-            self.interval_head_polls += 1
-            self.interval_head_seconds += seconds
-            if empty:
-                self.interval_empty_head_polls += 1
-
-    def record_rejected_head(self):
-        """Counts a head comment ID ignored because it was implausibly far ahead (see comment_reader)."""
-        with self._lock:
-            self.interval_rejected_heads += 1
-
-    def record_failed_block(self):
-        """Counts a block of comment IDs given up on after repeated errors."""
-        with self._lock:
-            self.interval_failed_blocks += 1
-
-    def record_skipped_ids(self, count):
-        """Counts comment IDs skipped because the reader fell too far behind."""
-        with self._lock:
-            self.interval_skipped_ids += count
+            self.interval_requests += 1
+            self.interval_request_seconds += seconds
+            self.interval_request_comments += comments_returned
+            self.interval_new_comments += new_comments
+            if gap:
+                self.interval_gaps += 1
 
     def record_newest_created(self, created_utc):
         with self._lock:
             if self.newest_created_utc is None or created_utc > self.newest_created_utc:
                 self.newest_created_utc = created_utc
-
-    def set_lag_ids(self, lag_ids):
-        with self._lock:
-            self.lag_ids = lag_ids
 
     def log_heartbeat(self):
         with self._lock:
@@ -141,10 +121,10 @@ class StreamMetrics:
             if self.interval_dropped:
                 message += f' | {self.interval_dropped} match(es) dropped, Phase 1 queue full'
             message += self._reading_summary(now)
-            # Heads came back but nothing was read: the reader is stuck, as on 2026-10-17
-            stalled = (
-                self.interval_head_polls > self.interval_empty_head_polls and self.interval_requests == 0
-            )
+            # Nothing read for a whole heartbeat: r/all always has new comments, so the reader is stuck,
+            # as from 2026-10-21, when Reddit's comment IDs stopped being sequential
+            stalled = self.interval_scanned == 0
+            requests = self.interval_requests
             self.interval_scanned = 0
             self.interval_matches = 0
             self.interval_aux = 0
@@ -152,18 +132,13 @@ class StreamMetrics:
             self.interval_requests = 0
             self.interval_request_comments = 0
             self.interval_request_seconds = 0.0
-            self.interval_head_polls = 0
-            self.interval_head_seconds = 0.0
-            self.interval_empty_head_polls = 0
-            self.interval_rejected_heads = 0
-            self.interval_failed_blocks = 0
-            self.interval_skipped_ids = 0
+            self.interval_new_comments = 0
+            self.interval_gaps = 0
             self.last_log_time = now
         logger.info(message)
         if stalled:
-            logger.warning(
-                '[Heartbeat] The newest comment ID was found but no comments were read: the comment reader is stalled'
-            )
+            reason = 'every request returned no new comment' if requests else 'no request was made'
+            logger.warning(f'[Heartbeat] No comments were read ({reason}): the comment reader is stalled')
 
     def _reading_summary(self, now):
         """The heartbeat's second half: how comments were read, and how far behind."""
@@ -176,28 +151,13 @@ class StreamMetrics:
             )
         else:
             parts.append('reads: 0 requests')
-        if self.interval_head_polls:
-            details = []
-            if self.interval_empty_head_polls:
-                details.append(f'{self.interval_empty_head_polls:,} empty')
-            if self.interval_rejected_heads:
-                details.append(f'{self.interval_rejected_heads:,} rejected')
-            empty = f' ({", ".join(details)})' if details else ''
+        if self.interval_requests and (self.interval_new_comments or self.interval_gaps):
             parts.append(
-                f'head: {self.interval_head_polls:,} polls{empty}, '
-                f'{self.interval_head_seconds / self.interval_head_polls:.2f} s/poll'
+                f'{self.interval_new_comments / self.interval_requests:.1f} new/request, '
+                f'gaps: {self.interval_gaps:,} ({100 * self.interval_gaps / self.interval_requests:.0f}%)'
             )
-        behind = []
         if self.newest_created_utc is not None:
-            behind.append(f'{max(0, now - self.newest_created_utc):.0f} s')
-        if self.lag_ids is not None:
-            behind.append(f'{self.lag_ids:,} IDs')
-        if behind:
-            parts.append('behind: ' + ', '.join(behind))
-        if self.interval_failed_blocks:
-            parts.append(f'{self.interval_failed_blocks} ID block(s) failed')
-        if self.interval_skipped_ids:
-            parts.append(f'{self.interval_skipped_ids:,} IDs skipped')
+            parts.append(f'behind: {max(0, now - self.newest_created_utc):.0f} s')
         return ' | ' + ' | '.join(parts)
 
 
@@ -243,7 +203,7 @@ def configure_logging():
 
 
 def init_comment_stream(continue_after_id=None):
-    """Returns PRAW's r/all comment stream (STREAM_SOURCE=listing).
+    """Returns PRAW's r/all comment stream (STREAM_SOURCE=stream).
 
     After a stream error, `continue_after_id` (the newest comment seen, as a fullname) makes the new stream
     start right after it, instead of skipping everything posted during the back-off.
@@ -401,24 +361,19 @@ def run_stream(phase1_workers):
 
     Returns the reader threads it started, so the shutdown can wait for them.
     """
-    if config.stream_source() == 'listing':
+    if config.stream_source() == 'stream':
         run_listing_stream(phase1_workers)
         return []
     reader_count = config.stream_reader_count()
-    reader = CommentReader(
-        lambda comment: dispatch_comment(comment, phase1_workers),
-        reader_count,
-        metrics=metrics,
-        handle_exception=handle_exception,
-    )
-    logger.info(f'Reading every new comment by ID on {reader_count} reader thread(s)')
+    reader = CommentReader(lambda comment: dispatch_comment(comment, phase1_workers), reader_count, metrics=metrics)
+    logger.info(f'Polling the r/all comment listing on {reader_count} reader thread(s)')
     reader.start()
     reader.run()
     return reader.threads
 
 
 def run_listing_stream(phase1_workers):
-    """STREAM_SOURCE=listing: reads PRAW's r/all comment stream, one request at a time."""
+    """STREAM_SOURCE=stream: reads PRAW's r/all comment stream, one request at a time."""
     c_stream = None
     newest_seen = {'fullname': None}
     while not shutdown.stop_requested():
