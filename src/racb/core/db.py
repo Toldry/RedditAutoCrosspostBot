@@ -30,7 +30,7 @@ def _mask_db_url(url_str):
             masked_netloc = parsed.netloc.replace(f':{parsed.password}@', ':***@')
             return parsed._replace(netloc=masked_netloc).geturl()
         return url_str
-    except Exception:
+    except (ImportError, ValueError):
         return '<unparseable db_url>'
 
 
